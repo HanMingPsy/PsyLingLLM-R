@@ -1,0 +1,55 @@
+Role,Typicality,Condition,Sentence
+Pilots,Male,congruent,Pilots were planning the flight. These men were very attentive.
+Pilots,Male,congruent,Pilots were discussing the project. These men were very focused.
+Pilots,Male,congruent,Pilots were training for the mission. These men were very dedicated.
+Pilots,Male,incongruent,Pilots were planning the flight. These women were very attentive.
+Pilots,Male,incongruent,Pilots were discussing the project. These women were very focused.
+Pilots,Male,incongruent,Pilots were training for the mission. These women were very dedicated.
+Pilots,Male,neutral,Pilots were planning the flight. These people were very attentive.
+Pilots,Male,neutral,Pilots were discussing the project. These people were very focused.
+Pilots,Male,neutral,Pilots were training for the mission. These people were very dedicated.
+Engineers,Male,congruent,Engineers were planning the flight. These men were very attentive.
+Engineers,Male,congruent,Engineers were discussing the project. These men were very focused.
+Engineers,Male,congruent,Engineers were training for the mission. These men were very dedicated.
+Engineers,Male,incongruent,Engineers were planning the flight. These women were very attentive.
+Engineers,Male,incongruent,Engineers were discussing the project. These women were very focused.
+Engineers,Male,incongruent,Engineers were training for the mission. These women were very dedicated.
+Engineers,Male,neutral,Engineers were planning the flight. These people were very attentive.
+Engineers,Male,neutral,Engineers were discussing the project. These people were very focused.
+Engineers,Male,neutral,Engineers were training for the mission. These people were very dedicated.
+Astronauts,Male,congruent,Astronauts were planning the flight. These men were very attentive.
+Astronauts,Male,congruent,Astronauts were discussing the project. These men were very focused.
+Astronauts,Male,congruent,Astronauts were training for the mission. These men were very dedicated.
+Astronauts,Male,incongruent,Astronauts were planning the flight. These women were very attentive.
+Astronauts,Male,incongruent,Astronauts were discussing the project. These women were very focused.
+Astronauts,Male,incongruent,Astronauts were training for the mission. These women were very dedicated.
+Astronauts,Male,neutral,Astronauts were planning the flight. These people were very attentive.
+Astronauts,Male,neutral,Astronauts were discussing the project. These people were very focused.
+Astronauts,Male,neutral,Astronauts were training for the mission. These people were very dedicated.
+Nurses,Female,congruent,Nurses were preparing the patients. These women were very careful.
+Nurses,Female,congruent,Nurses were organizing activities. These women were very energetic.
+Nurses,Female,congruent,Nurses were arranging bouquets. These women were very skillful.
+Nurses,Female,incongruent,Nurses were preparing the patients. These men were very careful.
+Nurses,Female,incongruent,Nurses were organizing activities. These men were very energetic.
+Nurses,Female,incongruent,Nurses were arranging bouquets. These men were very skillful.
+Nurses,Female,neutral,Nurses were preparing the patients. These people were very careful.
+Nurses,Female,neutral,Nurses were organizing activities. These people were very energetic.
+Nurses,Female,neutral,Nurses were arranging bouquets. These people were very skillful.
+Kindergarten teachers,Female,congruent,Kindergarten teachers were preparing the patients. These women were very careful.
+Kindergarten teachers,Female,congruent,Kindergarten teachers were organizing activities. These women were very energetic.
+Kindergarten teachers,Female,congruent,Kindergarten teachers were arranging bouquets. These women were very skillful.
+Kindergarten teachers,Female,incongruent,Kindergarten teachers were preparing the patients. These men were very careful.
+Kindergarten teachers,Female,incongruent,Kindergarten teachers were organizing activities. These men were very energetic.
+Kindergarten teachers,Female,incongruent,Kindergarten teachers were arranging bouquets. These men were very skillful.
+Kindergarten teachers,Female,neutral,Kindergarten teachers were preparing the patients. These people were very careful.
+Kindergarten teachers,Female,neutral,Kindergarten teachers were organizing activities. These people were very energetic.
+Kindergarten teachers,Female,neutral,Kindergarten teachers were arranging bouquets. These people were very skillful.
+Florists,Female,congruent,Florists were preparing the patients. These women were very careful.
+Florists,Female,congruent,Florists were organizing activities. These women were very energetic.
+Florists,Female,congruent,Florists were arranging bouquets. These women were very skillful.
+Florists,Female,incongruent,Florists were preparing the patients. These men were very careful.
+Florists,Female,incongruent,Florists were organizing activities. These men were very energetic.
+Florists,Female,incongruent,Florists were arranging bouquets. These men were very skillful.
+Florists,Female,neutral,Florists were preparing the patients. These people were very careful.
+Florists,Female,neutral,Florists were organizing activities. These people were very energetic.
+Florists,Female,neutral,Florists were arranging bouquets. These people were very skillful.
