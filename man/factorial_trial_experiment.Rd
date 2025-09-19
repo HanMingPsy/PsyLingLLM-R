@@ -61,7 +61,7 @@ factorial_trial_experiment(
 }
 \value{
 data.frame with columns:
-`Run`, `Item`, `Material`, factor columns, `Word`, `Carrier_Sentence`,
+`Run`, `Item`, `Material`, factor columns, `Word`, `Stimulus`,
 `TrialPrompt`, `Response`, `Think`, `ModelName`, `ResponseTime`.
 }
 \description{

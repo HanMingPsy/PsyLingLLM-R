@@ -22,13 +22,15 @@ generate_llm_experiment_list(
 
 \item{random}{Logical, whether to randomize trial order.}
 
-\item{force_base_cols}{Logical, whether to force `Run`/`Item` to appear first.}
+\item{force_base_cols}{Logical, whether to force `Run` and `Item` to appear first.}
 
-\item{save_path}{Optional character, path to save the processed CSV/XLSX.}
+\item{save_path}{Optional path to save the processed CSV/XLSX file.}
 }
 \value{
 A data.frame containing `Run`, `Item`, `Material`, optional metadata, and `TrialPrompt`.
 }
 \description{
-CSV 文件会被临时转为 XLSX 再读取，以避免编码问题。
+Create an experiment trial table from a CSV/XLSX file or a data.frame.
+CSV files are temporarily converted to XLSX to prevent encoding issues.
+UTF-8 compatibility is ensured, and 'Item' and 'Run' are automatically generated if missing.
 }

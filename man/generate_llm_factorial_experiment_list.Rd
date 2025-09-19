@@ -2,7 +2,7 @@
 % Please edit documentation in R/generate_factorial_experiment_list.R
 \name{generate_llm_factorial_experiment_list}
 \alias{generate_llm_factorial_experiment_list}
-\title{Generate LLM Experiment List for Factorial Design}
+\title{Generate LLM Experiment List for Factorial Design (UTF-8 safe)}
 \usage{
 generate_llm_factorial_experiment_list(
   data,
@@ -11,7 +11,8 @@ generate_llm_factorial_experiment_list(
   trial_prompt = "",
   repeats = 1,
   random = FALSE,
-  force_base_cols = TRUE
+  force_base_cols = TRUE,
+  save_path = NULL
 )
 }
 \arguments{
@@ -27,21 +28,15 @@ generate_llm_factorial_experiment_list(
 
 \item{random}{Logical, whether to randomize trial order.}
 
-\item{force_base_cols}{Logical, whether to force Run/Item to appear first.}
+\item{force_base_cols}{Logical, whether to force `Run`/`Item` to appear first.}
+
+\item{save_path}{Optional character, path to save the processed CSV/XLSX.}
 }
 \value{
 A long-format data.frame with `Run`, `Item`, `Material`, `Word`, factor columns, `TrialPrompt`.
 }
 \description{
-Create an experiment trial table from carrier sentences and a CW (critical word) wide table.
-Automatically expands multi-factor combinations and repeats, optionally randomizes order.
-Input can be a CSV/XLSX path or a data.frame.
-}
-\examples{
-data <- data.frame(Item = 1:2, Material = c("Sentence A", "Sentence B"))
-factors <- list(Congruity = c("Congruent", "Incongruent"))
-CW <- data.frame(Item = 1:2,
-                 Congruent = c("dog", "cat"),
-                 Incongruent = c("car", "chair"))
-generate_llm_factorial_experiment_list(data, factors, CW, trial_prompt = "Read carefully.")
+This function reads carrier sentences from a CSV/XLSX file or a data.frame,
+optionally expands a CW (critical word) wide table into long format, applies factors,
+repeats, randomizes order, and ensures UTF-8 safe text.
 }

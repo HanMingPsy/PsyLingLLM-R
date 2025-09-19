@@ -133,16 +133,6 @@ conversation_experiment <- function(
   cat("\n", data$ModelName[1], "completed! Total elapsed:",
       round(as.numeric(difftime(Sys.time(), start_time, units="secs")), 1), "secs\n")
 
-  # # Ensure character columns
-  # char_cols <- c(run_col, item_col, cond_cols,
-  #                "TrialPrompt", "Material", "Response", "Think",
-  #                "ConversationHistory", "ModelName")
-  # char_cols <- char_cols[!is.null(char_cols)]
-  # for (col in char_cols) {
-  #   if (col %in% colnames(data)) data[[col]] <- as.character(data[[col]])
-  # }
-
-  # --- 保存结果（调用外部函数） ---
   save_experiment_results(data, output_path, enable_thinking)
 
   return(data)

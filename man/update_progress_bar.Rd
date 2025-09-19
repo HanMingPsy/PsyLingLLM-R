@@ -2,7 +2,7 @@
 % Please edit documentation in R/progress_bar.R
 \name{update_progress_bar}
 \alias{update_progress_bar}
-\title{Update progress bar for experiment}
+\title{Update progress bar for an experiment}
 \usage{
 update_progress_bar(
   current,
@@ -13,19 +13,19 @@ update_progress_bar(
 )
 }
 \arguments{
-\item{current}{当前完成的试次数}
+\item{current}{Number of trials completed so far}
 
-\item{total}{总试次数}
+\item{total}{Total number of trials}
 
-\item{start_time}{实验开始时间}
+\item{start_time}{Experiment start time}
 
-\item{bar_width}{进度条宽度}
+\item{bar_width}{Width of the progress bar (default 40)}
 
-\item{model_name}{模型名，用于显示}
+\item{model_name}{Name of the model, for display purposes}
 }
 \value{
-NULL (直接在控制台打印进度条)
+NULL (prints the progress bar directly to the console)
 }
 \description{
-Update progress bar for experiment
+Update progress bar for an experiment
 }

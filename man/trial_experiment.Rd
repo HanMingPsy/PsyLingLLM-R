@@ -7,7 +7,7 @@
 trial_experiment(
   data,
   repeats = 1,
-  random = TRUE,
+  random = FALSE,
   api_key,
   model,
   api_url,

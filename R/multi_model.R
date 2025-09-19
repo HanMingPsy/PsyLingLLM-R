@@ -160,7 +160,9 @@ multi_model_experiment <- function(data,
     # Save per-model result
     if (!is.null(res) && is.data.frame(res)) {
       tryCatch({
-        write.csv(res, file = model_path, row.names = FALSE, fileEncoding = file_enc, quote = TRUE)
+        # write.csv(res, file = model_path, row.names = FALSE, fileEncoding = file_enc, quote = TRUE)
+
+        suppressMessages(save_experiment_results(res, model_path, enable_thinking, has_FAST = TRUE))
         message("Saved per-model results: ", model_path)
       }, error = function(e) {
         warning(sprintf("Failed to save results for '%s': %s", model_file_name, e$message))

@@ -4,7 +4,12 @@
 \alias{save_experiment_results}
 \title{Save Experiment Results to File}
 \usage{
-save_experiment_results(data, output_path, enable_thinking = TRUE)
+save_experiment_results(
+  data,
+  output_path,
+  enable_thinking = TRUE,
+  has_FAST = FALSE
+)
 }
 \arguments{
 \item{data}{data.frame Result dataset.}

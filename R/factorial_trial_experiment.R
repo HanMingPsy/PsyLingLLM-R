@@ -23,7 +23,7 @@
 #' @param output_path string, file path to save experiment results.
 #'
 #' @return data.frame with columns:
-#' `Run`, `Item`, `Material`, factor columns, `Word`, `Carrier_Sentence`,
+#' `Run`, `Item`, `Material`, factor columns, `Word`, `Stimulus`,
 #' `TrialPrompt`, `Response`, `Think`, `ModelName`, `ResponseTime`.
 #' @export
 #'
@@ -80,7 +80,7 @@ factorial_trial_experiment <- function(
   # --------------------------
   # 2. Fill carrier sentence with CW word
   # --------------------------
-  data$Carrier_Sentence <- vapply(seq_len(nrow(data)), function(i) {
+  data$Stimulus <- vapply(seq_len(nrow(data)), function(i) {
     cond <- as.character(data[i, factor_names])
     carrier <- as.character(data$Material[i])
     word <- if ("Word" %in% colnames(data)) as.character(data$Word[i]) else NULL
@@ -99,11 +99,6 @@ factorial_trial_experiment <- function(
       trial_prompt(data[i, , drop = FALSE])
     }, FUN.VALUE = character(1))
 
-  } else if (is.character(trial_prompt) && nzchar(trial_prompt)) {
-    if ("TrialPrompt" %in% colnames(data) && any(nzchar(data$TrialPrompt))) {
-      warning("Conflicting TrialPrompt detected. Overwriting with trial_prompt string.")
-    }
-    data$TrialPrompt <- paste0(trial_prompt, "\n")
   }
 
   # --------------------------
@@ -131,7 +126,7 @@ factorial_trial_experiment <- function(
         llm_caller(
           model = model,
           trial_prompt = data$TrialPrompt[i],
-          material = data$Carrier_Sentence[i],
+          material = data$Stimulus[i],
           api_key = api_key,
           api_url = api_url,
           custom = role_mapping,

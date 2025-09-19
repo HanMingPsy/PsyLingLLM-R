@@ -81,7 +81,19 @@ generate_llm_factorial_experiment_list <- function(data,
     }
     df <- long_data
   } else {
+    if (is.null(colnames(df)) || any(grepl("^X\\d+$", colnames(df))) || any(colnames(df) == "")) {
+      warning("[PsyLingLLM] Input appears to have no proper headers. Using first column as 'Material', ignoring other unnamed columns.")
+      colnames(df)[1] <- "Material"
+      unnamed_cols <- which(grepl("^X\\d+$", colnames(df)) | colnames(df) == "")
+      if (length(unnamed_cols) > 1) df <- df[, c(1, setdiff(seq_along(df), unnamed_cols[-1])), drop = FALSE]
+    }
     if (!"Item" %in% colnames(df)) df$Item <- seq_len(nrow(df))
+
+    # xpand factors
+    if (!is.null(factors) && length(factors) > 0) {
+      design <- expand.grid(factors, stringsAsFactors = FALSE)
+      df <- merge(df, design, by = NULL)
+    }
   }
 
   # --------------------------
@@ -115,8 +127,10 @@ generate_llm_factorial_experiment_list <- function(data,
     ext <- tolower(tools::file_ext(save_path))
     if (ext %in% c("csv")) readr::write_excel_csv(df, save_path)
     else if (ext %in% c("xls","xlsx")) openxlsx::write.xlsx(df, save_path)
-    else warning("Unsupported save format; defaulting to CSV.") |> {readr::write_excel_csv(df, paste0(save_path,".csv"))}
-    message("Experiment file saved to: ", save_path)
+    else {
+      warning("Unsupported save format; defaulting to CSV.")
+      readr::write_excel_csv(df, paste0(save_path, ".csv"))
+    }
   }
 
   return(df)

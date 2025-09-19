@@ -10,7 +10,7 @@
 #'
 #' @return NULL (the file is written to disk).
 #' @export
-save_experiment_results <- function(data, output_path, enable_thinking = TRUE) {
+save_experiment_results <- function(data, output_path, enable_thinking = TRUE, has_FAST = FALSE) {
   sys_name <- Sys.info()[["sysname"]]
 
   # If no directory is present in output_path, save to ~/Documents
@@ -33,6 +33,7 @@ save_experiment_results <- function(data, output_path, enable_thinking = TRUE) {
     file_enc <- ifelse(sys_name == "Windows", "GB18030", "UTF-8")
     tryCatch(
       {
+        if(has_FAST){
         write.csv(
           data,
           file = output_path_mod,
@@ -40,7 +41,17 @@ save_experiment_results <- function(data, output_path, enable_thinking = TRUE) {
           fileEncoding = file_enc,
           quote = TRUE
         )
-        message("Experiment results successfully saved as CSV: ", output_path_mod)
+        message("Experiment results successfully saved as CSV: ", output_path_mod)}
+        else{
+          write.csv(
+            data,
+            file = output_path,
+            row.names = FALSE,
+            fileEncoding = file_enc,
+            quote = TRUE
+          )
+          message("Experiment results successfully saved as CSV: ", output_path)
+        }
       },
       error = function(e) warning("Failed to save CSV: ", e$message)
     )
@@ -51,8 +62,12 @@ save_experiment_results <- function(data, output_path, enable_thinking = TRUE) {
     }
     tryCatch(
       {
-        writexl::write_xlsx(data, path = output_path_mod)
-        message("Experiment results successfully saved as Excel: ", output_path_mod)
+        if(has_FAST){
+          writexl::write_xlsx(data, path = output_path_mod)
+          message("Experiment results successfully saved as Excel: ", output_path_mod)}
+        else{
+          writexl::write_xlsx(data, path = output_path)
+          message("Experiment results successfully saved as Excel: ", output_path)}
       },
       error = function(e) warning("Failed to save Excel: ", e$message)
     )

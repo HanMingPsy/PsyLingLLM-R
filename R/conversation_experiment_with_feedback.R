@@ -165,7 +165,7 @@ conversation_experiment_with_feedback <- function(
     i <- i + 1
   }
 
-  cat("\nExperiment finished.\n")
+  # cat("\nExperiment finished.\n")
   out_df <- dplyr::bind_rows(results)
 
   if (apply_mode == "insert_dynamic"){

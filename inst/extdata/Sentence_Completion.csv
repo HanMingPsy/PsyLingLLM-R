@@ -1,0 +1,5 @@
+﻿Item,Condition_Constraint,Condition_Language,Material
+1,HighConstraint,English,John went to the bakery to buy a _____.
+2,HighConstraint,Chinese,小军去面包店买了一个_____。
+3,LowConstraint,English,Mary looked out the window and saw a _____.
+4,LowConstraint,Chinese,小丽望向窗外，看见了一个_____。

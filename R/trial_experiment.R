@@ -28,7 +28,7 @@
 trial_experiment <- function(
     data,
     repeats = 1,
-    random = TRUE,
+    random = FALSE,
     api_key,
     model,
     api_url,
@@ -87,7 +87,7 @@ trial_experiment <- function(
       t_end <- Sys.time()
       if (!inherits(parsed_resp, "error") || !grepl("429", parsed_resp$message)) break
       if (attempt > max_retry) stop("Repeatedly failed due to 429 Too Many Requests")
-      Sys.sleep(delay * 2 ^ attempt)  # 重试等待，不计入 RT
+      Sys.sleep(delay * 2 ^ attempt)  # RT not included
       attempt <- attempt + 1
     }
 
@@ -95,9 +95,9 @@ trial_experiment <- function(
     data$Response[i] <- parsed_resp$response
     data$Think[i] <- parsed_resp$think
 
-    Sys.sleep(delay)  # 延迟，不计入 RT
+    Sys.sleep(delay)  # RT not included
 
-    # --- 使用统一的进度条函数 ---
+
     update_progress_bar(i, n_trials, start_time, bar_width, data$ModelName[i])
   }
 
@@ -105,7 +105,7 @@ trial_experiment <- function(
   cat("\n", data$ModelName[1], "completed! Total elapsed: ", round(total_elapsed, 1), " secs\n")
 
 
-  # --- 使用统一的保存函数 ---
+
   save_experiment_results(data, output_path, enable_thinking)
 
   return(data)

@@ -57,8 +57,18 @@ generate_llm_experiment_list <- function(data,
   # --------------------------
   # 2. Ensure 'Item' column
   # --------------------------
-  if (!("Item" %in% colnames(df))) df$Item <- seq_len(nrow(df))
 
+  if (is.null(colnames(df)) || any(grepl("^X\\d+$", colnames(df))) || any(colnames(df) == "")) {
+    warning("[PsyLingLLM] Input appears to have no proper headers. Using first column as 'Material', ignoring other unnamed columns.")
+
+    # Rename first column as Material
+    colnames(df)[1] <- "Material"
+
+    # Drop all other unnamed columns
+    unnamed_cols <- which(grepl("^X\\d+$", colnames(df)) | colnames(df) == "")
+    if (length(unnamed_cols) > 1) df <- df[, c(1, setdiff(seq_along(df), unnamed_cols[-1])), drop = FALSE]
+  }
+  if (!("Item" %in% colnames(df))) df$Item <- seq_len(nrow(df))
   # --------------------------
   # 3. Apply global TrialPrompt
   # --------------------------

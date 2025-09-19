@@ -1,0 +1,7 @@
+Item,Condition,Material,TrialPrompt,Target
+1,GardenPath,The old man the boats.,Read the following sentence and judge whether it is easy to understand (Yes / No),No
+2,GardenPath,The horse raced past the barn fell.,Read the following sentence and judge whether it is easy to understand (Yes / No),No
+3,GardenPath,Fat people eat accumulates.,Read the following sentence and judge whether it is easy to understand (Yes / No),No
+4,GardenPath,The man whistling tunes pianos.,Read the following sentence and judge whether it is easy to understand (Yes / No),No
+5,Control,Birds are singing in the garden.,Read the following sentence and judge whether it is easy to understand (Yes / No),Yes
+6,Control,The children played football after school.,Read the following sentence and judge whether it is easy to understand (Yes / No),Yes
