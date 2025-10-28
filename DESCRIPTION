@@ -3,7 +3,7 @@ Type: Package
 Title: Tools for Psycholinguistic Experiments with Large Language Models
 Version: 0.3.0
 Author: Han Ming
-Maintainer: Han Ming <hanjldx123@Gmail.com>
+Maintainer: Han Ming <hanmingpsy@gmail.com>
 Description: A toolkit to design, run, and analyze psycholinguistic, psychological, and educational experiments with large language models in R.
 Depends: R (>= 4.0)
 Imports:
