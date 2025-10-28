@@ -1,17 +1,28 @@
 Package: PsyLingLLM
 Type: Package
 Title: Tools for Psycholinguistic Experiments with Large Language Models
-Version: 0.1.0
+Version: 0.3.0
 Author: Han Ming
 Maintainer: Han Ming <hanjldx123@Gmail.com>
 Description: A toolkit to design, run, and analyze psycholinguistic, psychological, and educational experiments with large language models in R.
 Depends: R (>= 4.0)
 Imports:
-    httr2,
-    dplyr,
+    curl,
+    writexl,
+    dplyr (>= 1.1.0),
+    tibble (>= 3.2.0),
+    jsonlite (>= 1.8.0),
+    magrittr,
+    yaml,
+    readr,
     readxl,
-    writexl
-License: MIT
+    openxlsx,
+    stringr,
+    stats,
+    utils,
+    stringi
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.2
+

@@ -5,13 +5,17 @@
 #' @param start_time Experiment start time
 #' @param bar_width Width of the progress bar (default 40)
 #' @param model_name Name of the model, for display purposes
+#'
+#' @importFrom utils flush.console
+#'
 #' @return NULL (prints the progress bar directly to the console)
 #' @export
 update_progress_bar <- function(current, total, start_time, bar_width = 40, model_name = "") {
   pct <- current / total
   n_filled <- round(pct * bar_width)
   n_empty <- bar_width - n_filled
-  bar <- paste0(strrep("█", n_filled), strrep("░", n_empty))
+  # bar <- paste0(strrep("█", n_filled), strrep("░", n_empty))
+  bar <- paste0(strrep("\u2588", n_filled), strrep("\u2591", n_empty))
 
   elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
   avg_time <- elapsed / max(current, 1)   # Avoid division by zero

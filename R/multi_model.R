@@ -1,188 +1,225 @@
-#' Run Multi-Model LLM Experiment
+#' Run Trials Across Multiple Models (registry-driven, assistant-native)
 #'
-#' Executes the same trial set across multiple models, calling a user-specified
-#' experiment function (`experiment_fn`). Arguments not supported by the
-#' experiment function are ignored with a warning.
+#' Executes the same trial table on multiple models. Each row of `models`
+#' describes one model configuration. For each row, this function delegates to
+#' \code{trial_experiment()} with the appropriate arguments and then row-binds
+#' the results into a single data frame.
 #'
-#' @param data data.frame Experiment material table (e.g., output of
-#'   \code{generate_llm_experiment_list}).
-#' @param model_file Path to CSV or Excel file containing model info.
-#'   Must have columns: \code{ModelName}, \code{API_Key}, \code{API_URL},
-#'   \code{Enable_Thinking}.
-#' @param experiment_fn Function to run for each model
-#'   (e.g., \code{trial_experiment}, \code{conversation_experiment}).
-#' @param output_path Directory to save results. If missing, defaults to
-#'   \code{~/PsyLingLLM_Results/MultiModel_Experiment_<timestamp>}.
-#' @param max_tokens Integer. Maximum tokens per trial.
-#' @param temperature Numeric. Sampling temperature.
-#' @param random Logical. Whether to randomize trial order.
-#' @param return_combined Logical. If TRUE, return combined results.
-#' @param ... Additional arguments passed to \code{experiment_fn}.
-#'   Unsupported arguments will trigger a warning and be ignored.
+#' ## `models` table
+#' Required column:
+#' - `model_key` (character): registry key, e.g. "deepseek-chat" or "deepseek-chat@proxy".
 #'
-#' @return If \code{return_combined = TRUE}, returns combined data.frame
-#'   across models. Otherwise returns \code{NULL} invisibly.
+#' Optional columns (all per-model; if absent, corresponding top-level args are used):
+#' - `generation_interface` (character, default "chat")
+#' - `api_key` (character)
+#' - `api_url` (character; required for non-official providers or to override official)
+#' - `stream` (logical or NA; `NA`/missing means follow registry default)
+#' - `system_content` (character or NA)
+#' - `assistant_content` (character vector or list-of-message objects; may be JSON string)
+#' - `optionals` (list column or JSON string; tri-state honored if column missing)
+#' - `role_mapping` (list column or JSON string; only passed if provided)
+#' - `output_path` (character; per-model output path for \code{trial_experiment()})
+#'
+#' Any JSON-like character column (e.g., `optionals`, `role_mapping`, `assistant_content`)
+#' will be JSON-decoded if it validates as JSON; otherwise passed through as-is.
+#'
+#' ## Optionals tri-state
+#' - If `models$optionals` exists for that row → pass it to downstream (user keys only).
+#' - Else if top-level `optionals` is missing → do **not** pass the param (use registry defaults).
+#' - Else if top-level `optionals` is provided (NULL or list) → pass that top-level value.
+#'
+#' ## Errors & timeouts
+#' - Each model is run independently. Errors/timeouts inside \code{trial_experiment()}
+#'   are recorded per-trial; the multi-model loop continues.
+#'
+#' @param models data.frame/tibble describing models; see "models table".
+#' @param data Trial table for \code{trial_experiment()} (must contain `Material`; `TrialPrompt` optional).
+#' @param trial_prompt Optional character(1). Global trial prefix; row `TrialPrompt` (if any) overrides.
+#' @param repeats Integer(1). Number of repetitions per trial for every model.
+#' @param random Logical(1). Randomize trial order for every model.
+#' @param delay Numeric(1). Delay (seconds) between trials for every model.
+#' @param timeout Integer(1). Per-request timeout in seconds.
+#' @param overwrite Logical(1). Overwrite per-model outputs.
+#' @param return_raw Logical(1). Include raw request/response in per-call results.
+#' @param system_content Optional character(1). Fallback system message if model row lacks one.
+#' @param assistant_content Optional static few-shot seed: character vector or a list of message objects
+#'   (`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.
+#' @param role_mapping Optional mapping of roles if model row lacks one.
+#' @param optionals Optional named list (or NULL) if model row lacks `optionals`.
+#'        *Omitting this argument* preserves the tri-state (registry defaults).
+#' @param stream Logical(1) or NULL. Default streaming policy if model row lacks `stream`.
+#' @param output_dir Optional character(1). If given, used as a base directory for per-model outputs
+#'        when the model row doesn't provide `output_path`.
+#' @param combined_output_path Optional character(1). If provided, write the combined results CSV here.
+#'
+#' @return A data.frame/tibble concatenating all per-model results. Each chunk retains the
+#'         standard PsyLingLLM schema columns and is annotated with `ModelKey` (alias of ModelName).
 #' @export
-multi_model_experiment <- function(data,
-                                   model_file,
-                                   experiment_fn = trial_experiment,
-                                   output_path,
-                                   max_tokens = 1024,
-                                   temperature = 0.7,
-                                   random = FALSE,
-                                   return_combined = FALSE,
-                                   ...) {
-  # --------------------------
-  # Handle output paths with timestamp
-  # --------------------------
-  timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+multi_model_experiment <- function(
+    models,
+    data,
+    trial_prompt = NULL,
+    repeats = 1,
+    random = FALSE,
+    delay = 0,
+    timeout = getOption("psylingllm.llm_timeout_sec", 120L),
+    overwrite = TRUE,
+    return_raw = FALSE,
+    system_content = NULL,
+    assistant_content,
+    role_mapping,
+    optionals = NULL,
+    stream = NULL,
+    output_dir = NULL,
+    combined_output_path = NULL
+) {
+  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+  nz_chr <- function(x) is.character(x) && length(x) == 1 && nzchar(x)
 
-  if (missing(output_path) || output_path %in% c(".", "")) {
-    base_dir <- path.expand("~/PsyLingLLM_Results")
-    if (!dir.exists(base_dir)) dir.create(base_dir, recursive = TRUE)
-    output_path <- file.path(base_dir, paste0("MultiModel_", timestamp))
-  }
-  if (!dir.exists(output_path)) dir.create(output_path, recursive = TRUE)
-
-  model_dir <- file.path(output_path, "Per_Model_Results")
-  if (!dir.exists(model_dir)) dir.create(model_dir, recursive = TRUE)
-
-  # --------------------------
-  # Load model info
-  # --------------------------
-  ext <- tolower(tools::file_ext(model_file))
-  if (ext == "csv") {
-    model_df <- read.csv(model_file, stringsAsFactors = FALSE)
-  } else if (ext %in% c("xls", "xlsx")) {
-    if (!requireNamespace("readxl", quietly = TRUE)) stop("Package 'readxl' required")
-    model_df <- readxl::read_excel(model_file)
-    model_df <- as.data.frame(model_df, stringsAsFactors = FALSE)
-  } else {
-    stop("Unsupported model file type: must be .csv, .xls or .xlsx")
-  }
-
-  required_cols <- c("ModelName", "API_Key", "API_URL", "Enable_Thinking")
-  missing_cols <- setdiff(required_cols, colnames(model_df))
-  if (length(missing_cols) > 0) stop("Model file missing required columns: ", paste(missing_cols, collapse = ", "))
-
-  # --------------------------
-  # Prepare experiment function
-  # --------------------------
-  exp_fn <- match.fun(experiment_fn)
-  exp_name <- if (is.character(experiment_fn)) experiment_fn else deparse(substitute(experiment_fn))
-  fn_formals <- names(formals(exp_fn))
-  has_dots <- "..." %in% fn_formals
-  dots_list <- list(...)
-
-  # Explicitly named user arguments (dots)
-  # 1. 获取 experiment_fn 的参数
-  fn_formals <- names(formals(exp_fn))
-  has_dots <- "..." %in% fn_formals
-
-  # 2. 检查 dots 中的用户传入参数
-  dots_list <- list(...)
-  dot_names <- names(dots_list)
-  if (is.null(dot_names)) dot_names <- rep("", length(dots_list))
-  explicit_named_dots <- unique(dot_names[dot_names != ""])
-
-  # 3. 只检查 experiment_fn 不支持的参数
-  if (!has_dots && length(explicit_named_dots) > 0) {
-    unsupported <- setdiff(explicit_named_dots, fn_formals)
-    if (length(unsupported) > 0) {
-      warning(sprintf(
-        "Experiment function '%s' does not accept these arguments: %s. Ignored.",
-        exp_name, paste(unsupported, collapse = ", ")
-      ))
+  # helpers ------------------------------------------------------------
+  try_json <- function(x) {
+    if (is.null(x)) return(NULL)
+    if (is.list(x)) return(x)
+    if (is.character(x) && length(x) == 1 && nzchar(x)) {
+      if (inherits(try(jsonlite::fromJSON(x, simplifyVector = TRUE), silent = TRUE), "try-error")) return(x)
+      return(jsonlite::fromJSON(x, simplifyVector = TRUE))
     }
+    x
+  }
+  has_col <- function(df, nm) nm %in% names(df)
+
+  if (!has_col(models, "model_key")) {
+    stop("`models` must contain column `model_key`.")
   }
 
-  # --------------------------
-  # Determine file encoding for CSV
-  # --------------------------
-  sys_name <- Sys.info()[["sysname"]]
-  file_enc <- ifelse(sys_name == "Windows", "GB18030", "UTF-8")
-
+  # iterate rows -------------------------------------------------------
   all_results <- list()
 
-  # --------------------------
-  # Loop over models
-  # --------------------------
-  for (m in seq_len(nrow(model_df))) {
-    # --------------------------
-    # Prepare model info and file paths
-    # --------------------------
-    model_info <- model_df[m, , drop = FALSE]
+  for (i in seq_len(nrow(models))) {
+    row <- models[i, , drop = FALSE]
+    mk   <- as.character(row$model_key)
 
-    # 原始模型名
-    model_file_name_orig <- as.character(model_info$ModelName)
+    gi   <- if (has_col(row, "generation_interface") && nz_chr(row$generation_interface)) {
+      as.character(row$generation_interface)
+    } else "chat"
 
-    # 标准化文件名/日志名
-    model_file_name <- gsub("[^A-Za-z0-9_-]", "_", model_file_name_orig)
+    # per-model keys/URL/flags
+    api_key_i <- if (has_col(row, "api_key") && nz_chr(row$api_key)) as.character(row$api_key) else NULL
+    api_url_i <- if (has_col(row, "api_url") && nz_chr(row$api_url)) as.character(row$api_url) else NULL
 
-    # 判断是否启用思考模式，不启用则加 _FAST
-    enable_thinking <- as.logical(model_info$Enable_Thinking)
-    if (!enable_thinking) model_file_name <- paste0(model_file_name, "_FAST")
+    stream_i <- if (has_col(row, "stream")) {
+      v <- row$stream[[1]]
+      if (is.null(v) || (is.logical(v) && any(is.na(v)))) NULL else isTRUE(v)
+    } else stream  # NULL/TRUE/FALSE (tri-state propagated)
 
-    # 输出文件路径
-    model_path <- file.path(model_dir, paste0(model_file_name, ".csv"))
+    # per-model role/system/assistant/optionals/mapping
+    sys_i <- if (has_col(row, "system_content") && nz_chr(row$system_content)) as.character(row$system_content) else system_content
 
-    # GitHub风格日志
-    message("[PsyLingLLM] Running trials for model: ", model_file_name)
+    # assistant_content: allow list-of-messages / character vector / JSON
+    asst_i <- if (has_col(row, "assistant_content")) try_json(row$assistant_content[[1]]) else
+      if (!missing(assistant_content)) assistant_content else NULL
 
-    # --------------------------
-    # Prepare arguments for experiment function
-    # --------------------------
-    base_args <- list(
-      data = data,
-      api_key = model_info$API_Key,
-      model = model_file_name_orig,
-      api_url = model_info$API_URL,
-      enable_thinking = enable_thinking,
-      max_tokens = max_tokens,
-      temperature = temperature,
-      random = random,
-      output_path = model_path
-    )
+    # role_mapping: allow list or JSON; only pass if provided (no forcing)
+    rolemap_i <- if (has_col(row, "role_mapping")) try_json(row$role_mapping[[1]]) else
+      if (!missing(role_mapping)) role_mapping else NULL
 
-    # Merge with dots
-    args_candidates <- modifyList(base_args, dots_list)
-    if (!has_dots) args_candidates <- args_candidates[names(args_candidates) %in% fn_formals]
-
-    # Call experiment function safely
-    res <- tryCatch({
-      suppressMessages(
-      do.call(exp_fn, args_candidates))
-    }, error = function(e) {
-      warning(sprintf("Model '%s' failed: %s", model_file_name, e$message))
-      NULL
-    })
-
-    # Save per-model result
-    if (!is.null(res) && is.data.frame(res)) {
-      tryCatch({
-        # write.csv(res, file = model_path, row.names = FALSE, fileEncoding = file_enc, quote = TRUE)
-
-        suppressMessages(save_experiment_results(res, model_path, enable_thinking, has_FAST = TRUE))
-        message("Saved per-model results: ", model_path)
-      }, error = function(e) {
-        warning(sprintf("Failed to save results for '%s': %s", model_file_name, e$message))
-      })
+    # optionals tri-state:
+    # - if column exists AND value is non-NA/non-empty -> pass that
+    # - else if top-level missing(...) -> DO NOT pass (preserve registry defaults)
+    # - else pass top-level (NULL or list)
+    pass_optionals <- FALSE
+    optionals_i <- NULL
+    is_naish <- function(v) {
+      if (is.null(v)) return(TRUE)
+      if (length(v) == 0) return(TRUE)
+      if (is.atomic(v) && length(v) == 1 && is.na(v)) return(TRUE)
+      if (is.character(v) && length(v) == 1) {
+        s <- trimws(v)
+        return(identical(s, "") || identical(tolower(s), "null"))
+      }
+      FALSE
+    }
+    if (has_col(row, "optionals")) {
+      val <- row$optionals[[1]]
+      if (!is_naish(val)) {
+        optionals_i <- try_json(val)
+        pass_optionals <- TRUE
+      }
+    } else if (!missing(optionals)) {
+      optionals_i <- optionals
+      pass_optionals <- TRUE
     }
 
-    all_results[[m]] <- res
+
+    # output path
+    out_path_i <- if (has_col(row, "output_path") && nz_chr(row$output_path)) {
+      as.character(row$output_path)
+    } else output_dir %||% NULL
+
+    # run one model via trial_experiment --------------------------------
+    call_args <- list(
+      model_key = mk,
+      generation_interface = gi,
+      api_key = api_key_i,
+      api_url = api_url_i,
+      data = data,
+      trial_prompt = trial_prompt,
+      system_content = sys_i,
+      assistant_content = asst_i,
+      role_mapping = rolemap_i,
+      stream = stream_i,
+      timeout = timeout,
+      repeats = repeats,
+      random = random,
+      delay = delay,
+      output_path = out_path_i,
+      overwrite = overwrite,
+      return_raw = return_raw
+    )
+    # preserve optionals tri-state by adding argument only when decided above
+    if (isTRUE(pass_optionals)) call_args$optionals <- optionals_i
+
+    res <- tryCatch(
+      do.call(trial_experiment, call_args),
+      error = function(e) {
+        warning(sprintf("[multi_model_experiment] model '%s' failed: %s", mk, e$message))
+        # return empty df with schema-compatible columns
+        data.frame(
+          Response = character(), Think = character(), ModelName = character(),
+          TotalResponseTime = numeric(), FirstTokenLatency = numeric(),
+          PromptTokens = integer(), CompletionTokens = integer(),
+          TrialStatus = character(), Streaming = logical(),
+          Timestamp = character(), RequestID = character(),
+          stringsAsFactors = FALSE
+        )
+      }
+    )
+
+    # annotate & collect
+    if (nrow(res)) {
+      if (!"ModelKey" %in% names(res)) res$ModelKey <- res$ModelName
+      all_results[[length(all_results) + 1]] <- res
+    }
   }
 
-  # --------------------------
-  # Merge non-null results
-  # --------------------------
-  non_null <- Filter(function(x) !is.null(x) && is.data.frame(x), all_results)
-  combined <- if (length(non_null) > 0) do.call(rbind, non_null) else data.frame()
+  combined <- if (length(all_results)) dplyr::bind_rows(all_results) else
+    data.frame(
+      Response = character(), Think = character(), ModelName = character(),
+      TotalResponseTime = numeric(), FirstTokenLatency = numeric(),
+      PromptTokens = integer(), CompletionTokens = integer(),
+      TrialStatus = character(), Streaming = logical(),
+      Timestamp = character(), RequestID = character(),
+      ModelKey = character(),
+      stringsAsFactors = FALSE
+    )
 
-  combined_path <- file.path(output_path, paste0("MultiModel_Results", ".csv"))
-  tryCatch({
-    write.csv(combined, file = combined_path, row.names = FALSE, fileEncoding = file_enc, quote = TRUE)
-    message("\n[PsyLingLLM] All model results successfully saved to: ", combined_path)
-  }, error = function(e) warning("Failed to save combined CSV: ", e$message))
+  # optional combined CSV -----------------------------------------------------
+  if (nz_chr(combined_output_path)) {
+    try({
+      readr::write_csv(combined, combined_output_path)
+      message("[PsyLingLLM] Combined results saved: ", combined_output_path)
+    }, silent = TRUE)
+  }
 
-  if (isTRUE(return_combined)) return(combined) else invisible(NULL)
+  combined
 }

@@ -2,82 +2,124 @@
 % Please edit documentation in R/factorial_trial_experiment.R
 \name{factorial_trial_experiment}
 \alias{factorial_trial_experiment}
-\title{Run Factorial Trial Experiment (Carrier Sentence + Critical Word Filling)}
+\title{Run Factorial Trial Experiment (registry-driven, assistant-native)}
 \usage{
 factorial_trial_experiment(
+  model_key,
+  generation_interface = "chat",
+  api_key,
+  api_url = NULL,
   data,
   factors,
   CW = NULL,
-  fill_method,
-  trial_prompt = "",
+  fill_method = NULL,
+  trial_prompt = NULL,
+  system_content = NULL,
+  assistant_content = NULL,
+  optionals = NULL,
+  role_mapping = NULL,
+  stream = NULL,
+  timeout = getOption("psylingllm.llm_timeout_sec", 120L),
   repeats = 1,
   random = FALSE,
-  role_mapping = list(user = "user", system = "system", assistant = "assistant"),
-  system_prompt = "You are a participant in a psychology experiment.",
-  api_key,
-  model,
-  api_url,
-  max_tokens = 512,
-  temperature = 0.7,
-  enable_thinking = TRUE,
-  delay = 1,
-  output_path = "experiment_results.csv"
+  delay = 0,
+  output_path = NULL,
+  overwrite = TRUE,
+  return_raw = FALSE
 )
 }
 \arguments{
-\item{data}{data.frame with columns `Item` and `Material`.}
+\item{model_key}{Character(1). Registry key (e.g., \code{"deepseek-chat"} or \code{"deepseek-chat@proxy"}).}
 
-\item{factors}{list of factors, e.g. `list(Congruity = c("Congruent","Incongruent"))`.}
+\item{generation_interface}{Character(1). Interface name; default \code{"chat"}.}
 
-\item{CW}{data.frame with `Item` and columns corresponding to factor-level combinations (wide format).}
+\item{api_key}{Character(1). Provider API key.}
 
-\item{fill_method}{function(condition, Material, CW_word) -> Material.}
+\item{api_url}{Optional character(1). Overrides registry default URL; required for non-official providers.}
 
-\item{trial_prompt}{string or function.}
+\item{data}{A \code{data.frame} or a file path accepted by
+\code{generate_llm_factorial_experiment_list()}. Must contain at least
+\code{Material} (carrier). If using CW, also provide \code{CW} or \code{Word}.}
 
-\item{repeats}{integer, number of repetitions per trial.}
+\item{factors}{A named list of factors, e.g.,
+\code{list(Congruity = c("Congruent", "Incongruent"))}.}
 
-\item{random}{logical, whether to randomize trial order.}
+\item{CW}{Optional \code{data.frame} with \code{Item} plus columns named by
+factor-level combinations in wide format.}
 
-\item{role_mapping}{list of role names for LLM call.}
+\item{fill_method}{Optional function to build the per-row stimulus (see "Stimulus construction").}
 
-\item{system_prompt}{string, global system message for LLM.}
+\item{trial_prompt}{Optional character(1). Global trial prefix; row-level \code{TrialPrompt}
+(if present) takes precedence.}
 
-\item{api_key}{string, API key.}
+\item{system_content}{Optional character(1) or \code{NULL}. If \code{NULL},
+registry \code{default_system} is used when available.}
 
-\item{model}{string, LLM model name.}
+\item{assistant_content}{Optional static few-shot seed: a character vector or a list of
+message objects (\code{list(role = ..., content = ...)}). These appear before
+rolling history and are preserved as-is.}
 
-\item{api_url}{string, API endpoint.}
+\item{optionals}{Optional named list. If not supplied, defaults are used (tri-state);
+if \code{NULL}, no defaults are injected; if a list, only user keys are sent.}
 
-\item{max_tokens}{integer, maximum tokens for response.}
+\item{role_mapping}{Optional mapping of roles (\code{system}/\code{user}/\code{assistant}).
+If absent, registry mapping applies.}
 
-\item{temperature}{numeric, sampling temperature.}
+\item{stream}{Logical(1) or \code{NULL}. If \code{NULL}, uses the registry default;
+otherwise forces streaming/non-streaming.}
 
-\item{enable_thinking}{logical, whether to enable model thinking trace.}
+\item{timeout}{Integer(1). Per-request timeout in seconds (passed to \code{llm_caller()}).}
 
-\item{delay}{numeric, delay (in seconds) between trials.}
+\item{repeats}{Integer(1). Number of repetitions per factorial row.}
 
-\item{output_path}{string, file path to save experiment results.}
+\item{random}{Logical(1). Randomize trial order.}
+
+\item{delay}{Numeric(1). Delay (seconds) between trials.}
+
+\item{output_path}{Character or \code{NULL}. Path to save results/logs
+(same behavior as \code{trial_experiment()}).}
+
+\item{overwrite}{Logical(1). Overwrite existing outputs.}
+
+\item{return_raw}{Logical(1). Include raw request/response for debugging.}
 }
 \value{
-data.frame with columns:
-`Run`, `Item`, `Material`, factor columns, `Word`, `Stimulus`,
-`TrialPrompt`, `Response`, `Think`, `ModelName`, `ResponseTime`.
+A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:
+  \code{Response}, \code{Think}, \code{ModelName}, \code{TotalResponseTime},
+  \code{FirstTokenLatency}, \code{PromptTokens}, \code{CompletionTokens},
+  \code{TrialStatus}, \code{Streaming}, \code{Timestamp}, \code{RequestID},
+  plus \code{Stimulus} and \code{ConditionLabel}.
 }
 \description{
-Supports multiple carrier sentences, factors, and CW mappings.
-Automatically generates `Carrier_Sentence` from carrier sentence and CW word.
-Supports trial prompt as a string or a function.
+Builds a factorial trial list (carrier sentences × factor levels × optional CW),
+constructs a stimulus for each row (via `fill_method` or sensible defaults),
+and calls \code{llm_caller()} for each trial using the package registry
+(no manual headers/body here).
 }
-\examples{
-data <- data.frame(Item = 1:2, Material = c("Sentence A", "Sentence B"))
-factors <- list(Congruity = c("Congruent", "Incongruent"))
-CW <- data.frame(Item = 1:2,
-                 Congruent = c("dog", "cat"),
-                 Incongruent = c("car", "chair"))
-fill_method <- function(cond, Material, CW_word) paste(Material, CW_word)
-factorial_trial_experiment(data, factors, CW, fill_method,
-                           trial_prompt = "Read carefully.",
-                           model = "gpt-4", api_key = "YOUR_KEY", api_url = "https://api.openai.com/v1/chat/completions")
+\details{
+The trial list is generated by \code{generate_llm_factorial_experiment_list()},
+which yields columns such as \code{Run}, \code{Item}, \code{Material} (carrier),
+\code{Word} (CW), factor columns, and optionally \code{TrialPrompt}.
+This function then produces a per-row user message (stimulus) and executes the trials.
 
+## Stimulus construction
+- If \code{fill_method} is provided, it is called as:
+  \preformatted{
+  fill_method(
+    condition = list(<Factor> = <Level>, ...),
+    material  = <carrier sentence>,
+    word      = <CW string or NA>
+  )
+  }
+
+- If \code{fill_method} is \code{NULL}, defaults to:
+  1) Replace the first occurrence of one of the placeholders
+     \code{"\\{CW\\}"}, \code{"[CW]"}, \code{"__CW__"}, or \code{"____"}
+     in \code{Material} with \code{Word} (if non-NA);
+  2) Otherwise, \code{paste(Material, Word)} if a CW word exists;
+  3) Otherwise, just \code{Material}.
+
+## Error & timeout handling
+- Timeout inside \code{llm_caller()} returns \code{status = 599} → \code{TrialStatus = "TIMEOUT"} (continue).
+- HTTP error (\code{status >= 400}) → \code{TrialStatus = "ERROR"} (continue).
 }

@@ -2,64 +2,96 @@
 % Please edit documentation in R/conversation_experiment_with_feedback.R
 \name{conversation_experiment_with_feedback}
 \alias{conversation_experiment_with_feedback}
-\title{Run LLM Conversation Experiment with Feedback}
+\title{Run LLM Conversation Experiment with Feedback (no injected rows in replace_next)}
 \usage{
 conversation_experiment_with_feedback(
+  model_key,
+  generation_interface = "chat",
+  api_key,
+  api_url = NULL,
   data,
+  trial_prompt = NULL,
+  system_content = NULL,
+  assistant_content = NULL,
+  optionals = NULL,
+  role_mapping = NULL,
+  history_mode = c("all", "last"),
+  max_history_turns = Inf,
+  max_turns = NULL,
+  stream = NULL,
+  timeout = getOption("psylingllm.llm_timeout_sec", 120L),
   repeats = 1,
   random = FALSE,
-  api_key,
-  model,
-  api_url,
-  trial_prompt = "",
-  feedback_fn,
   apply_mode = c("replace_next", "insert_dynamic"),
-  role_mapping = list(user = "user", system = "system", assistant = "assistant"),
-  system_prompt = "You are a participant in a psychology experiment.",
-  max_trials = 50,
-  delay = 1,
-  output_path = "experiment_results.csv",
-  enable_thinking = FALSE,
-  ...
+  feedback_fn,
+  delay = 0,
+  output_path = NULL,
+  overwrite = TRUE,
+  return_raw = FALSE
 )
 }
 \arguments{
-\item{data}{Data frame or file path with at least `TrialPrompt` and `Material`.}
+\item{model_key}{Character(1).}
 
-\item{repeats}{Number of times to repeat materials.}
+\item{generation_interface}{Character(1). Default "chat".}
 
-\item{random}{Shuffle trial order.}
+\item{api_key}{Character(1). Provider API key.}
 
-\item{api_key}{API key for the LLM.}
+\item{api_url}{Optional character(1). Overrides registry default URL; required for non-official providers.}
 
-\item{model}{LLM model name.}
+\item{data}{data.frame/tibble with ConversationId, Turn, Material; optional TrialPrompt.}
 
-\item{api_url}{LLM API endpoint.}
+\item{trial_prompt}{Optional character(1). Global prefix when row TrialPrompt is missing.}
 
-\item{trial_prompt}{Initial prompt prefix for each trial.}
+\item{system_content}{Optional character(1) or NULL. If NULL, uses registry `default_system` when available.}
 
-\item{feedback_fn}{Function(response, row, conversation) returning list(name, next_prompt, meta).}
+\item{assistant_content}{Optional static few-shot seed: character vector or a list of message objects
+(`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.}
 
-\item{apply_mode}{"replace_next" = overwrite next row, "insert_dynamic" = insert new row.}
+\item{optionals}{Optional named list. NULL → use registry typed defaults; list → send only user keys; missing → use defaults.}
 
-\item{role_mapping}{Mapping for roles: user/system/assistant.}
+\item{role_mapping}{Optional mapping for local labels; not forced into `llm_caller()` unless supplied.}
 
-\item{system_prompt}{Initial system message.}
+\item{history_mode}{"all" or "last". Default "all".}
 
-\item{max_trials}{Maximum trials to run.}
+\item{max_history_turns}{Integer(1) or Inf. Only for "all". Each turn contributes 2 messages.}
 
-\item{delay}{Delay (seconds) between trials.}
+\item{max_turns}{Integer(1) or NULL. Per-conv cap for insert_dynamic. Ignored for replace_next.}
 
-\item{output_path}{File path to save results.}
+\item{stream}{Logical(1) or NULL. NULL uses registry default; otherwise force streaming/non-streaming.}
 
-\item{enable_thinking}{Logical; enable chain-of-thought.}
+\item{timeout}{Integer(1). Per-request timeout seconds.}
 
-\item{...}{Extra arguments passed to `llm_caller`.}
+\item{repeats}{Integer(1). Conversation block repetitions before randomization.}
+
+\item{random}{Logical(1). Shuffle conversation order (Turn order preserved inside).}
+
+\item{apply_mode}{"replace_next" or "insert_dynamic".}
+
+\item{feedback_fn}{function(response, row, context) -> list(name, next_prompt, meta).}
+
+\item{delay}{Numeric(1). Seconds between turns.}
+
+\item{output_path}{Character or NULL. Where to save results/logs.}
+
+\item{overwrite}{Logical(1). Overwrite outputs.}
+
+\item{return_raw}{Logical(1). Include raw request/response.}
 }
 \value{
-Data frame of trial results.
+Tibble with PsyLingLLM schema per executed turn.
 }
 \description{
-Sequentially sends trials to an LLM, keeps conversation history,
-and applies user-defined feedback to modify subsequent prompts.
+Multi-turn conversations identified by `ConversationId` and ordered by `Turn`.
+Rolling history (seed + past turns) is passed to `llm_caller()` via `assistant_content`.
+}
+\details{
+Feedback semantics:
+- apply_mode = "replace_next": DO NOT insert extra rows; simply overwrite the
+  next planned row's `TrialPrompt` in the same conversation.
+- apply_mode = "insert_dynamic": if under per-conversation cap, append a new
+  executable row (next turn) using `next_prompt`.
+
+All request assembly (URL/headers/body/messages/defaults) is registry-driven
+by `llm_caller()`; this function never mutates headers.
 }

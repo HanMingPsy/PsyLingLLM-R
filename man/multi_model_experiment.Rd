@@ -2,51 +2,98 @@
 % Please edit documentation in R/multi_model.R
 \name{multi_model_experiment}
 \alias{multi_model_experiment}
-\title{Run Multi-Model LLM Experiment}
+\title{Run Trials Across Multiple Models (registry-driven, assistant-native)}
 \usage{
 multi_model_experiment(
+  models,
   data,
-  model_file,
-  experiment_fn = trial_experiment,
-  output_path,
-  max_tokens = 1024,
-  temperature = 0.7,
+  trial_prompt = NULL,
+  repeats = 1,
   random = FALSE,
-  return_combined = FALSE,
-  ...
+  delay = 0,
+  timeout = getOption("psylingllm.llm_timeout_sec", 120L),
+  overwrite = TRUE,
+  return_raw = FALSE,
+  system_content = NULL,
+  assistant_content,
+  role_mapping,
+  optionals = NULL,
+  stream = NULL,
+  output_dir = NULL,
+  combined_output_path = NULL
 )
 }
 \arguments{
-\item{data}{data.frame Experiment material table (e.g., output of
-\code{generate_llm_experiment_list}).}
+\item{models}{data.frame/tibble describing models; see "models table".}
 
-\item{model_file}{Path to CSV or Excel file containing model info.
-Must have columns: \code{ModelName}, \code{API_Key}, \code{API_URL},
-\code{Enable_Thinking}.}
+\item{data}{Trial table for \code{trial_experiment()} (must contain `Material`; `TrialPrompt` optional).}
 
-\item{experiment_fn}{Function to run for each model
-(e.g., \code{trial_experiment}, \code{conversation_experiment}).}
+\item{trial_prompt}{Optional character(1). Global trial prefix; row `TrialPrompt` (if any) overrides.}
 
-\item{output_path}{Directory to save results. If missing, defaults to
-\code{~/PsyLingLLM_Results/MultiModel_Experiment_<timestamp>}.}
+\item{repeats}{Integer(1). Number of repetitions per trial for every model.}
 
-\item{max_tokens}{Integer. Maximum tokens per trial.}
+\item{random}{Logical(1). Randomize trial order for every model.}
 
-\item{temperature}{Numeric. Sampling temperature.}
+\item{delay}{Numeric(1). Delay (seconds) between trials for every model.}
 
-\item{random}{Logical. Whether to randomize trial order.}
+\item{timeout}{Integer(1). Per-request timeout in seconds.}
 
-\item{return_combined}{Logical. If TRUE, return combined results.}
+\item{overwrite}{Logical(1). Overwrite per-model outputs.}
 
-\item{...}{Additional arguments passed to \code{experiment_fn}.
-Unsupported arguments will trigger a warning and be ignored.}
+\item{return_raw}{Logical(1). Include raw request/response in per-call results.}
+
+\item{system_content}{Optional character(1). Fallback system message if model row lacks one.}
+
+\item{assistant_content}{Optional static few-shot seed: character vector or a list of message objects
+(`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.}
+
+\item{role_mapping}{Optional mapping of roles if model row lacks one.}
+
+\item{optionals}{Optional named list (or NULL) if model row lacks `optionals`.
+*Omitting this argument* preserves the tri-state (registry defaults).}
+
+\item{stream}{Logical(1) or NULL. Default streaming policy if model row lacks `stream`.}
+
+\item{output_dir}{Optional character(1). If given, used as a base directory for per-model outputs
+when the model row doesn't provide `output_path`.}
+
+\item{combined_output_path}{Optional character(1). If provided, write the combined results CSV here.}
 }
 \value{
-If \code{return_combined = TRUE}, returns combined data.frame
-  across models. Otherwise returns \code{NULL} invisibly.
+A data.frame/tibble concatenating all per-model results. Each chunk retains the
+        standard PsyLingLLM schema columns and is annotated with `ModelKey` (alias of ModelName).
 }
 \description{
-Executes the same trial set across multiple models, calling a user-specified
-experiment function (`experiment_fn`). Arguments not supported by the
-experiment function are ignored with a warning.
+Executes the same trial table on multiple models. Each row of `models`
+describes one model configuration. For each row, this function delegates to
+\code{trial_experiment()} with the appropriate arguments and then row-binds
+the results into a single data frame.
+}
+\details{
+## `models` table
+Required column:
+- `model_key` (character): registry key, e.g. "deepseek-chat" or "deepseek-chat@proxy".
+
+Optional columns (all per-model; if absent, corresponding top-level args are used):
+- `generation_interface` (character, default "chat")
+- `api_key` (character)
+- `api_url` (character; required for non-official providers or to override official)
+- `stream` (logical or NA; `NA`/missing means follow registry default)
+- `system_content` (character or NA)
+- `assistant_content` (character vector or list-of-message objects; may be JSON string)
+- `optionals` (list column or JSON string; tri-state honored if column missing)
+- `role_mapping` (list column or JSON string; only passed if provided)
+- `output_path` (character; per-model output path for \code{trial_experiment()})
+
+Any JSON-like character column (e.g., `optionals`, `role_mapping`, `assistant_content`)
+will be JSON-decoded if it validates as JSON; otherwise passed through as-is.
+
+## Optionals tri-state
+- If `models$optionals` exists for that row → pass it to downstream (user keys only).
+- Else if top-level `optionals` is missing → do **not** pass the param (use registry defaults).
+- Else if top-level `optionals` is provided (NULL or list) → pass that top-level value.
+
+## Errors & timeouts
+- Each model is run independently. Errors/timeouts inside \code{trial_experiment()}
+  are recorded per-trial; the multi-model loop continues.
 }

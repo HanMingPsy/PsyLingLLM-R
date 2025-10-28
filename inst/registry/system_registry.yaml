@@ -1,0 +1,203 @@
+# =====================
+# Model: deepseek-chat
+
+deepseek-chat:
+  chat:
+    provider: official
+    reasoning: no
+    input:
+      default_url: https://api.deepseek.com/chat/completions
+      headers:
+        Content-Type: application/json
+        Authorization: Bearer ${API_KEY}
+      body:
+        model: deepseek-chat
+        messages:
+        - role: ${ROLE}
+          content: ${CONTENT}
+        ${PARAMETER}: ${VALUE}
+      fallback_body:
+        model: deepseek-chat
+        messages:
+        - role: system
+          content: You are a helpful assistant.
+        - role: user
+          content: ${CONTENT}
+        stream: no
+      optional_defaults:
+        stream:
+          value: yes
+          type: logical
+        max_tokens:
+          value: 1024.0
+          type: numeric
+        temperature:
+          value: 0.7
+          type: numeric
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+    output:
+      respond_path: list("choices..message.content")
+      thinking_path: ~
+      id_path: list("id")
+      object_path: list("object")
+      token_usage_path:
+        prompt: list("usage","prompt_tokens")
+        completion: list("usage","completion_tokens")
+    streaming:
+      enabled: yes
+      delta_path: list("choices..delta.content")
+      require_accept_header: no
+
+# =====================
+# Model: deepseek-reasoner
+
+deepseek-reasoner:
+  chat:
+    provider: official
+    reasoning: yes
+    input:
+      default_url: https://api.deepseek.com/chat/completions
+      headers:
+        Content-Type: application/json
+        Authorization: Bearer ${API_KEY}
+      body:
+        model: deepseek-reasoner
+        messages:
+        - role: ${ROLE}
+          content: ${CONTENT}
+        ${PARAMETER}: ${VALUE}
+      fallback_body:
+        model: deepseek-reasoner
+        messages:
+        - role: system
+          content: You are a helpful assistant.
+        - role: user
+          content: ${CONTENT}
+        stream: no
+      optional_defaults:
+        stream:
+          value: yes
+          type: logical
+        max_tokens:
+          value: 1024.0
+          type: numeric
+        temperature:
+          value: 0.7
+          type: numeric
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+    output:
+      respond_path: list("choices..message.content")
+      thinking_path: list("choices..message.reasoning_content")
+      id_path: list("id")
+      object_path: list("object")
+      token_usage_path:
+        prompt: list("usage","prompt_tokens")
+        completion: list("usage","completion_tokens")
+    streaming:
+      enabled: yes
+      delta_path: list("choices..delta.content")
+      thinking_delta_path: list("choices..delta.reasoning_content")
+      require_accept_header: no
+
+# =====================
+# Model: gpt-4o
+
+gpt-4o:
+  chat:
+    provider: official
+    reasoning: no
+    input:
+      default_url: https://api.openai.com/v1/chat/completions
+      headers:
+        Content-Type: application/json
+        Authorization: Bearer ${API_KEY}
+      body:
+        model: gpt-4o
+        messages:
+        - role: ${ROLE}
+          content: ${CONTENT}
+        ${PARAMETER}: ${VALUE}
+      fallback_body:
+        model: gpt-4o
+        messages:
+        - role: system
+          content: You are a helpful assistant.
+        - role: user
+          content: ${CONTENT}
+        stream: no
+      optional_defaults:
+        stream:
+          value: yes
+          type: logical
+        max_tokens:
+          value: 1024.0
+          type: numeric
+        temperature:
+          value: 0.7
+          type: numeric
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+    output:
+      respond_path: list("choices..message.content")
+      thinking_path: ~
+      id_path: list("id")
+      object_path: list("object")
+      token_usage_path:
+        prompt: list("usage","prompt_tokens")
+        completion: list("usage","completion_tokens")
+    streaming:
+      enabled: yes
+      delta_path: list("choices..delta.content")
+      require_accept_header: no
+  responses:
+    provider: official
+    reasoning: no
+    input:
+      default_url: https://api.openai.com/v1/responses
+      headers:
+        Content-Type: application/json
+        Authorization: Bearer ${API_KEY}
+      body:
+        model: gpt-4o
+        input: ${CONTENT}
+        ${PARAMETER}: ${VALUE}
+      fallback_body:
+        model: gpt-4o
+        input: ${CONTENT}
+        stream: no
+      optional_defaults:
+        stream:
+          value: yes
+          type: logical
+        max_output_tokens:
+          value: 1024.0
+          type: numeric
+        temperature:
+          value: 0.7
+          type: numeric
+      default_system: ~
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+    output:
+      respond_path: list("output..content..text")
+      thinking_path: ~
+      id_path: list("id")
+      object_path: list("object")
+    streaming:
+      enabled: yes
+      delta_path: list("response.output..content..text")
+      require_accept_header: no
+

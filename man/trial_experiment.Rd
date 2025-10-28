@@ -2,62 +2,84 @@
 % Please edit documentation in R/trial_experiment.R
 \name{trial_experiment}
 \alias{trial_experiment}
-\title{Run LLM Repeat-Trial Experiment (Multiple Conditions Supported)}
+\title{Run LLM Trial Experiment}
 \usage{
 trial_experiment(
+  model_key,
+  generation_interface = "chat",
+  api_key,
+  api_url = NULL,
   data,
+  trial_prompt = NULL,
+  system_content = NULL,
+  assistant_content = NULL,
+  optionals = NULL,
+  role_mapping = NULL,
+  stream = FALSE,
+  timeout = 120,
   repeats = 1,
   random = FALSE,
-  api_key,
-  model,
-  api_url,
-  trial_prompt = "",
-  role_mapping = list(user = "user", system = "system", assistant = "assistant"),
-  system_prompt = "You are a participant in a psychology experiment.",
-  max_tokens = 1024,
-  temperature = 0.7,
-  enable_thinking = TRUE,
   delay = 0,
-  output_path = "experiment_results.csv"
+  output_path = NULL,
+  overwrite = TRUE,
+  return_raw = FALSE
 )
 }
 \arguments{
-\item{data}{data.frame containing columns: optionally \code{Run}, optionally \code{Item},
-one or more \code{Condition*} columns, \code{Material}, optionally \code{TrialPrompt}.
-Optional columns: \code{Target}, \code{CorrectResponse}, \code{TrialType}, \code{Metadata}.}
+\item{model_key}{Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").}
 
-\item{repeats}{Integer. Number of repetitions per trial (default = 3).}
+\item{generation_interface}{Character(1). Interface name; defaults to "chat".}
 
-\item{random}{Logical. Whether to randomize trial order (default \code{TRUE}).}
+\item{api_key}{Character(1). Provider API key.}
 
-\item{api_key}{Character. API key for the LLM.}
+\item{api_url}{Optional character(1). Overrides registry default URL; required for non-official providers.}
 
-\item{model}{Character. Model name.}
+\item{data}{data.frame/tibble with `Material`; may contain `TrialPrompt`.}
 
-\item{api_url}{Character. API endpoint URL.}
+\item{trial_prompt}{Optional character(1). Global trial prompt (used when row `TrialPrompt` is missing).}
 
-\item{role_mapping}{List. Role mapping, default: \code{list(user="user", system="system", assistant="assistant")}.}
+\item{system_content}{Optional character(1) or NULL. If NULL, use registry `default_system` when available.}
 
-\item{system_prompt}{Character. System-level prompt for the model.
-Default: "You are a participant in a psychology experiment."}
+\item{assistant_content}{Optional static few-shot seed: character vector or a list of message objects
+(`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.}
 
-\item{max_tokens}{Integer. Maximum tokens to generate.}
+\item{optionals}{Optional named list. If NULL, use registry typed defaults; user keys are not merged with defaults.}
 
-\item{temperature}{Numeric. Temperature for sampling.}
+\item{role_mapping}{Optional list. Override registry role names (effective only when the template uses \code{\${ROLE}}).}
 
-\item{enable_thinking}{Logical. Whether to enable chain-of-thought reasoning (default \code{TRUE}).}
+\item{stream}{Logical(1) or NULL. NULL = use registry default; otherwise force streaming/non-streaming.}
 
-\item{delay}{Numeric. Delay in seconds between requests (default = 1).}
+\item{timeout}{Integer(1). Per-request HTTP/SSE timeout in seconds (passed to \code{llm_caller()}).}
 
-\item{output_path}{Character. Output file path (CSV or XLSX).}
+\item{repeats}{Integer(1). Number of repetitions per trial.}
+
+\item{random}{Logical(1). Randomize trial order.}
+
+\item{delay}{Numeric(1). Delay (seconds) between trials.}
+
+\item{output_path}{Character or NULL. Where to save results/logs (compatible with prior schema).}
+
+\item{overwrite}{Logical(1). Overwrite existing output files.}
+
+\item{return_raw}{Logical(1). Include raw request/response for debugging.}
 }
 \value{
-A \code{data.frame} including \code{Response}, \code{Think}, \code{ModelName},
-  \code{ResponseTime}, plus all original marker/condition columns in standard order.
+A data.frame/tibble with PsyLingLLM schema columns:
+  Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if stream),
+  PromptTokens, CompletionTokens, TrialStatus, Streaming, Timestamp, RequestID.
 }
 \description{
-Execute repeated trials using a large language model.
-Each \code{Item × Condition(s)} can be repeated multiple times,
-trials are randomized across repetitions if \code{random=TRUE},
-or sequential if \code{random=FALSE}. Results include responses and timing.
+Executes repeated trials using a registry-defined LLM interface. All request
+assembly (URL, headers, body/messages, defaults) is driven by the registry
+and calls are delegated to \code{llm_caller()}.
+}
+\details{
+Columns in `data`:
+- Required: `Material`
+- Optional: `TrialPrompt` (row-level), which overrides the global `trial_prompt` when present.
+
+Error/timeout handling:
+- Network/SSE timeout inside \code{llm_caller()} returns \code{status = 599}
+  and is marked as \code{"TIMEOUT"} without stopping the loop.
+- HTTP errors (\code{status >= 400}) are marked as \code{"ERROR"} and also continue.
 }

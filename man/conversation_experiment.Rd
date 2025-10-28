@@ -2,52 +2,104 @@
 % Please edit documentation in R/conversation_experiment.R
 \name{conversation_experiment}
 \alias{conversation_experiment}
-\title{Run LLM Conversation-style Experiment}
+\title{Run Multi-turn Conversation Experiment (assistant-native, registry-driven)}
 \usage{
 conversation_experiment(
-  data,
-  repeats = 1,
-  random = FALSE,
+  model_key,
+  generation_interface = "chat",
   api_key,
-  model,
-  api_url,
-  trial_prompt = "",
-  role_mapping = list(user = "user", system = "system", assistant = "assistant"),
-  system_prompt = "You are a participant in a psychology experiment.",
-  max_tokens = 1024,
-  temperature = 0.7,
-  enable_thinking = TRUE,
-  output_path = "experiment_results.csv"
+  api_url = NULL,
+  data,
+  trial_prompt = NULL,
+  system_content = NULL,
+  assistant_content = NULL,
+  optionals = NULL,
+  role_mapping = NULL,
+  history_mode = c("all", "last"),
+  max_history_turns = Inf,
+  stream = NULL,
+  timeout = getOption("psylingllm.llm_timeout_sec", 120L),
+  random = FALSE,
+  repeats = 1,
+  delay = 0,
+  output_path = NULL,
+  overwrite = TRUE,
+  return_raw = FALSE
 )
 }
 \arguments{
-\item{data}{data.frame with columns: TrialPrompt, Material.
-Optional columns: Run, Item, Condition*, Target, CorrectResponse, TrialType, Metadata}
+\item{model_key}{Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").}
 
-\item{random}{Logical. Whether to randomize trial order. Default: FALSE}
+\item{generation_interface}{Character(1). Interface name; default "chat".}
 
-\item{api_key}{API key}
+\item{api_key}{Character(1). Provider API key.}
 
-\item{model}{Model name}
+\item{api_url}{Optional character(1). Overrides registry default URL; required for non-official providers.}
 
-\item{api_url}{API endpoint}
+\item{data}{data.frame/tibble with ConversationId, Turn, Material; optional TrialPrompt.}
 
-\item{role_mapping}{List. Default: list(user="user", system="system", assistant="assistant")}
+\item{trial_prompt}{Optional character(1). Global prompt prefix (if row TrialPrompt is missing).}
 
-\item{system_prompt}{Character. Initial system message. Default: "You are a participant in a psychology experiment."}
+\item{system_content}{Optional character(1) or NULL. If NULL, registry `default_system` is used when available.}
 
-\item{max_tokens}{Integer. Maximum tokens per trial (can adjust per trial)}
+\item{assistant_content}{Optional static few-shot seed: character vector or a list of message objects
+(`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.}
 
-\item{temperature}{Numeric. Sampling temperature}
+\item{optionals}{Optional named list. NULL → use registry typed defaults; list → send only user keys; missing → use defaults.}
 
-\item{enable_thinking}{Logical. Default TRUE}
+\item{role_mapping}{Optional mapping of roles. If absent, we only use registry mapping for **local labeling**,
+and we do **not** pass a role map to \code{llm_caller()} (no forcing).}
 
-\item{output_path}{Character. CSV/XLSX path}
+\item{history_mode}{One of `"all"`, `"last"`. Default `"all"`.}
+
+\item{max_history_turns}{Integer(1) or Inf. Only for `history_mode="all"`. Each turn = 2 messages (user+assistant).}
+
+\item{stream}{Logical(1) or NULL. NULL uses registry default; otherwise force streaming/non-streaming.}
+
+\item{timeout}{Integer(1). Per-request timeout in seconds.}
+
+\item{random}{Logical(1). If TRUE, shuffle conversation order while preserving ascending Turn within each conversation.}
+
+\item{repeats}{Integer(1). Number of repetitions per base conversation. Typically 1 in feedback loops; each run can dynamically add more trials.}
+
+\item{delay}{Numeric(1). Delay (seconds) between turns.}
+
+\item{output_path}{Character or NULL. Where to save results/logs.}
+
+\item{overwrite}{Logical(1). Overwrite existing outputs.}
+
+\item{return_raw}{Logical(1). Include raw request/response for debugging.}
 }
 \value{
-data.frame with trial results and conversation history
+A data.frame/tibble with PsyLingLLM schema columns per turn:
+  Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if present),
+  PromptTokens, CompletionTokens, TrialStatus, Streaming, Timestamp, RequestID,
+  plus HistoryMode and HistoryUsedMsgs.
 }
 \description{
-Multiple-trials-per-run experiment. Each trial is sent sequentially to the LLM,
-previous trials' user/assistant pairs are preserved in conversation context.
+Executes multi-turn conversations where each conversation is identified by
+`ConversationId` and ordered by `Turn`. Running history is maintained as a
+list of structured role messages (`list(role=..., content=...)`) and passed
+to \code{llm_caller()} via `assistant_content`. This mirrors web chat:
+`(system) + seed messages + history + current user -> assistant reply`.
+}
+\details{
+Request assembly (URL, headers, body/messages, defaults) is driven entirely
+by the registry via \code{llm_caller()} — this function never mutates headers.
+
+Required columns in `data`:
+- `ConversationId` (character/factor)
+- `Turn` (integer/numeric)
+- `Material` (character)
+
+Optional:
+- `TrialPrompt` (row-level); used when present, otherwise `trial_prompt`.
+
+History policy:
+- `history_mode = "all" | "last"` (default `"all"`).
+  If `"all"`, you can cap with `max_history_turns` (number of past turns; each turn adds 2 messages).
+
+Errors / timeouts:
+- Timeout inside \code{llm_caller()} → `status = 599` ⇒ `TrialStatus = "TIMEOUT"` (continues).
+- HTTP error (`status >= 400`) ⇒ `TrialStatus = "ERROR"` (continues).
 }

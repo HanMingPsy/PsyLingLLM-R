@@ -2,49 +2,101 @@
 % Please edit documentation in R/llm_caller.R
 \name{llm_caller}
 \alias{llm_caller}
-\title{LLM API Caller with integrated prompt preparation}
+\title{Call an LLM via the registry}
 \usage{
 llm_caller(
-  model,
+  model_key,
+  generation_interface = NULL,
+  api_url = NULL,
   trial_prompt = NULL,
   material = NULL,
-  conversation = NULL,
-  api_key,
-  api_url,
-  custom = list(user = "user", system = "system", assistant = "assistant"),
-  system_prompt = "You are a participant in a psychology experiment.",
-  max_tokens = 1024,
-  temperature = 0.7,
-  enable_thinking = TRUE
+  system_content = NULL,
+  assistant_content = NULL,
+  api_key = NULL,
+  optionals,
+  stream = NULL,
+  role_mapping = NULL,
+  timeout = 120,
+  return_raw = FALSE,
+  debug = FALSE
 )
 }
 \arguments{
-\item{model}{Model name}
+\item{model_key}{Character(1). Registry key, e.g., \code{"deepseek-chat"} (official, no "@")
+or \code{"deepseek-chat@proxy"} (non-official, with "@provider").}
 
-\item{trial_prompt}{Trial prompt text (used if conversation is NULL)}
+\item{generation_interface}{Character(1) or \code{NULL}. One of:
+\code{"chat"}, \code{"completion"}, \code{"messages"}, \code{"responses"},
+\code{"conversation"}, \code{"generate"}, or \code{"inference"}. If \code{NULL} and exactly
+one interface exists, it is selected automatically.}
 
-\item{material}{Trial material text (used if conversation is NULL)}
+\item{api_url}{Character(1) or \code{NULL}. Optional only when registry provider is
+\code{"official"} (falls back to \code{input.default_url}). For non-official providers,
+this is required. If provided, it always overrides the registry default.}
 
-\item{conversation}{Optional list of messages with roles and content for conversation history
-e.g., list(list(role="user", content="Hello"), list(role="assistant", content="Hi"))}
+\item{trial_prompt}{Character(1) or \code{NULL}. Trial instruction text.}
 
-\item{api_key}{API key}
+\item{material}{Character(1) or \code{NULL}. Stimulus/item content to combine with
+\code{trial_prompt}.}
 
-\item{api_url}{API endpoint}
+\item{system_content}{Character(1) or \code{NULL}. Optional system message to prepend.
+If \code{NULL} and registry \code{input.default_system} is set, that default is used.
+If both are missing and the template supports roles, a single warning is emitted and no
+system message is inserted.}
 
-\item{custom}{Optional role mapping (default: user/system/assistant)}
+\item{assistant_content}{Optional static few-shot seed: character vector or a list of message
+objects (\code{list(role=..., content=...)}). These appear before rolling history and are
+preserved as-is.}
 
-\item{max_tokens}{Maximum number of tokens to generate}
+\item{api_key}{Character(1) or \code{NULL}. Injected into \code{"\${API_KEY}"} placeholders in
+headers/body.}
 
-\item{temperature}{Sampling temperature}
+\item{optionals}{Missing, \code{NULL}, or a named list. Missing → use registry defaults if
+present; \code{NULL} → none; named list → user keys only (no merge).}
 
-\item{enable_thinking}{Boolean, whether to enable CoT reasoning}
+\item{stream}{Logical(1) or \code{NULL}. Overrides both \code{optionals$stream} and registry
+\code{streaming.enabled}.}
+
+\item{role_mapping}{Named list or \code{NULL}. Optional override to map abstract roles
+("system", "assistant", "user") to provider labels. By default, no mapping is applied.}
+
+\item{timeout}{Numeric(1), default = 120. Request timeout in seconds.}
+
+\item{return_raw}{Logical(1), default = \code{FALSE}. If \code{TRUE}, include raw request/response
+in the result.}
+
+\item{debug}{Logical(1), default = \code{FALSE}. If \code{TRUE}, print diagnostic information.}
 }
 \value{
-List with parsed output: model, think, response
+A list with fields: \code{status}, \code{interface}, \code{model_key}, \code{streaming},
+  \code{usage}, \code{answer}, \code{thinking}, and optionally \code{raw} or \code{error}.
 }
 \description{
-Call a large language model (LLM) API and return parsed output,
-automatically handling model-specific fast/thinking modes.
-Supports optional conversation history.
+Builds a request strictly from the model registry entry (no ad-hoc headers/body/messages).
+The user message is composed from \code{trial_prompt} and \code{material}. Optional
+\code{system_content} and \code{assistant_content} are inserted before the user message
+*only* if the registry template actually supports \code{"\${ROLE}"} in the messages shape.
+Roles are not mapped by default; mapping is applied only when the caller supplies
+\code{role_mapping}.
+}
+\details{
+URL resolution
+\itemize{
+  \item User-provided \code{api_url} always takes precedence;
+  \item When \code{provider == "official"}, \code{api_url} is optional (falls back to
+    registry \code{input.default_url});
+  \item Otherwise (non-official), \code{api_url} is required.
+}
+
+Optionals (tri-state, injected via \code{"\${PARAMETER}"} if present)
+\itemize{
+  \item Missing: use registry \code{input.optional_defaults} if present; otherwise inject nothing;
+  \item \code{NULL}: inject nothing;
+  \item Named list: use user keys only (do not merge defaults).
+}
+
+Non-streaming extraction uses flat-key equality and wildcard ("..") regex fallback via
+\code{flatten_json_paths()} and \code{normalize_path_key_with_regex()}.
+Streaming reconstruction uses \code{stream_reconstruct_text()} and the registry
+\code{delta_path} (and optional \code{thinking_delta_path}).
 }

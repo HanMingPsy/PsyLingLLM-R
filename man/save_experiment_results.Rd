@@ -6,23 +6,35 @@
 \usage{
 save_experiment_results(
   data,
-  output_path,
-  enable_thinking = TRUE,
-  has_FAST = FALSE
+  output_path = NULL,
+  model = NULL,
+  overwrite = TRUE,
+  auto_naming = TRUE
 )
 }
 \arguments{
-\item{data}{data.frame Result dataset.}
+\item{data}{data.frame Result dataset (following PsyLingLLM_Schema).}
 
-\item{output_path}{character File path (CSV or Excel). If only a filename is provided, it will be saved under the user's Documents folder.}
+\item{output_path}{character File path (CSV or Excel). If NULL, auto-generate
+model name + timestamp in default folder.}
 
-\item{enable_thinking}{logical Whether to enable "thinking mode" (affects filename suffix). Defaults to TRUE.}
+\item{model}{character Model name (used for auto-naming).}
+
+\item{overwrite}{logical Whether to overwrite existing file. Default TRUE.}
+
+\item{auto_naming}{logical If TRUE (default), and no explicit filename is
+provided, auto-generate filename as \code{model_timestamp.csv}.}
 }
 \value{
-NULL (the file is written to disk).
+Invisible normalized file path
 }
 \description{
-Saves a data.frame of experiment results to a CSV or Excel file.
-The default save location is the user's "Documents" directory if only a filename is provided.
-If `enable_thinking = FALSE`, "_FAST" will be appended to the filename.
+Saves experiment results to a CSV or Excel file, conforming to
+PsyLingLLM_Schema. If `output_path` is NULL, a default filename is
+generated as \code{{model}_{YYYYMMDD_HHMMSS}.csv} in
+\code{~/PsyLingLLM_Results}.
+}
+\details{
+Columns that are entirely NA (e.g., FirstTokenLatency when streaming = FALSE)
+will be removed automatically.
 }
