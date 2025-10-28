@@ -1,0 +1,27 @@
+unsloth/gemma-3-4b-it:
+  provider: unsloth
+  auth_type: bearer
+  family: completion
+  message_format:
+    url: https://llm.chutes.ai/v1/completions
+    headers:
+      Content-Type: application/json
+      Authorization: Bearer your_api_key
+    body:
+      model: unsloth/gemma-3-4b-it
+      prompt: My favourite type of cat
+      stream: no
+  respond:
+    respond_path:
+    - choices
+    - 0.0
+    - text
+    thinking_path: ~
+  streaming:
+    enabled: yes
+    type: sse
+    event: data
+    delta_path: ~
+    thinking_delta_path: ~
+  aliases:
+  - gemma-3-4b-it
