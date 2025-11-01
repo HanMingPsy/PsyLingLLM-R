@@ -46,7 +46,7 @@ To install PsyLingLLM directly from the GitHub repository, execute the following
 
 ```r
 # Install devtools if not already available
-if (!require("devtools")) install.packages("devtools")
+install.packages("devtools")
 
 # Install PsyLingLLM from the GitHub repository
 devtools::install_github("HanMingPsy/PsyLingLLM-R")
@@ -164,11 +164,24 @@ Or
 
 ```r
 library(PsyLingLLM)
+# Build test material
 df <- data.frame(
-  Material = c("The cat sat on the ____.", 
-               "这只猫咪坐在____上。")
+  Material = c(
+    "The cat sat on the ____.",           # English
+    "这只猫咪坐在____上。",                # Chinese (Simplified)
+    "Le chat était assis sur le ____.",   # French
+    "El gato estaba sentado en el ____.", # Spanish
+    "Die Katze saß auf dem ____.",        # German
+    "Il gatto era seduto sul ____.",      # Italian
+    "ネコが____の上に座っていました。",     # Japanese
+    "고양이가 ____ 위에 앉아 있었습니다.",  # Korean
+    "O gato estava sentado no ____.",     # Portuguese
+    "Katten satt på ____.",               # Swedish
+    "Кот сидел на ____."                  # Russian
+  )
 )
 
+# run test
 result <- trial_experiment(
   data = df,
   api_key = "your_api_key_here",
@@ -185,23 +198,28 @@ print(result$Response)
 
 When you run an experiment with `PsyLingLLM`, you may see console output like:
 
-<img width="1350" height="207" alt="image" src="https://github.com/user-attachments/assets/fcc48d1b-2d45-4f1d-bc17-b8c893407c51" />
 
+<img width="1725" height="45" alt="image" src="https://github.com/user-attachments/assets/6b05da8f-2152-472e-95f3-52efef72a170" />
 
 
 **Explanation:**
 
-- `[█████...] 100%` → Progress bar showing the completion of all trials.
-- `Trial 1/2` → Indicates the current trial number out of total trials.
-- `ETA: 00:04` → Estimated time remaining (s).
-- `- tencent/Hunyuan-A13B-Instruct` → The model used for this experiment.
+- `[██████░░░] 73%` → Progress bar showing the completion of all trials.
+- `Trial 8/11` → Indicates the current trial number out of total trials.
+- `ETA: 01:14` → Estimated time remaining (s).
+- `- deepseek-reasoner` → The model used for this experiment.
 
-When experiment is finished you will see:
-- `completed! Total elapsed: 10 secs` → The experiment finished and took 10 seconds in total.
-<img width="1380" height="81" alt="image" src="https://github.com/user-attachments/assets/680191e5-bd92-4e71-81ad-0914e8b25472" />
+Upon experiment completion, the console will display execution results and output file paths:
 
 
-After this, the experiment results will be saved to your specified `output_path` or the default path `~/PsyLingLLM_Results`, and you can inspect the model responses in your `data.frame`.
+`[PsyLingLLM] Results saved: C:\Users\hanm5\Documents\.psylingllm\results\deepseek-reasoner_20251101_224010.csv`
+
+
+**Output File Management**
+Since no custom output_path was specified, results have been automatically saved to the default directory: ~/.psylingllm.
+Within this output directory, you will find two generated files:
+`deepseek-reasoner_20251101_221529.csv` - Contains structured experimental data and model responses
+`deepseek-reasoner_20251101_221529.log` - Provides detailed execution logs and diagnostic information
 
 
 ### 📝 Example Experiment Output
