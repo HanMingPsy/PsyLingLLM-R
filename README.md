@@ -4,20 +4,30 @@ It provides functions to **design, execute, and analyze** psycholinguistic, psyc
 The latest release introduces a comprehensive registry system that significantly streamlines model configuration and experimental setup. This architecture enhances reproducibility while maintaining flexibility across diverse LLM providers.
   
     **YAML-Based Configuration Registry**<br>
-    Structured Experiment Definitions: All model parameters and interface specifications stored in standardized YAML format
+    Structured Experiment Definitions: All model API parameters and interface specifications stored in standardized YAML format
     Version-Controlled Setups: Enable exact experiment replication through committed registry files
     Cross-Platform Compatibility: Consistent behavior across different computing environments
+    Flexible Field Mapping: Adapts to proprietary response formats without manual configuration
+    Custom Endpoint Support: Handles non-standard API structures from local deployments and proxy services
     
     **Pre-Configured Provider Templates**<br>
-    Major Provider Support: Pre-optimized templates for OpenAI, Anthropic, Google, Mistral, and Cohere
+    Major Provider Support:  Ready to use and pre-optimized templates for major providers
     Standardized Interfaces: Unified access patterns across different API specifications
     Rapid Deployment: Quick-start configurations requiring minimal customization
-    
-    **Automatic Path Detection System**<br>
-    Response Extraction: Intelligent identification of content paths in provider-specific JSON schemas
-    Reasoning Trace Capture: Automatic detection of thinking/explanation fields for interpretability studies
-    Streaming Support: Real-time delta path recognition for incremental response processing
   
+    **Automatic Regist System**<br>
+    Automated Registration Pipeline: A streamlined workflow systematically analyzes API endpoints, standardizes request templates, and generates optimized configuration files through intelligent path detection and structural inference.<br>
+    Interactive Preview Interface: Prior to finalization, researchers can comprehensively review all details through a structured preview that highlights potential inconsistencies or missing elements.<br>
+    Dual-Pass Validation Protocol: The system implements rigorous consistency verification by comparing path detection results between initial analysis (Pass-1) and standardized template reprobing (Pass-2), ensuring reliable extraction path selection.<br>
+    Provider-Agnostic Detection: Automatic identification of content paths across custom JSON schemas, including self-hosted and fine-tuned models<br>
+    Response Extraction: Intelligent identification of content paths in JSON schemas<br>
+    Reasoning Trace Capture: Automatic detection of thinking/explanation fields for interpretability studies<br>
+    Streaming Protocol Detection: Automated identification of Server-Sent Events (SSE) for incremental response processing and real-time data streaming<br>
+    Directly YAML: A user determined Registry which can be Automated generated<br>
+
+
+
+    Link：Prat II Register system
 ---
 
 ## 📖 Background
@@ -113,7 +123,7 @@ To run any experiment, you need to prepare the following three items **from your
 
 ### How to find them?
 - **API Key**: Available in your provider's user dashboard under API Keys or Access Tokens
-              (e.g., deepseek:https://api-docs.deepseek.com/; openai:https://platform.openai.com/api-keys; https://huggingface.co/settings/tokens ).  
+              (e.g., deepseek:https://api-docs.deepseek.com/; openai:https://platform.openai.com/api-keys; https://huggingface.co/settings/tokens).  
 - **Model Name**: check your provider’s *Models* or *Playground* page; names are case-sensitive.  
 - **API URL**: check the developer documentation of your provider. Many are OpenAI-compatible (`/v1/chat/completions`).
 
