@@ -1,8 +1,10 @@
 **PsyLingLLM** is an experimental toolkit for studying **human-like language processing** with Large Language Models (LLMs) in **R**.  
 It provides functions to **design, execute, and analyze** psycholinguistic, psychological, and educational experiments using LLMs.
+
+---
 - v0.3 Update: **New Registry System**<br>
-The latest release introduces a comprehensive registry system that significantly streamlines model configuration and experimental setup. This architecture enhances reproducibility while maintaining flexibility across diverse LLM providers.
-  
+The latest release introduces a comprehensive registry system that significantly streamlines model configuration and experimental setup. This architecture enhances reproducibility while maintaining flexibility across diverse LLM providers.<br>
+
     **YAML-Based Configuration Registry**<br>
     Structured Experiment Definitions: All model API parameters and interface specifications stored in standardized YAML format
     Version-Controlled Setups: Enable exact experiment replication through committed registry files
@@ -14,18 +16,10 @@ The latest release introduces a comprehensive registry system that significantly
     Major Provider Support:  Ready to use and pre-optimized templates for major providers
     Standardized Interfaces: Unified access patterns across different API specifications
     Rapid Deployment: Quick-start configurations requiring minimal customization
-  
+
     **Automatic Regist System**<br>
     Automated Registration Pipeline: A streamlined workflow systematically analyzes API endpoints, standardizes request templates, and generates optimized configuration files through intelligent path detection and structural inference.<br>
     Interactive Preview Interface: Prior to finalization, researchers can comprehensively review all details through a structured preview that highlights potential inconsistencies or missing elements.<br>
-    Dual-Pass Validation Protocol: The system implements rigorous consistency verification by comparing path detection results between initial analysis (Pass-1) and standardized template reprobing (Pass-2), ensuring reliable extraction path selection.<br>
-    Provider-Agnostic Detection: Automatic identification of content paths across custom JSON schemas, including self-hosted and fine-tuned models<br>
-    Response Extraction: Intelligent identification of content paths in JSON schemas<br>
-    Reasoning Trace Capture: Automatic detection of thinking/explanation fields for interpretability studies<br>
-    Streaming Protocol Detection: Automated identification of Server-Sent Events (SSE) for incremental response processing and real-time data streaming<br>
-    Directly YAML: A user determined Registry which can be Automated generated<br>
-
-
 
     Link：Prat II Register system
 ---
@@ -48,17 +42,23 @@ This enables researchers to focus on theory and analysis rather than experiment 
 
 ## 📥 Installation
 
-Clone the repository and install locally:
+To install PsyLingLLM directly from the GitHub repository, execute the following commands in your R environment:
 
 ```r
-# Install devtools if not available
-install.packages("devtools")
+# Install devtools if not already available
+if (!require("devtools")) install.packages("devtools")
 
-# Install from GitHub
+# Install PsyLingLLM from the GitHub repository
 devtools::install_github("HanMingPsy/PsyLingLLM-R")
 ```
+Verification
+```
+After installation, verify successful installation by loading the package and checking its version:
 
-
+```r
+library(PsyLingLLM)
+packageVersion("PsyLingLLM")
+```
 
 ---
 # 📚 Features
@@ -88,8 +88,14 @@ devtools::install_github("HanMingPsy/PsyLingLLM-R")
 - ✅ **Robust data handling**  
   Import/export CSV or Excel files with full UTF-8 support, making it straightforward to use materials in English, Chinese, or other languages.  
 
----
+- ✅ **Unified Registry Management**
+Version-controlled YAML files maintain reproducible experiment setups across all model providers and custom endpoints.
 
+- ✅ **Automated Endpoint Configuration**
+Intelligent probing automatically detects API schemas, response paths, and streaming protocols—eliminating manual setup for any LLM provider.
+
+
+---
 
 # 📑 Table of Contents
 
@@ -108,44 +114,50 @@ devtools::install_github("HanMingPsy/PsyLingLLM-R")
 - [10. Configuration Management](#1-single-trial-experiment)
 
 
+---
+
 
 # Prat 1 Experiment System
----
-# 🚀 Quick Start
+
+
+
+## 🚀 Quick Start
 ### 🔑 Authentication and Model Setup
 
 To run any experiment, you need to prepare the following three items **from your LLM provider**:
 
 1. **API Key** – your personal access token.  
-2. **Model Name** – the identifier of the model you want to call (e.g., `"gpt-4"`).  
-3. **API URL (Endpoint)** – the HTTP endpoint for chat/completion requests   
-   (e.g., OpenAI-compatible: `https://api.openai.com/v1/chat/completions`).
+2. **Model Name** – the identifier of the model you want to call.  
+3. **API URL** (only for non-official model) – the HTTP endpoint for requests   
+   (e.g., DeepSeek: `https://api.deepseek.com/chat/completions`).
 
 ### How to find them?
 - **API Key**: Available in your provider's user dashboard under API Keys or Access Tokens
-              (e.g., deepseek:https://api-docs.deepseek.com/; openai:https://platform.openai.com/api-keys; https://huggingface.co/settings/tokens).  
-- **Model Name**: check your provider’s *Models* or *Playground* page; names are case-sensitive.  
-- **API URL**: check the developer documentation of your provider. Many are OpenAI-compatible (`/v1/chat/completions`).
+  e.g., `DeepSeek: https://api-docs.deepseek.com/`<br>
+  `ChatGPT: https://platform.openai.com/api-keys`<br>
+  `HuggingFace: https://huggingface.co/settings/tokens`
+- **Model Name**: Check your provider's documentation for available models, names are case-sensitive.
+    e.g., `DeepSeek: deepseek-chat, deepseek-coder`
+    `OpenAI: gpt-5, gpt-4o, gpt-4o-mini`
+- **API URL**: check the developer documentation of your provider. 
+Custom endpoints: Your provider's API endpoint URL (e.g., `/v1/chat/completions` for chat interfaces, `/v1/completions` for completion interfaces)
+Self-hosted models: Local server address (e.g., `http://localhost:8080/v1/chat/completions`)
+ **Note**: Registered official providers are automatically configured—no URL specification required.
 
-⚠️ **Important**: Do not commit your API key to public. 
+    ⚠️ **Important**: Never expose your API keys in publicly accessible code. For enhanced security, consider store credentials as variables instead of hardcoding them in scripts. e.g.:
 
-**Use environment variables**
-
+ ```r
+        # Use variables
+        deepseek_api_key <- "sk-**********"
+        api_key = deepseek_api_key
+```
+Or 
 ```r
-Sys.setenv(API_KEY = "your_api_key_here")
+        # Use environment variables
+        Sys.setenv(deepseek_api_key = "sk-**********")
+        api_key = Sys.getenv("deepseek_api_key")
+```
 
-```
-or 
-
-**Directly input inside PsyLingLLM experiment functions**
-```
-result <- trial_experiment(
-  data   = "Demo/Materials_for_Demo/garden_path_sentences.csv",
-  api_key = "your_api_key_here",
-  model   = "your_model_here",
-  api_url = "https://your_api_url_here"
-)
-```
 ---
 
 ## 1. Single-Trial Experiment
