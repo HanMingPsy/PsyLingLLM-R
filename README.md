@@ -1,16 +1,23 @@
 **PsyLingLLM** is an experimental toolkit for studying **human-like language processing** with Large Language Models (LLMs) in **R**.  
 It provides functions to **design, execute, and analyze** psycholinguistic, psychological, and educational experiments using LLMs.
-- v0.3 Update: **New Registry System**
-  <br> The new registry system simplifies model configuration with:
+- v0.3 Update: **New Registry System**<br>
+The latest release introduces a comprehensive registry system that significantly streamlines model configuration and experimental setup. This architecture enhances reproducibility while maintaining flexibility across diverse LLM providers.
   
-
-  - YAML-based configuration for reproducible experiments
-  - Pre-configured templates for major providers
-  - Smart path detection for responses, reasoning traces, and streaming
+    **YAML-Based Configuration Registry**<br>
+    Structured Experiment Definitions: All model parameters and interface specifications stored in standardized YAML format
+    Version-Controlled Setups: Enable exact experiment replication through committed registry files
+    Cross-Platform Compatibility: Consistent behavior across different computing environments
+    
+    **Pre-Configured Provider Templates**<br>
+    Major Provider Support: Pre-optimized templates for OpenAI, Anthropic, Google, Mistral, and Cohere
+    Standardized Interfaces: Unified access patterns across different API specifications
+    Rapid Deployment: Quick-start configurations requiring minimal customization
+    
+    **Automatic Path Detection System**<br>
+    Response Extraction: Intelligent identification of content paths in provider-specific JSON schemas
+    Reasoning Trace Capture: Automatic detection of thinking/explanation fields for interpretability studies
+    Streaming Support: Real-time delta path recognition for incremental response processing
   
-
- 
-
 ---
 
 ## 📖 Background
