@@ -30,6 +30,58 @@ install.packages("devtools")
 # Install from GitHub
 devtools::install_github("HanMingPsy/PsyLingLLM-R")
 ```
+Register system
+```
+
+├── R/
+│ ├── register_orchestrator.R # llm_register(): end-to-end analysis → registry
+│ ├── register_probe_request.R # probe_llm_streaming(): POST (non-stream & SSE)
+│ ├── register_rank_endpoint.R # scoring (NS & ST) and keyword lexicon
+│ ├── register_build_input.R # build_standardized_input(), Pass-2 templates
+│ ├── register_read.R # structural inference & path helpers
+│ ├── register_classify.R # URL → interface classification
+│ ├── register_entry.R # build_registry_entry_from_analysis()
+│ ├── register_io.R # upsert into ~/.psylingllm/model_registry.yaml
+│ ├── register_preview.R # CI/human-readable preview
+│ ├── register_validate.R # Pass-2 consistency report
+│ └── register_utils.R # helpers (internal-only)
+├── inst/
+│   └── registry/
+│       └── system_registry.yaml
+```
+
+Experiment system
+```
+├── R/
+│ ├── llm_caller.R
+│ ├── trial_experiment.R
+│ ├── factorial_trial_experiment.R
+│ ├── conversation_experiment.R
+│ ├── conversation_experiment_with_feedback.R
+│ ├── multi_model.R
+│ ├── save_results.R
+│ ├── generate_experiment_materials.R
+│ ├── generate_factorial_experiment_list.R
+│ ├── llm_parser.R
+│ ├── get_model_config.R
+│ └── get_registry_entry.R
+├── inst/
+│   └── extdata/
+│       ├── Garden_path_sentences.csv
+│       └── Sentence_Completion.csv
+```
+Utils
+```
+├── R/
+│ ├── json_utils.R
+│ ├── progress_bar.R
+│ ├── write_experiment_log.R
+│ ├── error_handling.R
+│ └── schema.R
+
+```
+
+
 ---
 # 📚 Features
 
@@ -73,7 +125,7 @@ devtools::install_github("HanMingPsy/PsyLingLLM-R")
 
 
 
-
+# Prat 1 Experiment System
 ---
 # 🚀 Quick Start
 ### 🔑 Authentication and Model Setup
