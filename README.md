@@ -1,5 +1,15 @@
 **PsyLingLLM** is an experimental toolkit for studying **human-like language processing** with Large Language Models (LLMs) in **R**.  
 It provides functions to **design, execute, and analyze** psycholinguistic, psychological, and educational experiments using LLMs.
+- v0.3 Update: **New Registry System**
+  <br> The new registry system simplifies model configuration with:
+  
+
+  - YAML-based configuration for reproducible experiments
+  - Pre-configured templates for major providers
+  - Smart path detection for responses, reasoning traces, and streaming
+  
+
+ 
 
 ---
 
@@ -31,57 +41,6 @@ install.packages("devtools")
 devtools::install_github("HanMingPsy/PsyLingLLM-R")
 ```
 
-
-Experiment system
-```
-├── R/
-│ ├── llm_caller.R
-│ ├── trial_experiment.R
-│ ├── factorial_trial_experiment.R
-│ ├── conversation_experiment.R
-│ ├── conversation_experiment_with_feedback.R
-│ ├── multi_model.R
-│ ├── save_results.R
-│ ├── generate_experiment_materials.R
-│ ├── generate_factorial_experiment_list.R
-│ ├── get_model_config.R
-│ └── get_registry_entry.R
-├── inst/
-│   └── extdata/
-│       ├── Garden_path_sentences.csv
-│       └── Sentence_Completion.csv
-```
-
-Register system
-```
-├── R/
-│ ├── register_orchestrator.R                  # llm_register(): end-to-end analysis → registry
-│ ├── register_probe_request.R                 # probe_llm_streaming(): POST (non-stream & SSE)
-│ ├── register_rank_endpoint.R                 # scoring (NS & ST) and keyword lexicon
-│ ├── register_build_input.R                   # build_standardized_input(), Pass-2 templates
-│ ├── register_read.R                          # structural inference & path helpers
-│ ├── register_classify.R                      # URL → interface classification
-│ ├── register_entry.R                         # build_registry_entry_from_analysis()
-│ ├── register_io.R                            # upsert into ~/.psylingllm/model_registry.yaml
-│ ├── register_preview.R                       # CI/human-readable preview
-│ ├── register_validate.R                      # Pass-2 consistency report
-│ └── register_utils.R                         # helpers (internal-only)
-├── inst/
-│   └── registry/
-│       └── system_registry.yaml               # default registry file (pre-regist)
-```
-
-Utils
-```
-├── R/
-│ ├── json_utils.R
-│ ├── progress_bar.R
-│ ├── write_experiment_log.R
-│ ├── error_handling.R
-│ ├── llm_parser.R
-│ └── schema.R
-
-```
 
 
 ---
@@ -127,8 +86,10 @@ Utils
 - [7. Data Handling (CSV/XLSX, UTF-8 Safe)](#7-data-handling-csvxlsx-utf-8-safe)
 ## Part II
 - [8. Registry System Overview](#1-single-trial-experiment)
-- [9. Automatic Endpoint Registration](#1-single-trial-experiment)
+- [9. Endpoint Registration & Auto-Discovery](#1-single-trial-experiment)
+- [10. Provider-Agnostic Interface](#1-single-trial-experiment)
 - [10. Configuration Management](#1-single-trial-experiment)
+
 
 
 # Prat 1 Experiment System
@@ -138,13 +99,14 @@ Utils
 
 To run any experiment, you need to prepare the following three items **from your LLM provider**:
 
-1. **API Key** – your personal access token (e.g., from `OpenAI`).  
+1. **API Key** – your personal access token.  
 2. **Model Name** – the identifier of the model you want to call (e.g., `"gpt-4"`).  
 3. **API URL (Endpoint)** – the HTTP endpoint for chat/completion requests   
    (e.g., OpenAI-compatible: `https://api.openai.com/v1/chat/completions`).
 
 ### How to find them?
-- **API Key**: usually available in your provider’s user dashboard under *API Keys* or *Access Tokens*.  
+- **API Key**: Available in your provider's user dashboard under API Keys or Access Tokens
+              (e.g., deepseek:https://api-docs.deepseek.com/; openai:https://platform.openai.com/api-keys; https://huggingface.co/settings/tokens ).  
 - **Model Name**: check your provider’s *Models* or *Playground* page; names are case-sensitive.  
 - **API URL**: check the developer documentation of your provider. Many are OpenAI-compatible (`/v1/chat/completions`).
 
@@ -155,8 +117,6 @@ To run any experiment, you need to prepare the following three items **from your
 ```r
 Sys.setenv(API_KEY = "your_api_key_here")
 
-Sys.setenv(MODEL_NAME = "your_model_here")
-Sys.setenv(API_URL = "https://your_api_url_here")
 ```
 or 
 
@@ -857,3 +817,55 @@ results <- multi_model_experiment(
 
 ---
 ...
+
+
+Experiment system
+```
+├── R/
+│ ├── llm_caller.R
+│ ├── trial_experiment.R
+│ ├── factorial_trial_experiment.R
+│ ├── conversation_experiment.R
+│ ├── conversation_experiment_with_feedback.R
+│ ├── multi_model.R
+│ ├── save_results.R
+│ ├── generate_experiment_materials.R
+│ ├── generate_factorial_experiment_list.R
+│ ├── get_model_config.R
+│ └── get_registry_entry.R
+├── inst/
+│   └── extdata/
+│       ├── Garden_path_sentences.csv
+│       └── Sentence_Completion.csv
+```
+
+Register system
+```
+├── R/
+│ ├── register_orchestrator.R                  # llm_register(): end-to-end analysis → registry
+│ ├── register_probe_request.R                 # probe_llm_streaming(): POST (non-stream & SSE)
+│ ├── register_rank_endpoint.R                 # scoring (NS & ST) and keyword lexicon
+│ ├── register_build_input.R                   # build_standardized_input(), Pass-2 templates
+│ ├── register_read.R                          # structural inference & path helpers
+│ ├── register_classify.R                      # URL → interface classification
+│ ├── register_entry.R                         # build_registry_entry_from_analysis()
+│ ├── register_io.R                            # upsert into ~/.psylingllm/model_registry.yaml
+│ ├── register_preview.R                       # CI/human-readable preview
+│ ├── register_validate.R                      # Pass-2 consistency report
+│ └── register_utils.R                         # helpers (internal-only)
+├── inst/
+│   └── registry/
+│       └── system_registry.yaml               # default registry file (pre-regist)
+```
+
+Utils
+```
+├── R/
+│ ├── json_utils.R
+│ ├── progress_bar.R
+│ ├── write_experiment_log.R
+│ ├── error_handling.R
+│ ├── llm_parser.R
+│ └── schema.R
+
+```
