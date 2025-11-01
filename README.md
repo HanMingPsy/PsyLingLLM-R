@@ -117,6 +117,7 @@ Utils
 
 # 📑 Table of Contents
 
+## Part I
 - [1. Single-Trial Experiment](#1-single-trial-experiment)
 - [2. Repeated Trials with Conditions](#2-garden-path-sentences-judgment-task)
 - [3. Factorial Designs](#4-factorial-designs)
@@ -124,7 +125,10 @@ Utils
 - [5. Dynamic Feedback & Adaptive Difficulty](#6-conversation-experiment-with-feedback)
 - [6. Multi-Model Comparisons](#7-multi-model-experiment)
 - [7. Data Handling (CSV/XLSX, UTF-8 Safe)](#7-data-handling-csvxlsx-utf-8-safe)
-
+## Part II
+- [8. Registry System Overview](#1-single-trial-experiment)
+- [9. Automatic Endpoint Registration](#1-single-trial-experiment)
+- [10. Configuration Management](#1-single-trial-experiment)
 
 
 # Prat 1 Experiment System
