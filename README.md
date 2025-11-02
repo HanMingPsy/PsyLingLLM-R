@@ -141,6 +141,8 @@ To run any experiment, you need to prepare the following three items **from your
     `OpenAI: gpt-5, gpt-4o, gpt-4o-mini`
 - **API URL**: check the developer documentation of your provider. 
 Custom endpoints: Your provider's API endpoint URL (e.g., `/v1/chat/completions` for chat interfaces, `/v1/completions` for completion interfaces)
+
+
 Self-hosted models: Local server address (e.g., `http://localhost:8080/v1/chat/completions`)
  **Note**: Registered official providers are automatically configured—no URL specification required.
 
@@ -185,7 +187,7 @@ df <- data.frame(
 result <- trial_experiment(
   data = df,
   api_key = "your_api_key_here",
-  model   = "your_model_here",
+  model_key   = "your_model_here",
   api_url = "https://your_api_url_here",
   trial_prompt = "Please complete the blank in the sentence."
 )
@@ -194,15 +196,14 @@ print(result$Response)
 ```
 ---
 
-### ✅ Example Output Explanation
+### 🖥️ Console Output & File Management
 
-When you run an experiment with `PsyLingLLM`, you may see console output like:
+During `PsyLingLLM` experiment execution, the console output provides runtime feedback including:
 
 
 <img width="1725" height="45" alt="image" src="https://github.com/user-attachments/assets/6b05da8f-2152-472e-95f3-52efef72a170" />
 
 
-**Explanation:**
 
 - `[██████░░░] 73%` → Progress bar showing the completion of all trials.
 - `Trial 8/11` → Indicates the current trial number out of total trials.
@@ -212,40 +213,82 @@ When you run an experiment with `PsyLingLLM`, you may see console output like:
 Upon experiment completion, the console will display execution results and output file paths:
 
 
-`[PsyLingLLM] Results saved: C:\Users\hanm5\Documents\.psylingllm\results\deepseek-reasoner_20251101_224010.csv`
+`[PsyLingLLM] Results saved: C:\Users\Documents\.psylingllm\results\deepseek-reasoner_20251101_224010.csv`
 
 
 **Output File Management**
-Since no custom output_path was specified, results have been automatically saved to the default directory: ~/.psylingllm.
-Within this output directory, you will find two generated files:
-`deepseek-reasoner_20251101_221529.csv` - Contains structured experimental data and model responses
-`deepseek-reasoner_20251101_221529.log` - Provides detailed execution logs and diagnostic information
+When no custom output_path is specified, results are automatically saved to the default directory: ~/.psylingllm. The system generates timestamped files:
+deepseek-reasoner_20251101_221529.csv → Structured experimental data and model responses
+deepseek-reasoner_20251101_221529.log → Detailed execution logs and diagnostic information
 
 
-### 📝 Example Experiment Output
+Default file Naming Convention:
+`{model-name}_{YYYYMMDD}_{HHMMSS}.{extension}` ensures unique identification across multiple experimental runs.
 
-After running a trial experiment with `PsyLingLLM`, the results are returned as a `data.frame` (or saved to CSV/XLSX) like this:
 
-| Run | Item | TrialPrompt | Material | Response | Think | ModelName | ResponseTime |
-|-----|------|-------------|---------|---------|------|-----------|--------------|
-| 1 | 1 | Please complete the blank in the sentence: | The cat sat on the ____ | The cat sat on the couch. | "Okay, let's see. The user wants me to fill in the blank..." | tencent/Hunyuan-A13B-Instruct | 9.06 |
-| 2 | 2 | Please complete the blank in the sentence: | 猫咪坐在____上。 | 椅子 | "Okay, let's see. The user wants me to fill in the blank..." | tencent/Hunyuan-A13B-Instruct | 4.18 |
+### 📝 Result Data Structure
+
+After running a trial experiment with `PsyLingLLM`, the results are returned as a `data.frame` or saved to `CSV/XLSX` like this:
+
+| Run | Item | TrialPrompt | Material | Response | Think |
+|-----|------|--------------|-----------|-----------|----------------|
+| 1 | 1 | Please complete the blank in the sentence. | The cat sat on the ____. | The cat sat on the **mat**. | "This is a very common English sentence, often used as an example. The most typical completion is 'mat'..." |
+| 2 | 2 | Please complete the blank in the sentence. | 这只猫咪坐在____上。 | 这只猫咪坐在沙发上。 | "Common things a cat might sit on include a chair, a mat, a bed, a sofa... I'll go with '沙发'." |
+| 3 | 3 | Please complete the blank in the sentence. | Le chat était assis sur le ____. | Le chat était assis sur le **tapis**. | "The sentence is in French... 'tapis' is masculine and means 'mat' — a common choice." |
+| 4 | 4 | Please complete the blank in the sentence. | El gato estaba sentado en el ____. | El gato estaba sentado en el **tejado**. | "'En el' requires a masculine noun... 'tejado' (roof) makes sense here." |
+| 5 | 5 | Please complete the blank in the sentence. | Die Katze saß auf dem ____. | Die Katze saß auf dem **Dach**. | "'Auf dem Dach' means 'on the roof' — a standard example in German." |
+| 6 | 6 | Please complete the blank in the sentence. | Il gatto era seduto sul ____. | Il gatto era seduto sul divano. | "'Sul' is used with masculine nouns... 'divano' (sofa) is natural and common." |
+| 7 | 7 | Please complete the blank in the sentence. | ネコが____の上に座っていました。 | ネコがいすの上に座っていました。 | "The sentence means 'The cat was sitting on top of ___'... I'll use 'いす' (chair)." |
+| 8 | 8 | Please complete the blank in the sentence. | 고양이가 ____ 위에 앉아 있었습니다. | 고양이가 의자 위에 앉아 있었습니다. | "Common options include '의자', '탁자', '바닥'... I'll choose '의자' (chair)." |
+| 9 | 9 | Please complete the blank in the sentence. | O gato estava sentado no ____. | O gato estava sentado no **chão**. | "'No' combines 'em + o', so the noun must be masculine... 'chão' fits perfectly." |
+| 10 | 10 | Please complete the blank in the sentence. | Katten satt på ____. | Katten satt på mattan. | "In Swedish, 'på' means 'on'... 'mattan' (the mat) is the definite form." |
+| 11 | 11 | Please complete the blank in the sentence. | Кот сидел на ____. | Кот сидел на столе. | "'На' takes the prepositional case... 'стол' becomes 'на столе' (on the table)." |
+
+
+and includes comprehensive diagnostic metadata and trial execution states:
+
+
+| ModelName | TotalResponseTime | PromptTokens | CompletionTokens | TrialStatus | Streaming | Timestamp | RequestID |
+|------------|------------------:|--------------:|-----------------:|-------------|------------|------------------|--------------------|
+| deepseek-reasoner | 8.530571222 | 25 | 206 | SUCCESS | FALSE | 2025/11/1 22:15 | b6d5b351|
+| deepseek-reasoner | 14.36554313 | 24 | 376 | SUCCESS | FALSE | 2025/11/1 22:15 | d8bfa8c1|
+| deepseek-reasoner | 26.26069283 | 27 | 689 | SUCCESS | FALSE | 2025/11/1 22:16 | 2cbb1e4c|
+| deepseek-reasoner | 49.05775499 | 28 | 1346 | SUCCESS | FALSE | 2025/11/1 22:17 | 68062a0d|
+| deepseek-reasoner | 19.82083488 | 27 | 548 | SUCCESS | FALSE | 2025/11/1 22:17 | 7a9d3aa3|
+| deepseek-reasoner | 29.26222396 | 27 | 794 | SUCCESS | FALSE | 2025/11/1 22:17 | 273a27f2|
+| deepseek-reasoner | 36.12755489 | 29 | 977 | SUCCESS | FALSE | 2025/11/1 22:18 | 5041a156|
+| deepseek-reasoner | 16.51271296 | 30 | 436 | SUCCESS | FALSE | 2025/11/1 22:18 | a71ca7e3|
+| deepseek-reasoner | 42.01539993 | 27 | 1074 | SUCCESS | FALSE | 2025/11/1 22:19 | 9acc1843|
+| deepseek-reasoner | 33.07628107 | 25 | 900 | SUCCESS | FALSE | 2025/11/1 22:20 | da315652|
+| deepseek-reasoner | 17.22883201 | 25 | 465 | SUCCESS | FALSE | 2025/11/1 22:20 | 1c5f8f25|
 
 **Column Explanations:**
 
-- **Run** → The overall trial number.  
-- **Item** → The number of item or stimulus provided by user.  
-- **TrialPrompt** → The instruction or prompt given to the model.  
-- **Material** → The sentence or context the model is responding to.  
-- **Response** → The final answer generated by the model.  
-- **Think** → The model’s reasoning process (only if model support at), which is especially useful for psycholinguistic analysis or debugging prompts.  
-- **ModelName** → The LLM model used for this trial.  
-- **ResponseTime** → Time in seconds taken by the model to generate the response.
+**Run** → Global sequential index for each trial.  
+**Item** → Identifier of the presented stimulus or sentence item.  
+**TrialPrompt** → The instruction or task prompt shown to the model.  
+**Material** → The sentence, phrase, or experimental context the model responds to.  
+**Response** → The final completion or answer produced by the model.  
+**Think** → A short excerpt of the model’s reasoning trace (if available), useful for psycholinguistic or cognitive analysis.  
 
+**ModelName** → The name or identifier of the large language model used (e.g., `deepseek-reasoner`).  
+**TotalResponseTime** → Total time in seconds taken by the model to generate a full response.  
+**PromptTokens** → Number of tokens in the input prompt.  
+**CompletionTokens** → Number of tokens produced in the model’s output.  
+**TrialStatus** → Execution result of the trial.  
+**Streaming** → Indicates whether the response was generated using streaming mode.  
+**Timestamp** → timestamp of when the trial was completed.  
+**RequestID** → Unique identifier assigned to the request for reproducibility and traceability.  
+
+Leran more in Schema section
 ---
 
 
-### ⚙️ Function Arguments: `trial_experiment()`
+### ⚙️Full Function Arguments: `trial_experiment()`
+## Core Experiment Parameters
+- **`model_key`** → Registry identifier
+   >Specifies the pre-configured model entry from the registry (e.g., `deepseek-chat` or `deepseek-chat@proxy`).
+
 
 - **`data`** → The experiment materials. Can be a `data.frame` or a CSV/XLSX file.  
    >The data argument specifies the experimental materials. 
