@@ -146,9 +146,9 @@ Custom endpoints: Your provider's API endpoint URL (e.g., `/v1/chat/completions`
 Self-hosted models: Local server address (e.g., `http://localhost:8080/v1/chat/completions`)
  **Note**: Registered official providers are automatically configured—no URL specification required.
 
-    ⚠️ **Important**: Never expose your API keys in publicly accessible code. For enhanced security, consider store credentials as variables instead of hardcoding them in scripts. e.g.:
+⚠️ **Important**: Never expose your API keys in publicly accessible code. For enhanced security, consider store credentials as variables instead of save them in scripts. e.g.:
 
- ```r
+```r
         # Use variables
         deepseek_api_key <- "sk-**********"
         api_key = deepseek_api_key
@@ -165,34 +165,34 @@ Or
 ## 1. Single-Trial Experiment
 
 ```r
-library(PsyLingLLM)
-# Build test material
-df <- data.frame(
-  Material = c(
-    "The cat sat on the ____.",           # English
-    "这只猫咪坐在____上。",                # Chinese (Simplified)
-    "Le chat était assis sur le ____.",   # French
-    "El gato estaba sentado en el ____.", # Spanish
-    "Die Katze saß auf dem ____.",        # German
-    "Il gatto era seduto sul ____.",      # Italian
-    "ネコが____の上に座っていました。",     # Japanese
-    "고양이가 ____ 위에 앉아 있었습니다.",  # Korean
-    "O gato estava sentado no ____.",     # Portuguese
-    "Katten satt på ____.",               # Swedish
-    "Кот сидел на ____."                  # Russian
-  )
-)
-
-# run test
-result <- trial_experiment(
-  data = df,
-  api_key = "your_api_key_here",
-  model_key   = "your_model_here",
-  api_url = "https://your_api_url_here",
-  trial_prompt = "Please complete the blank in the sentence."
-)
-
-print(result$Response)
+   library(PsyLingLLM)
+   # Build test material
+   df <- data.frame(
+     Material = c(
+       "The cat sat on the ____.",           # English
+       "这只猫咪坐在____上。",                # Chinese (Simplified)
+       "Le chat était assis sur le ____.",   # French
+       "El gato estaba sentado en el ____.", # Spanish
+       "Die Katze saß auf dem ____.",        # German
+       "Il gatto era seduto sul ____.",      # Italian
+       "ネコが____の上に座っていました。",     # Japanese
+       "고양이가 ____ 위에 앉아 있었습니다.",  # Korean
+       "O gato estava sentado no ____.",     # Portuguese
+       "Katten satt på ____.",               # Swedish
+       "Кот сидел на ____."                  # Russian
+     )
+   )
+   
+   # run test
+   result <- trial_experiment(
+     data = df,
+     api_key = "your_api_key_here",
+     model_key   = "your_model_here",
+     api_url = "https://your_api_url_here",
+     trial_prompt = "Please complete the blank in the sentence."
+   )
+   
+   print(result$Response)
 ```
 ---
 
