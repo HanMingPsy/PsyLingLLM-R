@@ -288,7 +288,13 @@ Leran more in Schema section
 ## Core Experiment Parameters
 - **`model_key`** → Registry identifier
    >Specifies the pre-configured model entry from the registry (e.g., `deepseek-chat` or `deepseek-chat@proxy`).
-
+   >
+- **`generation_interface `** → API interface type
+   >Defines the interaction protocol; defaults to "chat" for conversational interfaces.
+   >
+- **`api_key`** → Authentication credentials
+   >Provider-specific API key for service access.
+   >
 
 - **`data`** → The experiment materials. Can be a `data.frame` or a CSV/XLSX file.  
    >The data argument specifies the experimental materials. 
