@@ -281,21 +281,26 @@ and includes comprehensive diagnostic metadata and trial execution states:
 **RequestID** → Unique identifier assigned to the request for reproducibility and traceability.  
 
 Leran more in Schema section
+
+
 ---
 
 
-### ⚙️Full Function Arguments: `trial_experiment()`
-## Core Experiment Parameters
+## ⚙️Full Function Arguments: `trial_experiment()`
+#### Core Experiment Parameters
 - **`model_key`** → Registry identifier
    >Specifies the pre-configured model entry from the registry (e.g., `deepseek-chat` or `deepseek-chat@proxy`).
    >
 - **`generation_interface `** → API interface type
-   >Defines the interaction protocol; defaults to "chat" for conversational interfaces.
+   >Defines the interaction protocol; defaults to "chat/completion" for conversational interfaces.
    >
 - **`api_key`** → Authentication credentials
    >Provider-specific API key for service access.
    >
-
+- **`api_url`** → Endpoint override
+   >Optional custom API URL; required for non-official providers.
+   >
+   
 - **`data`** → The experiment materials. Can be a `data.frame` or a CSV/XLSX file.  
    >The data argument specifies the experimental materials. 
    It supports multiple input formats and follows a clear processing pipeline `generate_llm_experiment_list()` to ensure compatibility and reproducibility.
@@ -328,12 +333,13 @@ Leran more in Schema section
   >`TrialPrompt` Global prompt applied to trials (if not provided per row)<br>
   >
   >**Optional Columns**<br>
-  > `Condition` One or more experimental condition columns (e.g., Congruity)<br>
-  > `Target` Correct answer or expected response<br>
-  > `CorrectResponse` Another variant for expected response<br>
-  > `TrialType` Type of trial, if multiple trial types are used<br>
-  > `Metadata` Any additional metadata you want to store per trial
+  > `Condition`: Experimental factors (e.g., Congruity, Difficulty)<br>
+  >  Columns matching `Condition` or `condition` patterns receive priority placement. You need to name columns starting with (e.g., `condition1`, `Condition_congruity`)<br>
+  >  `Custom Columns`: Add any additional columns to your dataset - all custom columns are preserved through the experimental pipeline.(e.g., correctresponse)<br>
+  >  Columns organized as: Core → Conditions → Content → Custom
   >
+  >  Link:Learn more in Data Handling section
+## Experiment Control Parameters
 - **`repeats`** → The repeats parameter controls how many times the entire experiment dataset (all rows in data) should be duplicated.
    >How it works
    ```r
