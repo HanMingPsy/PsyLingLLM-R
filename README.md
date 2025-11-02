@@ -163,6 +163,8 @@ Or
 ---
 
 ## 1. Single-Trial Experiment
+`trial_experiment()` represents the most fundamental paradigm for testing LLM behavior, analogous to presenting one stimulus to a human participant in psychological research. 
+
 
 ```r
    library(PsyLingLLM)
