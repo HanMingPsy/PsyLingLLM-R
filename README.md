@@ -302,21 +302,25 @@ Leran more in Schema section
    >
    
 - **`data`** → The experiment materials. Can be a `data.frame` or a CSV/XLSX file.  
-   >The data argument specifies the experimental materials. 
-   It supports multiple input formats and follows a clear processing pipeline `generate_llm_experiment_list()` to ensure compatibility and reproducibility.
+   >The experimental materials to be used for generating the LLM trial table. Can be a `data.frame`, or a path to a `.csv`, `.xls`, or `.xlsx` file.
    >
-   >**Input Formats**
+   >**Supported Input Formats**
    >
    > `PsyLingLLM` will automatically detect whether your data input is:
    >
    >`CSV file (.csv)`
-   >Read with readr::read_csv()
+   >Read using readr::read_csv() (UTF-8 safe).
    >
-   >Automatically checks for non-UTF8 characters. If found, they are auto-converted to UTF-8 using stringi::stri_enc_toutf8(), and a warning is shown.If issues persist → save as `XLSX` instead of CSV.
+   >PsyLingLLM will automatically checks for non-UTF-8 encodings.
+   >If non-UTF-8 characters (e.g., smart quotes, special symbols) are detected, they are automatically converted via stringi::stri_enc_toutf8().
+   >A warning is issued when conversion occurs.
+   >If encoding issues persist, it is recommended to save the file as Excel (.xlsx) instead.
    >
    >`Excel file (.xls, .xlsx)`
    >Read with readxl::read_excel()
-   >Recommended for Chinese or other non-ASCII text, since Excel avoids common CSV encoding issues.
+  >
+  >`R data.frame`
+  >If a data frame is already loaded or generated in R, it will be used directly.
   >
   >`R data.frame`
   >Directly passed in if already loaded or generated in R.Useful when you pre-process or dynamically create stimuli.
@@ -327,10 +331,10 @@ Leran more in Schema section
   >If the first column of your CSV/data.frame has no name, it will be treated as Material.<br>
   >
   >**Automatically Added Columns**<br>
-  >If missing from your data, the system will automatically add these columns:<br>
+  >If these columns are missing from your input data, the system will automatically generate them:<br>
   >`Item` Sequential item number assigned to each row<br>
   >`Run` Trial index after repetitions and randomization<br>
-  >`TrialPrompt` Global prompt applied to trials (if not provided per row)<br>
+  >`TrialPrompt` Prompt applied to trials<br>
   >
   >**Optional Columns**<br>
   > `Condition`: Experimental factors (e.g., Congruity, Difficulty)<br>
@@ -358,21 +362,20 @@ Leran more in Schema section
    ```
    >If you set repeats = 3, each row will be copied 3 times:
    >
-  > | Item | Material    |
-  > | ---- | ----------- |
-  > | 1    | Sentence 1  |
-  > | 2    | Sentence 2  |
-  > | …    | …           |
-  > | 10   | Sentence 10 |
-  > | 1    | Sentence 1  |
-  > | 2    | Sentence 2  |
-  > | …    | …           |
-  > | 10   | Sentence 10 |
-  > | 1    | Sentence 1  |
-  > | …    | …           |
-  > | 10   | Sentence 10 |
-   >
-   >df_expanded <- df[rep(seq_len(nrow(df)), 3), , drop = FALSE]
+   > | Run | Item | Material    |
+   > |-----|------|-------------|
+   > | 1 | 1    | Sentence 1  |
+   > | 2 | 2    | Sentence 2  |
+   > | … | …    | …           |
+   > | 10 | 10   | Sentence 10 |
+   > | 11 | 1    | Sentence 1  |
+   > | 12 | 2    | Sentence 2  |
+   > | … | …    | …           |
+   > | 20 | 10   | Sentence 10 |
+   > | 21 | 1    | Sentence 1  |
+   > | 22 | 2    | Sentence 2  |
+   > | … | …    | …           |
+   > | 30 | 10   | Sentence 10 |
    >
 - **`random`** → Whether to shuffle the order of trials (`TRUE`) or keep them sequential (`FALSE`).  
 
