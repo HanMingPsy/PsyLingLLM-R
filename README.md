@@ -63,37 +63,29 @@ packageVersion("PsyLingLLM")
 ---
 # 📚 Features
 
-- ✅ **Single-trial collection**  
-  Run controlled experiments where the model responds to one stimulus at a time, similar to presenting a single trial in psychology experiments.  
+- ✅ **Registry-first Reproducibility**
+      All experiment configurations — from model endpoints to parameter defaults — are stored in versioned YAML registries.
+      This guarantees full transparency and reproducibility across updates, labs, or computing environments.
+      Automatic endpoint detection and schema inference remove the need for manual API setup, letting you focus entirely on your experimental design.
 
-- ✅ **Repetition and randomization**  
-  Present the same material multiple times, or shuffle the order of trials, to study consistency and random effects—just like in behavioral experiments with human participants.  
+- ✅ **Precise Experimental Control**
+      PsyLingLLM treats LLMs like participants in a behavioral experiment.
+      It supports single-trial presentation, randomization, controlled repetition — ensuring every response is collected under precisely defined conditions.
+      This makes model evaluation quantitative, time-sensitive, and reproducible.
 
-- ✅ **Factorial design support**  
-  Test the influence of multiple factors (e.g., congruity × language condition) in a structured way, automatically expanding your stimuli into all combinations.  
+- ✅ **Factorial & Condition-based Design**  
+      Design complex experiments without manual table manipulation.
+      Built-in factorial expansion automatically generates all combinations of independent variables (e.g., Congruity × Language), while condition metadata keeps your datasets organized.
+      Ideal for psycholinguistic, reasoning, or cognitive modeling studies that test interaction effects between multiple experimental factors.
 
-- ✅ **Conversation-based tasks**  
-  Go beyond single prompts—simulate interactive experiments where the model engages in multi-turn dialogues, keeping track of context.  
-
-- ✅ **Adaptive and feedback-based experiments**  
-  Dynamically adjust task difficulty or provide feedback during the session, enabling learning-style or tutoring experiments with LLMs.  
-
-- ✅ **Customizable experimental methods**  
-  Beyond predefined setups, researchers can flexibly design their own experimental paradigms.  
-  You can control how stimuli are presented, how prompts are structured, and even how the model’s responses are evaluated. 
-
-- ✅ **Multi-model comparisons**  
-  Easily run the same experiment across different LLMs, to test how models vary in their “behavior” under identical conditions.  
-
-- ✅ **Robust data handling**  
-  Import/export CSV or Excel files with full UTF-8 support, making it straightforward to use materials in English, Chinese, or other languages.  
-
-- ✅ **Unified Registry Management**
-Version-controlled YAML files maintain reproducible experiment setups across all model providers and custom endpoints.
-
-- ✅ **Automated Endpoint Configuration**
-Intelligent probing automatically detects API schemas, response paths, and streaming protocols—eliminating manual setup for any LLM provider.
-
+- ✅ **Conversation & Adaptive Paradigms**  
+      Move beyond single prompts to multi-turn dialogue experiments with persistent context and rolling message history.
+      Implement adaptive or feedback-driven tasks, where the model’s next input depends on its previous response — enabling simulations of tutoring, learning, and cooperative reasoning.
+      
+- ✅ **Cross-model & Multilingual Benchmarking**  
+      Run the same experiment across different LLMs and languages under identical protocols.
+      Full UTF-8 and Excel/CSV compatibility ensures smooth multilingual data handling,
+      Structured logging and schema-standardized outputs allow direct cross-model comparison — turning raw model runs into analyzable experimental data.
 
 ---
 
@@ -465,10 +457,10 @@ Leran more in Schema section
 - **`output_path`** → Optional file or directory path where PsyLingLLM saves experiment results and logs.
    >The `output_path` argument specifies **where PsyLingLLM writes experiment results and logs**.<br>
    >If not provided (NULL), PsyLingLLM automatically creates a default directory at `~/.psylingllm/results` and generates a timestamped filename in the format {model}_{YYYYMMDD_HHMMSS}.csv.<br>
-   >You can provide either:<br>
-   >- a **file path** (e.g., "results/my_experiment.csv")<br>
+   >You can provide either:
+   >a **file path** (e.g., "results/my_experiment.csv")<br>
    >- a **directory path** (e.g., "results/", auto-naming enabled).<br>
-   >  
+   >
    > The function automatically chooses the save method based on file extension:<br>
    > `.csv` → uses `readr::write_excel_csv()` (UTF-8 encoded)<br>
    > `.xls / .xlsx` → uses `writexl::write_xlsx()` <br> 
@@ -481,40 +473,44 @@ Leran more in Schema section
    >
 - **`timeout`** → Integer value specifying the maximum time (in seconds) allowed for each LLM API request.<br>
    >The `timeout` parameter sets the upper limit for how long PsyLingLLM waits for a model response before aborting the request.<br>
-   >- Default → 120 seconds unless overridden by a global option.<br>
+   >- `Default` → 120 seconds unless overridden by a global option.<br>
    >
    >If the model does not respond within this duration, the trial is automatically marked as a timeout error (`TrialStatus = "TIMEOUT"`).<br>
    >This ensures that a single slow or unresponsive API call does not block the entire experiment run.<br>
    >
 - **`overwrite`** → Logical flag indicating whether to overwrite existing output files.<br>
    >The overwrite parameter controls whether `PsyLingLLM` should replace an existing result file when writing experiment outputs via `output_path`.<br>
+   >  
    >`TRUE` (default) → overwrite existing files if they already exist.<br>
    >`FALSE` → throw an error if the file already exists, preventing accidental data loss.<br>
+   >   
    >This parameter is useful when you want to preserve previous experiment runs or enforce explicit versioning of output files.<br>
    >
 - **`delay`** → Pause time (in seconds) between trials.<br>
    >The delay parameter introduces a controlled time interval between successive API requests.<br>
-   >- Default is `0` (no delay).<br>
+   >   
+   >- `Default` is `0` (no delay).<br>
    >- Use a positive value (e.g., `delay = 1.5`) to insert a fixed pause between trials.<br>
    >
    >This can be useful in experiments where:<br>
       >API rate limits must be respected (e.g., OpenAI or Anthropic quotas).<br>
       >Controlled timing between stimuli is required (e.g., simulating human pacing).<br>
       >You want to prevent server overload during batch trials.<br>
+   >   
    >The delay applies after each trial (or conversation turn) and before the next request begins.<br>
    >
-- **`return_raw`** → Logical flag indicating whether to include raw request and response objects in the returned results.
-   >The return_raw parameter controls whether PsyLingLLM should attach the complete raw data for each API call — including the request body, headers, and raw response text — to the output data frame.
-   >`FALSE` (default) → returns only structured trial results conforming to PsyLingLLM_Schema.
-   >`TRUE` → adds additional columns containing the full raw request and response payloads for each trial.
-   >This option is useful for debugging, model comparison, or advanced post-hoc analyses where you need to inspect the exact input/output exchanged with the LLM API.
+- **`return_raw`** → Logical flag indicating whether to include raw request and response objects in the returned results.<br>
+   >The return_raw parameter controls whether PsyLingLLM should attach the complete raw data for each API call — including the request body, headers, and raw response text — to the output data frame.<br>
+   >`FALSE` (default) → returns only structured trial results conforming to PsyLingLLM_Schema.<br>
+   >`TRUE` → adds additional columns containing the full raw request and response payloads for each trial.<br>
+   >This option is useful for debugging, model comparison, or advanced post-hoc analyses where you need to inspect the exact input/output exchanged with the LLM API.<br>
+
+  
 ---
 
 
-
-
 ## 2. Garden Path Sentences Judgment Task
-This example demonstrates how to run a repeated-trial experiment using all available parameters in trial_experiment().
+This example demonstrates how to run a repeated-trial experiment using all available parameters in `trial_experiment()`.
 It shows how to load demo linguistic materials, configure model behavior, and control experiment pacing.
 
 
