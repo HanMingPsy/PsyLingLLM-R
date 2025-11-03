@@ -128,8 +128,7 @@ To run any experiment, you need to prepare the following three items **from your
 
 1. **API Key** – your personal access token.  
 2. **Model Name** – the identifier of the model you want to call.  
-3. **API URL** (only for non-official model) – the HTTP endpoint for requests   
-   (e.g., DeepSeek: `https://api.deepseek.com/chat/completions`).
+3. **API URL** – the HTTP endpoint for requests.
 
 ### How to find them?
 - **API Key**: Available in your provider's user dashboard under API Keys or Access Tokens
@@ -139,11 +138,9 @@ To run any experiment, you need to prepare the following three items **from your
 - **Model Name**: Check your provider's documentation for available models, names are case-sensitive.
     e.g., `DeepSeek: deepseek-chat, deepseek-coder`
     `OpenAI: gpt-5, gpt-4o, gpt-4o-mini`
-- **API URL**: check the developer documentation of your provider. 
-Custom endpoints: Your provider's API endpoint URL (e.g., `/v1/chat/completions` for chat interfaces, `/v1/completions` for completion interfaces)
-
-
-Self-hosted models: Local server address (e.g., `http://localhost:8080/v1/chat/completions`)
+- **API URL**: check the developer documentation of your provider.<br>
+      Custom endpoints: Your provider's API endpoint URL (e.g., `https://api.deepseek.com/chat/completions` for DeepSeek chat interfaces)<br>
+      Self-hosted models: Local server address (e.g., `http://localhost:8080/v1/chat/completions`)<br>
  **Note**: Registered official providers are automatically configured—no URL specification required.
 
 ⚠️ **Important**: Never expose your API keys in publicly accessible code. For enhanced security, consider store credentials as variables instead of save them in scripts. e.g.:
@@ -168,7 +165,7 @@ Or
 
 ```r
    library(PsyLingLLM)
-   # Build test material
+   # Test material
    df <- data.frame(
      Material = c(
        "The cat sat on the ____.",           # English
@@ -185,7 +182,7 @@ Or
      )
    )
    
-   # run test
+   # Run test
    result <- trial_experiment(
      data = df,
      api_key = "your_api_key_here",
@@ -345,8 +342,8 @@ Leran more in Schema section
   >  Columns organized as: Core → Conditions → Content → Custom
   >
   >  Link:Learn more in Data Handling section
-## Experiment Control Parameters
-- **`repeats`** → The repeats parameter controls how many times the entire experiment dataset (all rows in data) should be duplicated.
+#### Experiment Control Parameters
+- **`repeats`** → The repeats parameter controls how many times the entire experiment dataset (all rows in data) should be duplicated. Optional (defualt = 1). 
    >How it works
    ```r
          df <- df[rep(seq_len(nrow(df)), repeats), , drop = FALSE]
@@ -379,47 +376,59 @@ Leran more in Schema section
    > | … | …    | …           |
    > | 30 | 10   | Sentence 10 |
    >
-- **`random`** → Whether to shuffle the order of trials (`TRUE`) or keep them sequential (`FALSE`).  
-
-- **`api_key`**, **`model`**, **`api_url`** → The credentials and endpoint of your LLM provider.  
-
-- **`system_prompt`** → A global instruction given to the model at the start.  
-   >The `system_prompt` parameter allows you to set the **behavior, role, and style** of the large language model (LLM) for your experiment.  
-   >It is sent as the **first system message** in the conversation, providing the model with instructions on how to act.
+- **`random`** → Logical flag to control the order of trials.
+   >`TRUE` → trials are shuffled randomly.
+   >`FALSE` (default) → trials are kept in sequential order.
    >
-   >**How it works**<br>
-   > Placed at the beginning of the message sequence:<br>
-   ```r
-         messages <- list(
-           list(role = "system", content = system_prompt),
-           list(role = "user", content = trial_prompt)
-         )
-   ```
-  >**Examples:**<br>
-  > `"You are a participant in a psychology experiment."` (default)  
-  > `"You are a child learning English."` (simulate a learner)  
-  > `"You are a bilingual speaker."` (simulate bilingual processing)  
+- **`stream`** → Logical flag to control streaming output from the LLM. <br>
+   > The stream parameter determines whether the model should return responses incrementally (token by token) or all at once.<br>
+   > `TRUE` → streaming enabled; partial tokens are returned as they are generated.<br>
+   > `FALSE` → standard non-streaming behavior; the full response is returned after completion.<br>
+   > NULL (default) → PsyLingLLM uses the registry-defined (if support SSE then TRUE) default for the selected model.<br>
+   > _note_:If stream = TRUE but the selected model does not support streaming, PsyLingLLM will ignore this setting and fall back to non-streaming mode, and FirstTokenLatency will not be available.<br>
+   > _note_:`FirstTokenLatency` is only available when `stream = TRUE`.<br>
+   > 
+- **`trial_prompt`** → A trial-level instruction applied to each experimental trial. Can be a single string or a per-row field in your data (optional).
+  >The `trial_prompt` defines the task instruction presented to the model **together** with each stimulus (Material).<br>
+  >It is combined with the stimulus text during request construction to form the user message for the LLM.<br>
+     >**Examples:**<br>
+     >`trial_prompt <- "Judge if the following sentence is grammatical:"`<br>
+     >`Material <- "The cats sits on the mat."`<br>
+     >The message sent to the LLM:<br>
+     >`"Judge if the following sentence is grammatical: The cats sits on the mat."`<br>
+  >When a `TrialPrompt` column **exists** in your dataset, its value takes precedence over the `trial_prompt` argument.<br>
+  >If both are missing, an empty string is used by default.<br>
+  >The `trial_prompt` applies to **all** trials unless overridden per row.<br>
   >
-  >Researchers can use `system_prompt` to:<br>
-  > Standardize responses across trials  
-  > Manipulate the experimental context  
-  > Create conditions that test different cognitive or linguistic scenarios  
-  >
-- **`role_mapping`** → Defines how roles are labeled (Check your API).  
-   >The role_mapping parameter tells LLM how to translate between internal role names and the role labels required by your LLM API.<br>
-   >By default, PsyLingLLM assumes the OpenAI convention:<br>
-   ```r
-         role_mapping = list( 
-           user = "user", 
-           system = "system",
-           assistant = "assistant"
-         )
-   ```
-   >`system` → Provides the global instruction or context for the model
-   >`user` → Represents the trial prompt or experimental stimulus.
-   >`assistant` → Represents the model's reply (the generated output).
+  
+- **`system_content`** → Optional system-level instruction (system prompt) that defines the LLM’s behavior or global context during the experiment.<br>
+   >The `system_content` argument specifies the system message sent to the model before any user message or stimulus.<br>
+   >It controls how the model interprets and responds to experimental inputs, shaping the overall behavior of the assistant (e.g., tone, task, perspective).<br>
    >
-   >Example 1 – Anthropic Claude. Claude uses "human" instead of "user", and "assistant" stays the same:
+   >Used in chat-based interfaces. It is sent as the **first system message** in the conversation, providing the model with instructions on how to act.<br>
+   >This parameter is ignored only when the model template does not support system roles, in which case a one-time warning is issued.
+   >
+   >Researchers can use `system_content` to:<br>
+   > Standardize responses across trials<br>
+   > Manipulate the experimental context<br>
+   > Create conditions that test different cognitive or linguistic scenarios<br>
+   >
+   > **Examples:**<br>
+   > `"You are a participant in a psychology experiment."`<br>
+   > `"You are a child learning English."` (simulate a learner)  <br>
+   > `"You are a bilingual speaker fluent in English and Japanese."` (simulate bilingual processing)  <br>
+   > `"Always respond in JSON with fields { 'judgment': <Yes/No>, 'confidence': <0-1> }."`  <br>
+   >
+- **`assistant_content`** → Optional seed messages provided to the assistant before each trial. list of message objects (`list(role=..., content=...)`).<br>
+   >The `assistant_content` argument allows you to include pre-defined assistant messages.
+   >It simulates prior dialogue history or “context examples” in multi-turn or instruction-following settings.
+   >The argument is fully compatible with the registry-defined role structure (e.g., `system`, `user`, `assistant`) and is automatically normalized before sending the request to the LLM.
+   >
+- **`role_mapping`** → Optional mapping of abstract conversation roles (system, user, assistant) to the provider’s native role labels defined in the model’s API schema.<br>
+   >The `role_mapping` parameter specifies how PsyLingLLM translates between its internal role names and the role identifiers expected by your LLM provider’s API.<br>
+   >In most cases, you **do not need to specify** this argument manually —PsyLingLLM automatically uses the default role mapping defined in the model’s **registry entry**.<br>
+   >You may optionally supply a custom mapping to **override** the registry defaults, forcing PsyLingLLM to use your specified `role_mapping` instead.<br>
+   >**Example:**<br>
    ```r
          role_mapping = list(
            user = "human",
@@ -427,9 +436,19 @@ Leran more in Schema section
            assistant = "assistant"
          )
    ```
-   >**Why this matters**
-   >If role_mapping does not match your provider’s expected labels, your request may fail or the model may ignore parts of the prompt.
-   >Always check your provider’s API documentation for the correct role labels, and adjust role_mapping accordingly.
+   >_Note_:If your custom mapping does not match the provider’s expected role labels, the request may fail or certain message parts (e.g., `system` or `assistant` prompts) may be ignored by the model.
+   >
+- **`optionals`** → Optional named list controlling optional parameters for the LLM request (**except** stream).<br>
+   >The `optionals` argument allows you to specify **user-provided optional fields** that may be included in the request body if supported by the model registry.<br>
+   
+   >PsyLingLLM uses a tri-state logic to handle these optionals:
+      >**Use registry defaults**	Omit optionals entirely (missing(optionals) → registry defaults are applied).
+      >**Disable optional parameters**	optionals = NULL → no optional parameters sent, API uses its own defaults.
+      >**Inject specific options**	optionals = list(reasoning = "high") → only reasoning and stream are injected.
+
+
+
+
 
 - **`max_tokens`** → Maximum length of the model’s response.
    >The `max_tokens` parameter sets the **maximum number of tokens** the model can generate in a single response.  
@@ -445,42 +464,7 @@ Leran more in Schema section
    >Example prompt:<br>
    >“Please answer in one short sentence of about 10 words.”
 
-- **`temperature`** → Controls randomness of the response (Check your API).  
-   >The temperature parameter controls the randomness (or creativity) of the model’s output.
-   >It affects how likely the model is to pick less probable words during text generation.
-   >
-   >**How it works**<br>
-   >Low values **(e.g., 0 – 0.3)**
-   >Output is more deterministic, stable, and focused.
-   >The model will almost always choose the most likely completion.
-   >Useful for tasks requiring accuracy and consistency, e.g., grammar correction, factual Q&A, psycholinguistic experiments where variability is undesirable.
-   >
-   >Medium values **(e.g., 0.5 – 0.7, default = 0.7)**
-   >Output is balanced: reasonably creative but not too random.
-   >Suitable for most experimental stimuli generation and general-purpose experiments.
-   >
-   >High values **(e.g., 0.8 – 1.2)**
-   >Output becomes more diverse and creative, but also less predictable.
-   >Useful for tasks like brainstorming, generating multiple varied responses, or simulating human-like variability in language experiments.
-   >
-   >Extreme values **(> 1.2)**
-   >Output may become very random or even incoherent.
-   >Rarely useful in controlled experiments.
-   >
-- **`enable_thinking`** → If `TRUE`, captures the model’s reasoning process (chain-of-thought).  
-  >This is saved into the **Think** column for later analysis.<br>
-  >Setting enable_thinking = FALSE does not stop the model from thinking internally; it switches the LLM to a fast mode that produces answers with minimal or hidden reasoning.
-   >**How it works**<br>
-   >PsyLingLLM adapts API calls for different models, such as:
-   >GPT series	reasoning_effort = "low" (less explicit CoT)
-   >Hunyuan	enable_thinking = FALSE (fast mode)
-   >
-   >**Post-parsing logic**:<br>
-   >If `reasoning_content` exists, it is extracted as `Think` based on API rules.<br>
-   >If `Think` content goes into Response:<br>
-   >Keyword extraction: Detects phrases like Reasoning:, Note:, 解析:, 思考: to capture hidden reasoning.
-   >Bracketed annotations: Extracts reasoning in parentheses or brackets following sentences.
-   >
+
 - **`delay`** → Pause time (in seconds) between trials.  
    >This is used to control the pacing of API requests.<br>
    >After each trial, the function pauses for `delay` seconds to avoid sending requests too quickly.<br>
