@@ -299,7 +299,6 @@ Leran more in Schema section
 - **`api_url`** → Endpoint override
    >Optional custom API URL; required for non-official providers.
    >
-   
 - **`data`** → The experiment materials. Can be a `data.frame` or a CSV/XLSX file.  
    >The experimental materials to be used for generating the LLM trial table. Can be a `data.frame`, or a path to a `.csv`, `.xls`, or `.xlsx` file.
    >
@@ -385,8 +384,8 @@ Leran more in Schema section
    > `TRUE` → streaming enabled; partial tokens are returned as they are generated.<br>
    > `FALSE` → standard non-streaming behavior; the full response is returned after completion.<br>
    > NULL (default) → PsyLingLLM uses the registry-defined (if support SSE then TRUE) default for the selected model.<br>
-   > _note_:If stream = TRUE but the selected model does not support streaming, PsyLingLLM will ignore this setting and fall back to non-streaming mode, and FirstTokenLatency will not be available.<br>
-   > _note_:`FirstTokenLatency` is only available when `stream = TRUE`.<br>
+   > _note_: If stream = TRUE but the selected model does not support streaming, PsyLingLLM will ignore this setting and fall back to non-streaming mode.<br>
+   > _note_: `FirstTokenLatency` is only available when `stream = TRUE`.<br>
    > 
 - **`trial_prompt`** → A trial-level instruction applied to each experimental trial. Can be a single string or a per-row field in your data (optional).
   >The `trial_prompt` defines the task instruction presented to the model **together** with each stimulus (Material).<br>
@@ -436,54 +435,79 @@ Leran more in Schema section
            assistant = "assistant"
          )
    ```
-   >_Note_:If your custom mapping does not match the provider’s expected role labels, the request may fail or certain message parts (e.g., `system` or `assistant` prompts) may be ignored by the model.
+   >_Note_: If your custom mapping does not match the provider’s expected role labels, the request may fail or certain message parts (e.g., `system` or `assistant` prompts) may be ignored by the model.
    >
 - **`optionals`** → Optional named list controlling optional parameters for the LLM request (**except** stream).<br>
    >The `optionals` argument allows you to specify **user-provided optional fields** that may be included in the request body if supported by the model registry.<br>
-   
-   >PsyLingLLM uses a tri-state logic to handle these optionals:
-      >**Use registry defaults**	Omit optionals entirely (missing(optionals) → registry defaults are applied).
-      >**Disable optional parameters**	optionals = NULL → no optional parameters sent, API uses its own defaults.
-      >**Inject specific options**	optionals = list(reasoning = "high") → only reasoning and stream are injected.
-
-
-
-
-
-- **`max_tokens`** → Maximum length of the model’s response.
-   >The `max_tokens` parameter sets the **maximum number of tokens** the model can generate in a single response.  
-   >A token roughly corresponds to a word or word piece (e.g., "cat" = 1 token, "running" = 2 tokens: "runn", "ing").  
-   >It is an upper bound, not a target length. The model decides when to stop naturally, but if this limit is too low, the output may be cut off mid-sentence. 
-   
-   >**Why this matters**<br>
-   >max_tokens ensures:<br>
-   >Responses are bounded → avoids excessively long outputs that may waste time or resources.<br>
-   >Experimental control → guarantees each trial produces outputs within a predictable size range.<br>
-   >If you need consistent response length (e.g., always one short sentence), use prompt design, not max_tokens.<br>
+   >PsyLingLLM uses a tri-state logic to handle these optionals:<br>
+   >`Missing (not supplied)` → PsyLingLLM uses the registry defaults (input.optional_defaults) if present; otherwise, no optional parameters are sent.<br>
+   >`NULL` → Do not send any optional parameters; the API defaults are used.<br>
+   >`Named list` → Only the keys you provide are injected into the request; registry defaults are not merged.<br>
    >
-   >Example prompt:<br>
-   >“Please answer in one short sentence of about 10 words.”
+   >**OpenAI Common Optionals**<br>
+      `max_tokens`	Controls the length of the model’s response. Useful for experiments where you want consistent response size or to avoid overly long outputs that may bias response times or token-based measures.<br>
+      `temperature`	Sampling temperature (0–2); Higher temperature increases variability in responses, useful for studying model creativity or variability in judgments. Low temperature ensures deterministic, reproducible outputs for controlled experiments.<br>
+      `top_p`	Nucleus sampling probability (0–1).Together with temperature, controls response diversity. Useful in experiments examining model uncertainty or probabilistic decision-making.<br>
+      `presence_penalty`	Penalizes new tokens based on presence in prior text (−2.0–2.0).Reduces repetitive responses. Useful in multi-turn experiments where repeated wording could confound response evaluation.<br>
+      `frequency_penalty`	Penalizes new tokens based on frequency in prior text (−2.0–2.0).Encourages variety in responses. Helps experimental designs where lexical diversity is relevant, e.g., studying sentence generation or semantic novelty.<br>
+   >
+   >**Example:**<br>
+   ```r
+        optionals = list(
+          max_tokens = 150,
+          temperature = 0.7,
+          top_p = 0.9
+        )
+   ```
+   >
 
-
-- **`delay`** → Pause time (in seconds) between trials.  
-   >This is used to control the pacing of API requests.<br>
-   >After each trial, the function pauses for `delay` seconds to avoid sending requests too quickly.<br>
-   >If the API returns a `429 Too Many Requests` error, an **exponential backoff** is applied:  
-
-   >This ensures that bursts of requests are automatically throttled, reducing the chance of hitting rate limits.<br>
-   >Only the final successful response counts toward the recorded `ResponseTime`; the wait during retries is **not** included.
-
-- **`output_path`** → Where to save the results (CSV or XLSX).  
-   >Supports both **CSV** and **XLSX** formats.<br>
-   >Defaults to `"experiment_results.csv"` if not specified.<br>
-   >The function automatically chooses the save method based on the file extension:<br>
-   >`.csv` → uses `readr::write_excel_csv()`<br>
-   >`.xls` / `.xlsx` → uses `openxlsx::write.xlsx()` (requires the `openxlsx` package)<br> 
-   >If an unsupported extension is provided, the function defaults to CSV and appends `.csv` to the filename. <br>
-   >After saving, a confirmation message is printed to the console <br>
-
-- **`Return value:`**  
-  > The function returns a **`data.frame`** containing all trial results.
+#### Other Parameters
+- **`output_path`** → Optional file or directory path where PsyLingLLM saves experiment results and logs.
+   >The `output_path` argument specifies **where PsyLingLLM writes experiment results and logs**.<br>
+   >If not provided (NULL), PsyLingLLM automatically creates a default directory at `~/.psylingllm/results` and generates a timestamped filename in the format {model}_{YYYYMMDD_HHMMSS}.csv.<br>
+   >You can provide either:<br>
+   >- a **file path** (e.g., "results/my_experiment.csv")<br>
+   >- a **directory path** (e.g., "results/", auto-naming enabled).<br>
+   >  
+   > The function automatically chooses the save method based on file extension:<br>
+   > `.csv` → uses `readr::write_excel_csv()` (UTF-8 encoded)<br>
+   > `.xls / .xlsx` → uses `writexl::write_xlsx()` <br> 
+   > unsupported or missing extension → defaults to .csv and appends it automatically<br>
+   >If the target directory does not exist, it will be created recursively.<br>
+   >  
+   >After saving, PsyLingLLM prints a confirmation message to the console showing the full path of the saved file.<br>
+   >Example auto-generated file:`~/.psylingllm/results/gpt-4o_20251103_134210.csv`<br>
+   >Corresponding logs are automatically written to the same location with a .log extension.<br>
+   >
+- **`timeout`** → Integer value specifying the maximum time (in seconds) allowed for each LLM API request.<br>
+   >The `timeout` parameter sets the upper limit for how long PsyLingLLM waits for a model response before aborting the request.<br>
+   >- Default → 120 seconds unless overridden by a global option.<br>
+   >
+   >If the model does not respond within this duration, the trial is automatically marked as a timeout error (`TrialStatus = "TIMEOUT"`).<br>
+   >This ensures that a single slow or unresponsive API call does not block the entire experiment run.<br>
+   >
+- **`overwrite`** → Logical flag indicating whether to overwrite existing output files.<br>
+   >The overwrite parameter controls whether `PsyLingLLM` should replace an existing result file when writing experiment outputs via `output_path`.<br>
+   >`TRUE` (default) → overwrite existing files if they already exist.<br>
+   >`FALSE` → throw an error if the file already exists, preventing accidental data loss.<br>
+   >This parameter is useful when you want to preserve previous experiment runs or enforce explicit versioning of output files.<br>
+   >
+- **`delay`** → Pause time (in seconds) between trials.<br>
+   >The delay parameter introduces a controlled time interval between successive API requests.<br>
+   >- Default is `0` (no delay).<br>
+   >- Use a positive value (e.g., `delay = 1.5`) to insert a fixed pause between trials.<br>
+   >
+   >This can be useful in experiments where:<br>
+      >API rate limits must be respected (e.g., OpenAI or Anthropic quotas).<br>
+      >Controlled timing between stimuli is required (e.g., simulating human pacing).<br>
+      >You want to prevent server overload during batch trials.<br>
+   >The delay applies after each trial (or conversation turn) and before the next request begins.<br>
+   >
+- **`return_raw`** → Logical flag indicating whether to include raw request and response objects in the returned results.
+   >The return_raw parameter controls whether PsyLingLLM should attach the complete raw data for each API call — including the request body, headers, and raw response text — to the output data frame.
+   >`FALSE` (default) → returns only structured trial results conforming to PsyLingLLM_Schema.
+   >`TRUE` → adds additional columns containing the full raw request and response payloads for each trial.
+   >This option is useful for debugging, model comparison, or advanced post-hoc analyses where you need to inspect the exact input/output exchanged with the LLM API.
 ---
 
 
