@@ -510,49 +510,99 @@ Leran more in Schema section
 
 
 ## 2. Garden Path Sentences Judgment Task
-This example demonstrates how to run a repeated-trial experiment using all available parameters in `trial_experiment()`.
-It shows how to load demo linguistic materials, configure model behavior, and control experiment pacing.
+This example demonstrates how to conduct a repeated-trial psycholinguistic experiment using the `trial_experiment()` function in **PsyLingLLM**.
+The task is based on the classical Garden Path Sentences paradigm, widely used to study syntactic reanalysis and semantic plausibility judgments.
 
-
-Load preset linguistic material shipped with the package:
+` 🧩 Input Materials
+First, import the example stimulus set from the package presets:
 ```r
 path <- system.file("extdata", "garden_path_sentences.csv", package = "PsyLingLLM")
 ```
-Input Data :
+You will get:
 
-| Item | Condition   | Material                           | TrialPrompt                                                        | Target |
-|------|-------------|------------------------------------|--------------------------------------------------------------------|--------|
-| 1    | GardenPath  | The old man the boats.             | Read the following sentence and judge whether it is easy to understand (Yes / No) | No     |
-| 2    | GardenPath  | The horse raced past the barn fell.| Read the following sentence and judge whether it is easy to understand (Yes / No) | No     |
-| 3    | GardenPath  | Fat people eat accumulates.        | Read the following sentence and judge whether it is easy to understand (Yes / No) | No     |
-| 4    | GardenPath  | The man whistling tunes pianos.    | Read the following sentence and judge whether it is easy to understand (Yes / No) | No     |
-| 5    | Control     | Birds are singing in the garden.   | Read the following sentence and judge whether it is easy to understand (Yes / No) | Yes    |
-| 6    | Control     | The children played football after school.| Read the following sentence and judge whether it is easy to understand (Yes / No) | Yes    |
+| Item | Condition   | Material                              | TrialPrompt                                   |
+|------|-------------|---------------------------------------|-----------------------------------------------|
+| 1    | GardenPath  | The old man the boats.                | Does the following sentence make sense? (Y/N) |
+| 2    | GardenPath  | The horse raced past the barn fell.   | Does the following sentence make sense? (Y/N) |
+| 3    | GardenPath  | Fat people eat accumulates.           | Does the following sentence make sense? (Y/N) |
+| 4    | GardenPath  | The man whistling tunes pianos.       | Does the following sentence make sense? (Y/N) |
+| 5    | Control     | The young man watches the boats.      | Does the following sentence make sense? (Y/N) |
+| 6    | Control     | The cat napping on the sofa purred.   | Does the following sentence make sense? (Y/N) |
+| 7    | Control     | The young man watches the boats.      | Does the following sentence make sense? (Y/N) |
+| 8    | Control     | The cat napping on the sofa purred.   | Does the following sentence make sense? (Y/N) |
+| 9    | Anomalous   | The clever dust the furniture.        | Does the following sentence make sense? (Y/N) |
+| 10   | Anomalous   | The cake baked in the oven laughed.   | Does the following sentence make sense? (Y/N) |
+| 11   | Anomalous   | Stone workers cut precisely floats.   | Does the following sentence make sense? (Y/N) |
+| 12   | Anomalous   | The student considering ideas clouds. | Does the following sentence make sense? (Y/N) |
 
--**Running the Experiment**
+This dataset contains **three experimental conditions**:
+`GardenPath` — syntactically ambiguous sentences that initially mislead the parser (e.g., The old man the boats).
+`Control` — unambiguous and semantically coherent sentences (e.g., The young man watches the boats).
+`Anomalous` — grammatically valid but semantically implausible sentences (e.g., The cake baked in the oven laughed).
+Each condition includes 4 items, and we set the experiment to repeat twice, yielding a total of 3 × 4 × 2 = 24 randomized trials.
+
+-⚙️**Running the Experiment**
 ```r
-result <- trial_experiment(
-  data = path,
+system_content =
+  "You are a participant in a psychology experiment.
+Your task is to answer the following questions with ONLY a single character: Y for Yes or N for No.
+Do not provide any other text, explanation, or punctuation."
+
+Res <- trial_experiment(
+  data = garden_path_sentences,
   api_key = api_key,
-  model   = model,
-  api_url = api_url,
-  random = FALSE,
-  repeats  = 2,
-  delay = 0, 
-  max_tokens = 1024, 
-  enable_thinking = TRUE,
-  output_path = "experiment_results.csv"
+  model_key = model,
+  system_content = system_content,
+  random = TRUE,
+  stream = TRUE,
+  repeats  = 2
 )
 ```
+During execution, a real-time progress bar will display trial progress and model status:
+[████████████████████████████████████████] 100% Trial 24/24 - ETA: 00:00 - deepseek-reasoner
+Upon completion, the full trial results are automatically saved to the default results directory:
+[PsyLingLLM] Results saved: C:\Users\<username>\Documents\.psylingllm\results\deepseek-reasoner_20251105_153054.csv
+
 -**Inspecting the Results**
+The output CSV file (or dataframe `Res`) contains structured records for each trial, including columns such as:
 
-print(result$Response)
+| Run | Item | Condition | TrialPrompt | Material | Response | Think（excerpt） | ModelName | TotalResponseTime | FirstTokenLatency | PromptTokens | CompletionTokens |
+|-----|------|------------|--------------|-----------|-----------|----------------|------------|------------------:|-----------------:|--------------:|-----------------:|
+| 1 | 5 | Control | Does the following sentence make sense? (Y/N) | The young man watches the boats. | Y | "Simple active clause; syntactically and semantically normal." | deepseek-reasoner | 8.91 | 0.89 | 65 | 187 |
+| 2 | 3 | GardenPath | Does the following sentence make sense? (Y/N) | Fat people eat accumulates. | N | "Sentence becomes ungrammatical after 'eat'; lacks proper continuation." | deepseek-reasoner | 14.69 | 2.01 | 63 | 297 |
+| 3 | 4 | GardenPath | Does the following sentence make sense? (Y/N) | The man whistling tunes pianos. | N | "Garden-path effect; possible parse but meaning unclear, likely nonsense." | deepseek-reasoner | 19.33 | 0.77 | 66 | 427 |
+| 4 | 7 | Control | Does the following sentence make sense? (Y/N) | Dust people stir up settles. | Y | "Relative clause structure; though complex, it is interpretable and meaningful." | deepseek-reasoner | 16.90 | 1.01 | 65 | 375 |
+| 5 | 2 | GardenPath | Does the following sentence make sense? (Y/N) | The horse raced past the barn fell. | N | "Classic garden-path; missing main verb interpretation; judged nonsensical." | deepseek-reasoner | 18.97 | 0.66 | 66 | 431 |
+| 6 | 1 | GardenPath | Does the following sentence make sense? (Y/N) | The old man the boats. | Y | "Reanalysis: 'man' as verb; grammatical though unusual—makes sense." | deepseek-reasoner | 35.30 | 0.77 | 64 | 812 |
+| 7 | 8 | Control | Does the following sentence make sense? (Y/N) | The woman reading books knits. | Y | "Reduced relative clause; sentence is coherent and grammatical." | deepseek-reasoner | 13.58 | 0.98 | 65 | 286 |
+| 8 | 12 | Anomalous | Does the following sentence make sense? (Y/N) | The student considering ideas clouds. | N | "Semantic anomaly; final noun ‘clouds’ breaks coherence." | deepseek-reasoner | 21.07 | 0.87 | 64 | 471 |
+| 9 | 4 | GardenPath | Does the following sentence make sense? (Y/N) | The man whistling tunes pianos. | N | "Similar to previous case; syntactically confusing, semantically implausible." | deepseek-reasoner | 19.62 | 0.71 | 66 | 438 |
+| 10 | 3 | GardenPath | Does the following sentence make sense? (Y/N) | Fat people eat accumulates. | N | "Uninterpretable; parsing fails at main verb boundary." | deepseek-reasoner | 23.39 | 0.74 | 63 | 527 |
+| 11 | 11 | Anomalous | Does the following sentence make sense? (Y/N) | Stone workers cut precisely floats. | N | "Implausible predicate structure; no logical subject–verb relation." | deepseek-reasoner | 27.89 | 0.89 | 64 | 625 |
+| 12 | 8 | Control | Does the following sentence make sense? (Y/N) | The woman reading books knits. | Y | "Clear relative clause; meaning coherent." | deepseek-reasoner | 13.40 | 0.93 | 65 | 281 |
+| 13 | 10 | Anomalous | Does the following sentence make sense? (Y/N) | The cake baked in the oven laughed. | N | "Grammatical but violates semantic selection; inanimate subject can't laugh." | deepseek-reasoner | 9.17 | 0.98 | 66 | 197 |
+| 14 | 11 | Anomalous | Does the following sentence make sense? (Y/N) | Stone workers cut precisely floats. | N | "Repetition; again implausible semantic mapping." | deepseek-reasoner | 26.32 | 0.79 | 64 | 592 |
+| 15 | 1 | GardenPath | Does the following sentence make sense? (Y/N) | The old man the boats. | Y | "Unusual syntax but valid reading—'old people operate boats'." | deepseek-reasoner | 33.02 | 0.83 | 64 | 746 |
+| 16 | 6 | Control | Does the following sentence make sense? (Y/N) | The cat napping on the sofa purred. | Y | "Straightforward descriptive clause; grammatical and plausible." | deepseek-reasoner | 11.07 | 0.75 | 68 | 237 |
+| 17 | 6 | Control | Does the following sentence make sense? (Y/N) | The cat napping on the sofa purred. | Y | "Repetition; same analysis—valid, coherent sentence." | deepseek-reasoner | 9.38 | 0.94 | 68 | 200 |
+| 18 | 9 | Anomalous | Does the following sentence make sense? (Y/N) | The clever dust the furniture. | N | "Lexical ambiguity (‘dust’ verb/noun); meaning breakdown without reanalysis." | deepseek-reasoner | 15.14 | 0.96 | 64 | 337 |
+| 19 | 7 | Control | Does the following sentence make sense? (Y/N) | Dust people stir up settles. | Y | "Reduced relative; interpretable with reanalysis, makes sense." | deepseek-reasoner | 19.30 | 0.76 | 65 | 419 |
+| 20 | 5 | Control | Does the following sentence make sense? (Y/N) | The young man watches the boats. | Y | "Simple SVO structure; clear meaning." | deepseek-reasoner | 11.55 | 0.79 | 65 | 254 |
+| 21 | 10 | Anomalous | Does the following sentence make sense? (Y/N) | The cake baked in the oven laughed. | N | "Repetition; semantic violation again—nonsensical." | deepseek-reasoner | 19.22 | 1.13 | 66 | 423 |
+| 22 | 9 | Anomalous | Does the following sentence make sense? (Y/N) | The clever dust the furniture. | N | "Repetition; still anomalous due to lexical ambiguity." | deepseek-reasoner | 19.35 | 0.71 | 64 | 440 |
+| 23 | 12 | Anomalous | Does the following sentence make sense? (Y/N) | The student considering ideas clouds. | N | "Repetition; semantic error at end." | deepseek-reasoner | 18.92 | 0.70 | 64 | 437 |
+| 24 | 2 | GardenPath | Does the following sentence make sense? (Y/N) | The horse raced past the barn fell. | N | "Classic garden-path again; surface parse fails, nonsensical reading." | deepseek-reasoner | 24.12 | 1.08 | 66 | 535 |
 
-<img width="1389" height="117" alt="image" src="https://github.com/user-attachments/assets/66517938-b199-4ded-9555-4ef045e08c0c" />
+Each row represents one model judgment, with optional “Think” reasoning traces (if enable_thinking = TRUE) for interpretability or psycholinguistic analysis.
 
-You may get outputs like the following in `experiment_results.csv`:
+You can visualize or summarize results using tidyverse tools, for instance:
 
-<img width="1785" height="1167" alt="image" src="https://github.com/user-attachments/assets/85ac0915-8f46-43ed-8e50-28a20b37e3c3" />
+🧠 Interpretation
+
+This experiment illustrates how PsyLingLLM can replicate classic psycholinguistic paradigms, enabling quantitative comparison of LLM behavior across syntactic and semantic manipulations.
+   > _References_:
+   > Ferreira, F., & Henderson, J. M. (1991). Recovery from misanalyses of garden-path sentences. Journal of Memory and Language, 30(6), 725–745.
+   > Christianson, K., Hollingworth, A., Halliwell, J. F., & Ferreira, F. (2001). Thematic roles assigned along the garden path linger. Cognitive Psychology, 42(4), 368–407.
 
 ---
 
