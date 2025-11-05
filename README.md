@@ -509,8 +509,6 @@ Leran more in Schema section
 ---
 <br>
 <br>
-<br>
-
 ## 2. Garden Path Sentences Judgment Task
 This example demonstrates how to conduct a repeated-trial psycholinguistic experiment using the `trial_experiment()` function in **PsyLingLLM**.<br>
 The task is based on the classical Garden Path Sentences paradigm, widely used to study syntactic reanalysis and semantic plausibility judgments.<br>
@@ -568,7 +566,7 @@ Upon completion, the full trial results are automatically saved to the default r
 -**Inspecting the Results**
 The output `CSV` file (or dataframe `Res`) contains structured records for each trial, including columns such as:<br>
 
-| Run | Item | Condition  | TrialPrompt                                   | Material                              | Response | ThinkExcerpt | ModelName | TotalResponseTime | FirstTokenLatency | PromptTokens | CompletionTokens | TrialStatus | Streaming | Timestamp | RequestID |
+| Run | Item | Condition  | TrialPrompt                                   | Material                              | Response | Think(excerpt) | ModelName | TotalResponseTime | FirstTokenLatency | PromptTokens | CompletionTokens | TrialStatus | Streaming | Timestamp | RequestID |
 |-----|------|-----------|-----------------------------------------------|----------------------------------------|---------|--------------|-----------|-----------------|-----------------|--------------|-----------------|------------|----------|-----------|-----------|
 | 1   | 3    | GardenPath | Does the following sentence make sense? (Y/N) | Fat people eat accumulates.            | N       | Recognizes grammatical error; interprets intended meaning (“The fat that people eat accumulates”); concludes it’s ungrammatical → N. | deepseek-reasoner | 13.24165797 | 0.850236893 | 63 | 335 | SUCCESS | TRUE | 2025/11/5 21:44 | bb33b1d5-f470-4391-a51f-69d75e46933e |
 | 2   | 2    | GardenPath | Does the following sentence make sense? (Y/N) | The horse raced past the barn fell.    | N       | Identifies as a classic garden path sentence; recognizes structural ambiguity; initially confusing → N. | deepseek-reasoner | 24.77416396 | 1.013739824 | 66 | 623 | SUCCESS | TRUE | 2025/11/5 21:44 | 4660d6b6-b3a4-4ae0-9b66-69e914e15151 |
@@ -612,14 +610,14 @@ summary_res <- res %>%
 
 print(summary_res)
 ```
-you will get something like this:<br>
+You will get a summary like this::<br>
 | Condition   | mean_FTL | mean_RT | mean_tokens | Y_prob |
 |------------|----------|--------|------------|-------|
 | Anomalous  | 1.06     | 21.9   | 552        | 0     |
 | Control    | 0.965    | 10.7   | 257        | 1     |
 | GardenPath | 0.914    | 21.1   | 534        | 0.25  |
 
-and plot it:
+You can visualize these results with a grouped bar or line plot to compare conditions across metrics. For example:
 
 ```r
 library(dplyr)
@@ -670,7 +668,7 @@ ggplot(summary_res, aes(x = Condition, y = Y_prob, group = 1)) +
 
 This experiment demonstrates how PsyLingLLM can replicate classic psycholinguistic paradigms, allowing quantitative comparison of LLM behavior across syntactic and semantic manipulations.<br>
 
-In reasoning models, the results show human-like processing patterns: `GardenPath` and `Anomalous` sentences take **longer** to process and generate **more tokens** than Control sentences. Acceptance judgments correspond with sentence type: `Control` sentences are always accepted, `GardenPath` sentences are partially (25%) accepted, and `Anomalous` sentences are never accepted.<br>
+In reasoning models, the results show human-like processing patterns: `GardenPath` and `Anomalous` sentences take **longer** to process and generate **more tokens** than Control sentences. **Acceptance** judgments correspond with sentence type: `Control` sentences are always accepted, `GardenPath` sentences are partially (25%) accepted, and `Anomalous` sentences are never accepted.<br>
 
 
 >_Note_: This is a methodological demonstration. Due to the limited number of trials, these results do not constitute a full statistical analysis.<br>
@@ -681,6 +679,8 @@ In reasoning models, the results show human-like processing patterns: `GardenPat
    > Christianson, K., Hollingworth, A., Halliwell, J. F., & Ferreira, F. (2001). Thematic roles assigned along the garden path linger. Cognitive Psychology, 42(4), 368–407.
 
 ---
+<br>
+<br>
 
 ## 3. Sentence Completion Task
 This example demonstrates how to run a repeated-trial experiment where each stimulus is presented under multiple experimental conditions.
