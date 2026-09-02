@@ -1,2 +1,14 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^\.Rhistory$
+^\.Rapp\.history$
+^\.RData$
+^\.Ruserdata$
+^\.Renviron$
+^R/\.RData$
+^R/\.Rhistory$
+^R\.zip$
+^AGENTS\.md$
+^inst/design/current-architecture-backup\.md$
+^.*\.Rcheck$
+^.*\.tar\.gz$
