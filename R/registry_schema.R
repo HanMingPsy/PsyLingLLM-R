@@ -218,7 +218,9 @@ validate_registry_v2_interface <- function(interface, id, capability_ids) {
     request,
     required = "builder",
     allowed = c(
-      "builder", "method", "encoding", "path", "parameter_map", "defaults"
+      "builder", "method", "encoding", "path", "url", "headers", "body",
+      "fallback_body", "default_system", "role_mapping", "parameter_map",
+      "defaults"
     ),
     domain = "interfaces",
     entry_id = id,
@@ -246,12 +248,37 @@ validate_registry_v2_interface <- function(interface, id, capability_ids) {
       "Request path must start with `/`.", "interfaces", id, "request.path"
     )
   }
+  registry_schema_assert_optional_string(
+    request$url, "interfaces", id, "request.url"
+  )
+  registry_schema_assert_optional_string_map(
+    request$headers, "interfaces", id, "request.headers"
+  )
+  registry_schema_assert_optional_list(
+    request$body, "interfaces", id, "request.body"
+  )
+  registry_schema_assert_optional_list(
+    request$fallback_body, "interfaces", id, "request.fallback_body"
+  )
+  registry_schema_assert_optional_string(
+    request$default_system, "interfaces", id, "request.default_system"
+  )
+  registry_schema_assert_optional_string_map(
+    request$role_mapping, "interfaces", id, "request.role_mapping"
+  )
   registry_schema_assert_optional_string_map(
     request$parameter_map, "interfaces", id, "request.parameter_map"
   )
   if (!is.null(request$defaults)) {
     registry_schema_assert_overrides(
       request$defaults, request, "interfaces", id, "request.defaults"
+    )
+  }
+  if (identical(request$builder, "legacy_template_v1") &&
+      is.null(request$body)) {
+    registry_schema_abort(
+      "The legacy request builder requires `body`.",
+      "interfaces", id, "request"
     )
   }
 
@@ -406,8 +433,7 @@ validate_registry_v2_model <- function(model, id, registry) {
   registry_schema_assert_fields(
     model,
     required = c(
-      "provider", "model_id", "interfaces", "default_interface",
-      "capabilities"
+      "provider", "model_id", "interfaces", "capabilities"
     ),
     allowed = c(
       "provider", "model_id", "aliases", "interfaces", "default_interface",
@@ -424,14 +450,16 @@ validate_registry_v2_model <- function(model, id, registry) {
   registry_schema_assert_references(
     model$interfaces, names(registry$interfaces), "models", id, "interfaces"
   )
-  registry_schema_assert_string(
-    model$default_interface, "models", id, "default_interface"
-  )
-  if (!model$default_interface %in% model$interfaces) {
-    registry_schema_abort(
-      "Default interface must be one of the model interfaces.",
-      "models", id, "default_interface"
+  if (!is.null(model$default_interface)) {
+    registry_schema_assert_string(
+      model$default_interface, "models", id, "default_interface"
     )
+    if (!model$default_interface %in% model$interfaces) {
+      registry_schema_abort(
+        "Default interface must be one of the model interfaces.",
+        "models", id, "default_interface"
+      )
+    }
   }
 
   registry_schema_assert_named_list(
@@ -455,6 +483,12 @@ validate_registry_v2_model <- function(model, id, registry) {
     )
   }
   if (!is.null(model$defaults)) {
+    if (is.null(model$default_interface)) {
+      registry_schema_abort(
+        "Model defaults require a default interface.",
+        "models", id, "defaults"
+      )
+    }
     request <- registry$interfaces[[model$default_interface]]$request
     registry_schema_assert_overrides(
       model$defaults, request, "models", id, "defaults"

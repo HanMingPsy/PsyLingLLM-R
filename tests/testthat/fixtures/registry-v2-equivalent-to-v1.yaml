@@ -1,0 +1,78 @@
+schema_version: 2
+
+providers:
+  fixture-provider:
+    type: custom
+    metadata:
+      legacy_provider_labels:
+        chat: Fixture-Provider
+
+interfaces:
+  legacy.fixture-model.chat:
+    protocol: legacy_v1
+    request:
+      builder: legacy_template_v1
+      method: POST
+      encoding: json
+      url: https://example.invalid/v1/chat/completions
+      headers:
+        Content-Type: application/json
+      body:
+        model: fixture-model
+      parameter_map:
+        temperature: temperature
+        enabled: enabled
+        stream: stream
+      defaults:
+        temperature: 0.25
+        enabled: true
+      default_system: Be concise.
+      role_mapping:
+        system: developer
+        user: user
+        assistant: assistant
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: legacy_paths_v1
+      selectors:
+        answer: [choices, "*", message, content]
+        reasoning: [choices, "*", message, reasoning_content]
+        request_id: [id]
+        usage_prompt: [usage, prompt_tokens]
+        usage_completion: [usage, completion_tokens]
+        answer_delta: [choices, "*", delta, content]
+        reasoning_delta: [choices, "*", delta, reasoning_content]
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    metadata:
+      source_schema_version: 1
+      legacy_interface: chat
+      legacy_provider_label: Fixture-Provider
+      legacy_streaming_enabled: false
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+
+capabilities:
+  reasoning:
+    value_type: logical
+    default: false
+  streaming:
+    value_type: logical
+    default: false
+
+models:
+  fixture-model:
+    provider: fixture-provider
+    model_id: fixture-model
+    interfaces: [legacy.fixture-model.chat]
+    default_interface: legacy.fixture-model.chat
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      source_schema_version: 1
