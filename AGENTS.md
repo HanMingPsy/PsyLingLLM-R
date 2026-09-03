@@ -1,118 +1,1094 @@
-\# PsyLingLLM Development Guide
+# PsyLingLLM Development Guide
 
+## Project Mission
 
+PsyLingLLM is an R package for controlled psychological, psycholinguistic, cognitive, and educational experiments with large language models.
 
-\## Project
+The package must let researchers run the same experimental design across models and providers while preserving comparable prompts, timing, responses, reasoning fields, token metrics, trial status, and logs. Registry-driven adaptability exists to protect experimental reproducibility, not merely to add more provider integrations.
 
+Project reference:
 
+- Repository: <https://github.com/HanMingPsy/PsyLingLLM-R>
+- Current architecture backup: `inst/design/current-architecture-backup.md`
 
-PsyLingLLM is an R package for psychological and psycholinguistic experiments using LLMs.
+`AGENTS.md` is the single normative implementation plan for the Registry v2 migration. Do not create a second target-architecture or migration-plan document unless the user explicitly requests one. The current architecture backup is descriptive evidence of the 0.3 implementation, not a competing source of requirements.
 
+Before changing registry or runtime behavior, read the relevant section of the current architecture backup and identify the compatibility behavior that must remain stable.
 
+## PsyLingLLM 0.4.0 Goal
 
-\## Current Goal
+The primary 0.4.0 goal is **stable model and API adaptability**.
 
+PsyLingLLM must be able to support current and future models, cloud providers, proxy services, and local runtimes without adding model-specific branches to core experiment or runtime code.
 
+Expected extension behavior:
 
-Migrate the LLM runtime to Registry v2 architecture.
+- A new model using an existing protocol should normally require registry configuration only.
+- A new provider using an existing protocol should normally require provider/deployment configuration only.
+- A genuinely new protocol may require one reusable protocol adapter, request builder, transport decoder, or response parser.
+- Adding a new model must not require editing `llm_caller()`.
+- Provider API changes should be handled by versioned interface configuration or a reusable protocol component, not model-name conditionals.
 
+The system must remain strict enough to reject invalid configuration before a real experiment begins. Flexibility belongs at registry and adapter boundaries; the compiled runtime configuration must be explicit and validated.
 
+Core principle:
 
-Current phase:
+```text
+Flexible registry inputs
+  -> strict validation and compatibility conversion
+  -> canonical runtime configuration
+  -> deterministic runtime execution
+```
 
+Do not solve adaptability by making YAML arbitrary or silently permissive.
 
+## Current Migration Phase
 
-Phase 1: Registry v2 compatibility foundation.
+Current phase: **Phase 1 complete — Phase 2 awaiting implementation**.
 
+Phase 1 delivered:
 
+1. Define Registry v2 schema boundaries.
+2. Add strict Registry v2 validation.
+3. Detect Registry v1 and v2 inputs.
+4. Convert v1 and v2 inputs into equivalent normalized configuration in memory.
+5. Add characterization tests for current registry behavior.
+6. Add equivalent v1/v2 fixtures and compare their normalized output.
 
-\## Architecture Rules
+The following Phase 1 boundaries remain in force as compatibility guarantees:
 
+- Do not change `llm_caller()` production code during Phase 1. Its signature and behavior remain frozen until the Phase 3 extraction work has characterization tests and explicit review.
+- Do not modify or refactor experiment functions during the Registry v2 runtime migration.
+- Do not migrate `inst/registry/system_registry.yaml`.
+- Do not automatically modify user registry files.
+- Request-builder, transport, parser, caller, and registration extraction were
+  not performed during Phase 1.
+- Do not add provider-specific runtime branches.
 
+The next implementation phase is **Phase 2 — Unified Registry Resolver**. Begin
+with the internal registry bundle loader, then add the canonical resolver. Keep
+the public return contracts of `load_registry()`, `get_registry_entry()`, and
+`get_model_config()` unchanged while delegation is introduced incrementally.
 
-\- Keep existing public APIs.
+## CRAN Submission Standard
 
-\- Keep llm\_caller() function signature unchanged.
+PsyLingLLM 0.4.0 is intended for CRAN submission. Development and release decisions must follow the current official CRAN Repository Policy, the CRAN submission checklist, and Writing R Extensions:
 
-\- Do not rewrite experiment functions during registry migration.
+- <https://cran.r-project.org/web/packages/policies.html>
+- <https://cran.r-project.org/web/packages/submission_checklist.html>
+- <https://cran.r-project.org/doc/manuals/r-release/R-exts.html>
+- <https://cran.r-project.org/submit.html>
 
-\- Do not automatically modify user registry files.
+Apply these rules throughout development rather than postponing them until release:
 
+- Treat the current official CRAN policies, Writing R Extensions, the submission checklist, and current `R CMD check --as-cran` results as authoritative. The CRAN-passing 0.3 release is useful regression evidence only and must not override current requirements.
+- Build the submission archive with `R CMD build`; run `R CMD check --as-cran` against the built source tarball, not only against the working directory.
+- The release candidate must have no ERROR, no WARNING, and no unexplained significant NOTE. Treat new check findings as release blockers.
+- Test with the current R release and, before submission, R-devel. Use Win-builder for the CRAN Windows environment and a multi-platform service such as R-hub when practical.
+- Keep code portable across Windows, macOS, and Linux. Do not rely on shell behavior, path separators, locale, encoding, case-sensitive file systems, or platform-specific utilities without guarded alternatives.
+- Keep the declared minimum R version consistent with syntax and APIs used by the package. The current source uses the native pipe while `DESCRIPTION` declares R >= 4.0; Phase 1 must decide whether to remove that syntax or raise the minimum version deliberately.
+- Keep dependencies minimal. Runtime dependencies belong in `Imports`; test-only dependencies belong in `Suggests` and must be used conditionally where appropriate. Required dependencies must be available from CRAN or Bioconductor.
+- Normal tests, examples, installation, package loading, and checks must not require credentials or Internet access. External services must fail gracefully and must not create CRAN check failures.
+- Live API smoke tests must remain explicit opt-in tests, disabled on CRAN, short, low-cost, and secret-safe. `NOT_CRAN` alone is not permission to make an external request; require a project-specific opt-in variable and credentials.
+- Roxygen `@examples` sections are not required for every function. Add or retain examples according to current CRAN requirements and user value, not according to the 0.3 file layout. Executed examples must be short, deterministic, offline, portable, and verified after roxygen2 generates the corresponding Rd file. Do not call paid or production APIs. Use `\dontrun{}` only when execution genuinely requires user setup or an external service and when current CRAN guidance supports it.
+- Use UTF-8 and non-ASCII text only in ways permitted by current CRAN requirements and portable across supported locales. Do not remove or forbid characters solely because they are non-ASCII; fix or escape them when generated Rd, parsing, encoding, locale, or check results show a real problem. Avoid decorative symbols that add no user value.
+- Tests and examples may write only inside `tempdir()`. Package installation and loading must not write files, modify the global environment, start external applications, or make network requests.
+- Runtime functions may write user data only after an explicit user action. New user-specific config/cache locations must use `tools::R_user_dir("PsyLingLLM", ...)`; retain a read-compatible path for the existing `~/.psylingllm` registry and do not silently move or rewrite it.
+- Never expose API keys in examples, fixtures, condition messages, snapshots, logs, raw debug output, or returned diagnostic objects.
+- Keep checks and examples efficient. Do not use more than two cores during checks, and do not introduce timing-sensitive tests.
+- Keep source packages small and clean. Exclude development archives, IDE state, session files, check directories, local design artifacts not intended for users, and other non-package files through `.Rbuildignore`. In this repository, `AGENTS.md` and `inst/design/current-architecture-backup.md` are development inputs and must not be included in the CRAN tarball.
+- Do not ship merge-conflict markers, generated session data, binary archives, or hidden workspace files. The existing conflicted `.gitignore`, root `R.zip`, `.Rhistory`, and hidden files under `R/` must be resolved or excluded before a release build.
+- Use `Authors@R`, an informative CRAN-compliant `Title` and `Description`, current maintainer details, `URL`, and `BugReports` before submission. Review licenses and attribution for every bundled fixture, data file, and derived configuration.
+- Generate `NAMESPACE` and `man/*.Rd` only from roxygen2 source. Verify documentation coverage, examples, aliases, argument documentation, and cross-references during every release check.
+- Validate URLs and spelling, inspect the built tarball contents, and review the final CRAN check log before submission.
 
+CRAN compatibility is a continuous phase gate. A refactor that passes focused tests but makes the package less portable, writes outside permitted locations during checks, requires network access, or introduces a check WARNING is not complete.
 
-\## R Package Rules
+## Product Stability Requirements
 
+Preserve the scientific and public contract of the package:
 
+- Keep all existing exported functions available.
+- Keep the complete `llm_caller()` signature unchanged.
+- Keep experiment modules provider-independent.
+- Preserve experiment input semantics and output columns.
+- Preserve response, reasoning, timing, token, request-ID, streaming, and trial-status behavior.
+- Preserve status `599` behavior relied on by experiment code unless a separately approved compatibility change replaces it.
+- Preserve user-registry precedence.
+- Preserve Registry v1 readability throughout 0.4 development.
+- Preserve missing-versus-`NULL` behavior, especially the three-state `optionals` contract.
+- Preserve explicit `api_url` and `stream` override behavior unless an approved migration explicitly changes it.
+- Do not automatically rewrite or migrate user files.
 
-\- Use roxygen2 documentation for exported functions.
+When architectural cleanliness conflicts with compatibility, add a compatibility adapter first. Remove legacy behavior only through a separately reviewed deprecation plan.
 
-\- Use snake\_case function names.
+## Stability-First Engineering Policy
 
-\- Follow tidyverse style.
+PsyLingLLM is a research tool, not an architecture demonstration. Reliability, understandable behavior, reproducible results, and maintainability take priority over architectural purity or theoretical extensibility.
 
-\- Never manually edit man/\*.Rd.
+Apply these rules to every migration decision:
 
-\- Never manually edit generated NAMESPACE.
+- Prefer the smallest change that creates a clear compatibility or adaptability benefit.
+- Do not introduce an abstraction solely because a future provider might need it. Require a current protocol difference, a tested fixture, or a concrete near-term use case.
+- Do not create a general plugin framework while a small allowlisted component registry is sufficient.
+- Do not split one stable file into many files unless the split produces an independently testable responsibility.
+- Do not physically split Registry v2 into multiple production YAML files until loading, merging, validation, diagnostics, and rollback behavior are proven with a single bundle.
+- Preserve the current working path while introducing a new path beside it. Switch defaults only after equivalence and integration tests pass.
+- Keep compatibility wrappers until all internal callers and representative user workflows have migrated.
+- Make each change independently reviewable and reversible. Avoid changes that simultaneously alter schema, resolution, request generation, transport, parsing, and experiment output.
+- Prefer explicit code and data contracts over clever metaprogramming, implicit dispatch, or permissive recursive merging.
+- Reject invalid configuration early, but provide actionable errors identifying the model, interface, field, and expected value.
+- A registry configuration is not considered supported until its request and response contract passes network-free end-to-end tests.
+- Optional live smoke tests confirm current external API availability, but failures in external services must not make normal package tests unstable.
+- Preserve a known-good v1 execution route until the corresponding v2 route demonstrates equivalent behavior.
+- If a proposed refactor makes debugging harder for package maintainers or researchers, simplify the design before implementation.
 
+Use this priority order when trade-offs arise:
 
+```text
+1. Correct and reproducible experiment behavior
+2. Backward compatibility
+3. Clear diagnostics and testability
+4. Maintainable model/API adaptability
+5. Performance where measured and relevant
+6. Architectural elegance
+```
 
-\## Git Rules
+Do not claim support based only on schema validation or unit-level parsing. Support requires a resolved configuration, correct request generation, transport-level verification through a mock server or equivalent harness, correct response normalization, and an unchanged experiment-facing contract.
 
+## `llm_caller()` Optimization Policy
 
+`llm_caller()` may be optimized incrementally before the final orchestration-only stage. It does not need to remain structurally frozen during the migration.
+
+Allowed work includes:
+
+- Adding characterization tests around its current behavior.
+- Extracting existing request construction, transport, streaming, parsing, and result-normalization logic into internal functions without changing behavior.
+- Removing duplicated internal logic after equivalence is demonstrated by tests.
+- Improving internal naming and data boundaries in small, reviewable changes.
+- Fixing a confirmed defect when the fix is separately identified, tested, and approved.
+
+Every `llm_caller()` change must preserve:
+
+- Its complete public function signature.
+- The missing-versus-`NULL` semantics of `optionals`.
+- URL and streaming override precedence.
+- Message ordering and history behavior.
+- Public return field names and compatible value types.
+- Status, timeout, error, reasoning, usage, and first-token-latency behavior relied on by experiments.
+
+Do not combine behavior-preserving extraction with new provider support in the same change. Do not add temporary provider branches as a shortcut. First capture the current contract, then move one responsibility at a time.
+
+Experiment functions are out of scope for structural refactoring. They may be exercised by compatibility tests, but must not be edited unless the user separately approves a specific experiment-layer change.
+
+## Registry v2 Domain Model
+
+Registry v2 must separate:
+
+```text
+Model != Provider != Interface != Capability
+```
+
+### Model
+
+Describes model identity and references:
+
+- Registry key and aliases
+- Provider reference
+- Provider-facing model ID
+- Supported interfaces
+- Default interface
+- Declared capabilities
+- Model defaults and validated, limited overrides
+
+Models must not contain duplicated protocol implementations when an interface can be reused.
+
+### Provider
+
+Describes service or deployment information:
+
+- Provider identity
+- Cloud, local, proxy, or custom deployment type
+- Endpoint defaults
+- Authentication scheme and environment-variable name
+- Provider-level headers or connection metadata
+
+Provider identity must remain separate from deployment type. `openai`, `deepseek`, or `anthropic` are identities; `official`, `proxy`, and `local` are deployment properties.
+
+Never store API keys or other secrets in registry files, fixtures, logs, previews, or raw diagnostic output.
+
+### Interface
+
+Describes a reusable, versioned API protocol:
+
+- Request builder ID
+- HTTP method and body encoding
+- Endpoint path rules
+- Message/input structure
+- Parameter mappings
+- Non-stream and stream transport IDs
+- Response decoder ID
+- Semantic response channels
+- Streaming event or framing rules
+
+Examples include OpenAI Chat-compatible, OpenAI Responses, Anthropic Messages, Ollama, and future protocols.
+
+Reuse interfaces by protocol. Do not create one adapter per model.
+
+### Capability
+
+Describes research-relevant model behavior:
+
+- Reasoning
+- Streaming
+- Vision
+- Tools
+- Structured output
+- Log probabilities
+- Token probabilities
+- Long context
+
+Capabilities are not limited to booleans. They may carry defaults, limits, or supported modes.
+
+The model declares whether a capability is supported. The interface defines how a protocol activates or exposes that capability. Do not store provider-specific absolute response paths in the capability definition itself.
+
+## Registry Representation
+
+Registry v2 may initially use one bundle:
+
+```yaml
+schema_version: 2
+providers: {}
+interfaces: {}
+capabilities: {}
+models: {}
+```
+
+This keeps conceptual separation without introducing premature multi-file merge complexity.
+
+The loader may later support separate files:
+
+- `inst/registry/models.yaml`
+- `inst/registry/providers.yaml`
+- `inst/registry/interfaces.yaml`
+- `inst/registry/capabilities.yaml`
+
+Single-file and multi-file sources must compile into the same internal registry bundle. Do not migrate the production YAML until the compatibility layer and resolver are tested.
+
+Resolution priority remains:
+
+```text
+Runtime arguments > User registry > System registry > Default registry
+```
+
+Define merge behavior explicitly for each domain. Do not use unrestricted recursive list merging when it can silently discard or combine incompatible interface definitions.
+
+## Strictness and Extensibility Rules
+
+- Detect the registry version before normalization.
+- Treat missing version plus the existing model/interface shape as Registry v1.
+- Reject unsupported explicit schema versions.
+- Reject ambiguous mixed v1/v2 documents.
+- Validate document, provider, interface, capability, and model structures.
+- Validate all cross-references before runtime.
+- Validate model defaults and overrides against their declared types and allowed fields.
+- Restrict request builders, transports, and response decoders to registered component IDs.
+- Reject unknown component IDs before making a network request.
+- Do not allow YAML to name or execute arbitrary R functions.
+- Do not silently fall back to an OpenAI response path when a validated v2 selector fails.
+- Keep permissive legacy parsing inside the v1 compatibility layer; do not copy legacy looseness into v2.
+- Fail with specific errors for YAML syntax, schema, reference, adapter, model, interface, authentication, transport, and response failures.
+
+## Response and Streaming Adaptability
+
+Prefer semantic extraction over fixed structural paths.
+
+For typed protocols, describe semantic channels using item, block, role, or event types:
+
+```text
+answer
+reasoning
+usage
+request_id
+answer_delta
+reasoning_delta
+error
+done
+```
+
+OpenAI Responses-style and Anthropic-style protocols should be decoded by typed item/event semantics rather than assumptions about array position.
+
+Fixed path selectors remain acceptable for legacy or untyped OpenAI-compatible JSON, but they must:
+
+- Live in a reusable versioned interface, not in every model.
+- Support ordered candidates where providers expose documented variants.
+- Remain a compatibility mechanism rather than the default design for typed protocols.
+
+New Registry v2 paths should use explicit YAML path segments. Keep legacy `list("...")`, dotted-path, and `..` wildcard conversion inside the v1 compatibility boundary.
+
+Streaming framing and semantic event parsing are separate concerns. A transport may decode SSE or JSON Lines frames; a response parser interprets provider/protocol event meaning.
+
+## Target Runtime Architecture
+
+The final runtime flow is:
+
+```text
+User request
+  -> Registry resolver
+  -> Canonical model/provider/interface/capability configuration
+  -> Request builder
+  -> Transport
+  -> Response parser
+  -> Standardized result
+```
+
+The three primary runtime extension boundaries are:
+
+1. Request Builder
+2. Transport
+3. Response Parser
+
+Avoid adding additional abstraction layers until a concrete protocol requires them.
+
+The final `llm_caller()` must only orchestrate:
+
+```text
+resolve -> build -> send -> parse -> normalize
+```
+
+It must not contain:
+
+- Provider-name branches
+- Model-name branches
+- Provider-specific request bodies
+- curl callbacks
+- SSE or JSON Lines framing logic
+- Provider-specific JSON paths
+- Typed item/event parsing
+- Provider-specific error extraction
+
+## Registry Resolver Requirements
+
+The resolver must eventually handle:
+
+- Registry source loading
+- User/system/default precedence
+- v1 compatibility conversion
+- Model key and alias resolution
+- Provider resolution
+- Interface selection
+- Capability lookup
+- Defaults and limited overrides
+- Cross-reference validation
+- Compilation into one canonical runtime configuration
+
+Registry resolution must not perform HTTP requests or parse provider responses.
+
+Existing public functions such as `load_registry()`, `get_registry_entry()`, and `get_model_config()` must remain available as compatibility-facing APIs.
+
+## Registration and Probe Requirements
+
+Treat probing as discovery, not as the registry itself.
+
+Target registration flow:
+
+```text
+User input
+  -> Endpoint/protocol discovery
+  -> Discovery evidence
+  -> Capability analysis
+  -> Registry compiler
+  -> Validation
+  -> Preview
+  -> Optional persistence
+```
+
+Separate:
+
+- User input normalization
+- Network probing
+- Protocol detection
+- Candidate response analysis
+- Capability analysis
+- Registry compilation
+- Validation
+- Preview
+- Persistence
+
+Preserve the existing `llm_register()` public API while introducing these internal boundaries incrementally.
+
+Future registration should support:
+
+- A simple mode for known provider/protocol profiles.
+- An advanced mode for explicit custom interfaces and capability mappings.
+
+Probe results are evidence, not guaranteed configuration. Store candidates, confidence, and warnings. Do not automatically compile or persist low-confidence discoveries.
+
+Probe logic must not assume every endpoint uses OpenAI JSON, `stream`, SSE `data:`, or `[DONE]`.
+
+## Testing and Real API Usability
+
+Current credential policy:
+
+- During the current development stages, do not request, use, store, or transmit any real API key.
+- Complete schema, compatibility, resolver, request-builder, transport, parser, caller, and experiment-compatibility tests with fixtures, injected mocks, or a local mock server.
+- Real-provider smoke testing is deferred until the user explicitly provides credentials and approves that specific test run.
+- Absence of credentials does not block Phases 1 through 4 or network-free protocol contract tests.
+- Never copy a credential into source code, YAML, test fixtures, command history, snapshots, logs, Git diffs, or persisted debug output.
+
+Registry v2 is not complete when YAML merely parses. A configuration must be proven through the full contract:
+
+```text
+Registry fixture
+  -> validate
+  -> resolve
+  -> build request
+  -> mock transport or local mock server
+  -> parse response
+  -> standardized result
+```
+
+Before changing existing behavior, add characterization tests for:
+
+- System registry loading
+- User registry precedence
+- Interface selection
+- Typed defaults
+- Message ordering
+- Role behavior
+- `optionals` missing/`NULL`/named-list semantics
+- Streaming precedence
+- URL overrides
+- Answer, reasoning, usage, and request-ID extraction
+- Status `599`
+- Existing experiment result fields
+
+For Registry v2, test:
+
+- Schema and cross-reference failures
+- Equivalent v1/v2 normalized configuration
+- Multiple models sharing one interface
+- A previously unknown model added without core R changes
+- Request generation for every supported interface
+- Non-streaming and streaming response parsing
+- Arbitrary network chunk boundaries
+- Unicode split across chunks
+- Typed output items and events
+- Provider errors, malformed payloads, timeouts, and interrupted streams
+- Secret redaction
+
+Normal tests must not use real provider APIs or credentials. Prefer fixtures, injected mock transports, and a local mock HTTP server.
+
+Optional live smoke tests may be added separately and must:
+
+- Be disabled by default and on CRAN.
+- Require an explicit environment-variable opt-in.
+- Use environment-provided credentials.
+- Use short, low-cost requests.
+- Never persist secrets or sensitive responses.
+
+Run focused tests first, then the full test suite and `R CMD check` when practical. Do not weaken tests to make a refactor pass.
+
+## PsyLingLLM 0.4.0 Acceptance Criteria
+
+- A model using an existing interface can be added through registry configuration without changing core runtime code.
+- A provider using an existing protocol can be added without changing `llm_caller()`.
+- A new protocol can be added through reusable runtime components without provider branches in orchestration.
+- OpenAI-compatible, DeepSeek, and Anthropic-style scenarios have network-free contract tests. Add a local-runtime scenario only when PsyLingLLM claims that protocol as supported in 0.4.0.
+- Existing bundled models continue working.
+- Existing experiments, exported names, function signatures, and documented return contracts remain compatible.
+- Existing v1 user registries remain readable and are not rewritten automatically.
+- Invalid registry configuration fails before network execution.
+- Request, transport, parsing, streaming, error, and timeout behavior are independently testable.
+- Public model/capability discovery can eventually be provided through `llm_models()`, `llm_capabilities()`, and `find_llm()`.
+- `llm_caller()` contains orchestration only.
+- The built source tarball passes `R CMD check --as-cran` with no ERROR, no WARNING, and no unexplained significant NOTE.
+- Normal tests and examples work without network access, credentials, or writes outside temporary directories.
+
+## Scope Control for 0.4.0
+
+The required 0.4.0 path is deliberately smaller than the complete long-term roadmap:
+
+1. Phase 1A through Phase 1C: characterize v1, freeze the v2 schema, and add in-memory compatibility.
+2. Phase 2: introduce one strict resolver and canonical runtime configuration.
+3. Phase 3A through Phase 3C: extract request, transport, and response boundaries without behavior changes.
+4. Phase 4: reduce `llm_caller()` to orchestration.
+5. Phase 6 minimum proof: OpenAI-compatible/DeepSeek reuse plus one genuinely different Anthropic-style protocol.
+6. Phase 7: migrate only the bundled registry after equivalence is demonstrated.
+7. Phase 8: complete CRAN release validation.
+
+The following work is independently deferrable to 0.4.x and must not delay a stable 0.4.0 unless it becomes necessary for compatibility:
+
+- Broad registration/probe redesign in Phase 5.
+- A new local JSON Lines transport when no maintained 0.4.0 model requires it.
+- New public query APIs such as `llm_models()`, `llm_capabilities()`, and `find_llm()`.
+- A general external plugin system or user-defined executable adapter API.
+
+Do not claim support for a deferred provider or protocol in 0.4.0 documentation. A smaller tested support matrix is preferable to a broad, partially verified one.
+
+## Engineering Implementation Plan
+
+The migration must proceed through the following engineering phases. Each phase must leave the package in a usable state. Do not combine phases into one large change.
+
+### Phase 1A — Characterize the Current Contract
+
+Goal: create a safety net before changing registry or runtime behavior.
+
+Implementation steps:
+
+1. Build the package tarball and record the baseline `R CMD check` findings before changing behavior.
+2. Resolve or exclude non-package build inputs, including merge-conflict markers, session files, IDE state, root archives, and hidden files under `R/`.
+3. Decide and document the minimum supported R version; reconcile the current R >= 4.0 declaration with native-pipe syntax.
+4. Audit current roxygen examples and source/documentation encodings against current CRAN requirements and generated Rd checks. Use 0.3 only to explain historical decisions; do not bulk-add, delete, or rewrite content without evidence from the current checks.
+5. Add testthat edition 3 infrastructure using `Suggests` and `Config/testthat/edition: 3`.
+6. Snapshot all existing exported names and the formals of compatibility-critical public functions, not only `llm_caller()`.
+7. Create sanitized Registry v1 fixtures based on representative bundled entries.
+8. Test system-registry loading and user-registry precedence without writing to the real user registry.
+9. Test single-interface selection, multi-interface ambiguity, missing-model errors, and current `get_model_config()` fallback behavior.
+10. Test typed optional defaults and role mapping normalization.
+11. Record the exact `llm_caller()` formal arguments, especially the missing `optionals` default.
+12. Test request message ordering and the three-state `optionals` contract through existing internal helpers or a mock boundary.
+13. Test current non-stream and stream extraction, status `599`, usage fields, request ID, and first-token latency behavior.
+14. Add minimal experiment-facing contract tests without modifying experiment functions.
+
+Expected files:
+
+- Modify `DESCRIPTION` to add test dependencies under `Suggests`.
+- Modify `.Rbuildignore` and repair `.gitignore` as separate package-hygiene changes where required.
+- Add `tests/testthat.R`.
+- Add focused files under `tests/testthat/`.
+- Add sanitized fixtures under `tests/testthat/fixtures/`.
+- Do not modify `R/llm_caller.R` or experiment modules in this step.
+
+Exit criteria:
+
+- Current Registry v1 behavior is reproducible in network-free tests.
+- Existing exports, critical public signatures, and result structures have explicit tests.
+- Tests never read or write the real user registry.
+- A built tarball excludes development-only files and has a recorded baseline check result.
+
+Suggested commit:
+
+```text
+fix(package): establish CRAN-safe build inputs
+test(registry): characterize existing registry and runtime behavior
+```
+
+### Phase 1B — Define Registry v2 Schema
+
+Goal: define a strict, minimal Registry v2 bundle without changing production loading behavior.
+
+Implementation steps:
+
+1. Define the top-level v2 bundle with `models`, `providers`, `interfaces`, and `capabilities` domains.
+2. Define required and optional fields for each domain.
+3. Define the built-in component-ID vocabulary for request builders, transports, and response decoders without implementing runtime dispatch yet.
+4. Validate types, required fields, allowed values, and unknown fields.
+5. Validate all cross-references between models, providers, interfaces, and capabilities.
+6. Define explicit override allowlists rather than unrestricted recursive merging.
+7. Define canonical error messages containing the registry domain, entry ID, and invalid field.
+8. Freeze the public contract of exported `validate_registry_schema()`: it must detect v1/v2 documents, dispatch to version-specific validation, return `TRUE` for valid supported documents, and fail with a stable `registry_validation_error` condition for invalid documents.
+9. Keep implementation-availability checks separate from structural schema checks until the built-in component dispatchers exist.
+
+Expected files:
+
+- Modify `R/registry_schema.R`.
+- Add schema-focused tests under `tests/testthat/`.
+- Add a minimal valid Registry v2 fixture and multiple invalid fixtures.
+- Regenerate documentation with roxygen2 only if public documentation changes.
+
+Exit criteria:
+
+- Valid v2 fixtures pass.
+- Broken references and syntactically invalid or undeclared component IDs fail during validation; missing R implementations fail during resolver/dispatcher validation once those components exist.
+- Validation performs no network or filesystem writes.
+- Existing v1 registries are not rejected by the public compatibility-facing validation path.
+
+Suggested commit:
+
+```text
+feat(registry): define strict Registry v2 schema
+```
+
+### Phase 1C — Add the v1/v2 Compatibility Layer
+
+Goal: normalize current Registry v1 and future Registry v2 data without changing the production YAML or user files.
+
+Implementation steps:
+
+1. Detect v1, v2, unsupported versions, and invalid mixed documents.
+2. Convert v1 registry entries into a v2-compatible in-memory representation.
+3. Convert legacy provider labels into provider identity and deployment metadata without losing the original value.
+4. Convert legacy request templates and typed defaults into compatibility configuration.
+5. Convert legacy response and streaming paths into canonical selectors.
+6. Preserve a `legacy_template_v1` compatibility mechanism for shapes that cannot yet use a native v2 interface.
+7. Produce one canonical registry intermediate representation for equivalent v1 and v2 fixtures. Runtime model selection and compilation remain Phase 2 responsibilities.
+8. Do not write converted data back to disk.
+
+Expected files:
+
+- Add `R/registry_compatibility.R`.
+- Add `tests/testthat/test-registry-compatibility.R`.
+- Add equivalent v1/v2 fixtures under `tests/fixtures/`.
+- Do not modify `inst/registry/system_registry.yaml`.
+
+Exit criteria:
+
+- Equivalent v1 and v2 fixtures normalize to equivalent canonical registry values.
+- Existing user-registry shapes remain readable.
+- No compatibility conversion performs filesystem writes.
+
+Suggested commit:
+
+```text
+feat(registry): add v1 and v2 compatibility conversion
+```
+
+### Phase 2 — Introduce the Unified Registry Resolver
+
+Goal: make one internal layer responsible for model, provider, interface, capability, alias, default, and precedence resolution.
+
+Implementation steps:
+
+1. Define a registry bundle loader that keeps system, user, default, and merged views distinguishable.
+2. Resolve model keys and aliases without heuristic provider fallbacks that can silently select the wrong model.
+3. Resolve provider identity and deployment metadata.
+4. Select the requested or default interface and reject ambiguity.
+5. Resolve capabilities, defaults, and allowed overrides.
+6. Compile the resolved entry into a strict canonical runtime configuration.
+7. Validate the compiled configuration before returning it.
+8. Make `get_registry_entry()`, `get_model_config()`, and `load_registry()` delegate incrementally while preserving their public return contracts.
+9. Resolve the existing untracked `R/resolve_registry_entry.R` ownership before editing or replacing it.
+
+Expected files:
+
+- Add or modify `R/registry_loader.R`.
+- Add or modify `R/registry_resolver.R` or `R/resolve_registry_entry.R` after ownership is confirmed.
+- Modify `R/get_registry_entry.R` incrementally.
+- Modify `R/get_model_config.R` incrementally.
+- Modify `R/register_utils.R` only where loader delegation is needed.
+- Add resolver, alias, precedence, ambiguity, and compiled-config tests.
+
+Exit criteria:
+
+- One resolver produces canonical configuration from both v1 and v2 fixtures.
+- Existing public registry functions retain documented behavior.
+- Resolution performs no HTTP requests.
+- User, system, and default precedence is explicit and tested.
+
+Suggested commits:
+
+```text
+refactor(registry): introduce unified registry loader
+refactor(registry): introduce canonical model resolver
+```
+
+### Phase 3A — Extract the Request Builder Boundary
+
+Goal: move existing request construction behind an independently testable boundary without changing generated requests.
+
+Implementation steps:
+
+1. Define a normalized call context that preserves prompt, material, system message, history, role mapping, stream override, and `optionals` missing state.
+2. Define a transport-neutral request object containing method, URL, headers, body, encoding, stream mode, transport ID, and timeout.
+3. Move existing v1 template construction into a legacy request builder without changing its output.
+4. Add an allowlisted request-builder dispatcher based on interface configuration.
+5. Keep authentication values out of logs and snapshots.
+6. Make `llm_caller()` delegate request construction while preserving its signature and results.
+
+Expected files:
+
+- Add `R/runtime_request_builder.R`.
+- Add request-builder tests and request snapshots or structural assertions.
+- Modify `R/llm_caller.R` only to delegate existing behavior.
+- Do not modify experiment modules.
+
+Exit criteria:
+
+- Existing v1 calls generate equivalent URLs, headers, bodies, messages, parameters, and stream flags.
+- Request generation is testable without curl or a live server.
+- No provider-name or model-name branches are added.
+
+Suggested commit:
+
+```text
+refactor(runtime): extract request builder without behavior changes
+```
+
+### Phase 3B — Extract the Transport Boundary
+
+Goal: isolate HTTP execution and stream framing from request construction and response semantics.
+
+Implementation steps:
+
+1. Define a transport response object containing status, headers, raw/text body, frames/events, timing, and structured transport errors.
+2. Move existing JSON POST behavior into `http_json` transport.
+3. Move existing SSE framing into `sse_json` transport while preserving current behavior.
+4. Preserve status `599` compatibility at the public normalization boundary.
+5. Add injected/mock transport support for tests.
+6. Add a local mock-server test for URL, headers, payload, timeout, HTTP errors, and stream chunk boundaries.
+7. Do not interpret answer, reasoning, or usage fields in the transport layer.
+8. Preserve the current no-automatic-retry behavior. Any future retry policy must be explicit, bounded, separately tested, and safe for potentially billable non-idempotent requests.
+
+Expected files:
+
+- Add `R/runtime_transport.R`.
+- Add `R/runtime_transport_http.R` if separation is justified by independent testing.
+- Add `R/runtime_transport_sse.R` if separation is justified by independent testing.
+- Add a minimal CRAN-available mock-server package to `Suggests` only if injected transports cannot cover the HTTP integration contract; guard its use conditionally.
+- Add transport and mock-server tests.
+- Modify `R/llm_caller.R` only to delegate transport execution.
+
+Exit criteria:
+
+- Non-stream and SSE behavior remains compatible.
+- Transport tests use no external API.
+- Arbitrary chunks, multiple events per chunk, incomplete final frames, Unicode, timeout, and interruption are covered.
+- The transport layer contains no provider-specific response extraction.
+
+Suggested commit:
+
+```text
+refactor(runtime): extract transport without behavior changes
+```
+
+### Phase 3C — Extract the Response Parser Boundary
+
+Goal: isolate response semantics and support strict reusable decoders.
+
+Implementation steps:
+
+1. Define a parsed response object for answer, reasoning, usage, request ID, finish reason, and provider error.
+2. Consolidate overlapping path extraction behavior behind one compatibility implementation.
+3. Preserve the legacy path decoder for current v1 entries.
+4. Add typed-item and typed-event decoder contracts for modern protocols only when supported by concrete fixtures.
+5. Keep stream framing in transport and event meaning in the parser.
+6. Remove direct provider JSON extraction from `llm_caller()` by delegation.
+7. Preserve whitespace, empty-response, reasoning, usage, and error semantics through characterization tests.
+
+Expected files:
+
+- Add `R/runtime_response_parser.R`.
+- Modify `R/llm_parser.R` and `R/json_utils.R` incrementally where logic is reused.
+- Modify `R/llm_caller.R` only to delegate parsing.
+- Add parser fixtures and tests for legacy paths, typed items, typed events, malformed responses, and provider errors.
+
+Exit criteria:
+
+- Existing v1 response fixtures produce equivalent normalized values.
+- Typed protocols are selected by interface decoder ID, not provider branches.
+- `llm_caller()` no longer traverses provider response JSON directly.
+
+Suggested commit:
+
+```text
+refactor(runtime): extract response parser without behavior changes
+```
+
+### Phase 4 — Complete `llm_caller()` Orchestration
+
+Goal: simplify `llm_caller()` after its responsibilities have already moved behind tested boundaries.
+
+Implementation steps:
+
+1. Retain the exact public signature.
+2. Capture `missing(optionals)` at the public boundary.
+3. Resolve canonical configuration.
+4. Normalize call context.
+5. Build the request.
+6. Send the request.
+7. Parse the response.
+8. Normalize the existing public result.
+9. Keep compatibility wrappers for existing internal helpers until removal is separately approved.
+10. Verify experiment-facing behavior without editing experiment modules.
+
+Expected files:
+
+- Modify `R/llm_caller.R`.
+- Add or modify `R/runtime_result.R` if result normalization has a meaningful independent contract.
+- Extend caller compatibility and experiment-facing tests.
+
+Exit criteria:
+
+- `llm_caller()` performs `resolve -> build -> send -> parse -> normalize` only.
+- Its public signature and return contract remain compatible.
+- It contains no provider/model branches, curl callbacks, stream framing, or provider JSON traversal.
+- Representative experiment tests pass without experiment-source changes.
+
+Suggested commit:
+
+```text
+refactor(runtime): simplify llm caller orchestration
+```
+
+### Phase 5 — Separate Registration Discovery and Compilation
+
+Goal: improve registration without discarding the existing two-pass probe investment.
+
+This phase is independently deferrable to 0.4.x. Do not begin it merely because the core Registry v2 runtime is ready; require a concrete registration defect or approved 0.4.0 release need.
+
+Implementation steps:
+
+1. Define a stable discovery-result object containing evidence, candidates, confidence, and warnings.
+2. Separate network probing from protocol detection.
+3. Separate response candidate ranking from capability conclusions.
+4. Add a Registry compiler that converts reviewed discovery results into valid v2 entries.
+5. Keep Pass-1/Pass-2 validation as evidence where useful.
+6. Prevent low-confidence results from being automatically persisted.
+7. Preserve the existing `llm_register()` signature and advanced workflow.
+8. Add simple registration only for provider/protocol profiles with reliable defaults.
+9. Improve user-registry persistence atomically in a separate reviewed change.
+
+Expected files:
+
+- Modify `R/register_orchestrator.R` incrementally.
+- Reuse and delegate from `R/register_probe_request.R`, `R/register_rank_endpoint.R`, `R/register_build_input.R`, and `R/register_entry.R`.
+- Add discovery-result and Registry-compiler files only when their responsibilities are independently testable.
+- Add registration compiler and persistence tests without live APIs.
+
+Exit criteria:
+
+- Probe output is not treated as automatically valid Registry configuration.
+- Registration can compile a validated v2 entry without writing it.
+- Existing registration entry points remain available.
+- User files are never migrated implicitly.
+
+Suggested commits:
+
+```text
+refactor(registration): separate discovery from registry compilation
+feat(registration): compile validated Registry v2 entries
+```
+
+### Phase 6 — Add Native Registry v2 Protocol Coverage
+
+Goal: prove adaptability with a small set of real protocol families before migrating production configuration.
+
+Implementation steps:
+
+1. Add one native OpenAI-compatible interface fixture.
+2. Add a DeepSeek model fixture reusing that interface where compatible.
+3. Add one typed OpenAI Responses fixture using item/event semantics.
+4. Add one Anthropic-style fixture using content-block/event semantics.
+5. Add a local-runtime fixture only if that protocol is part of the approved 0.4.0 support matrix; otherwise defer it rather than adding an unused transport.
+6. Verify that a newly named model using an existing interface requires no R runtime change.
+7. Add optional, explicit live smoke tests separately from normal package tests.
+
+Expected files:
+
+- Add protocol-focused Registry fixtures.
+- Add only the builders, transports, or decoders required by concrete fixtures.
+- Add network-free end-to-end contract tests.
+- Do not edit experiment modules.
+
+Exit criteria:
+
+- Supported protocol fixtures complete validate, resolve, build, send-mock, parse, and normalize flows.
+- New models reuse interfaces rather than duplicating adapters.
+- No provider-specific branches appear in `llm_caller()`.
+
+Suggested commits should be protocol-scoped, for example:
+
+```text
+feat(runtime): add typed Responses protocol adapter
+feat(runtime): add Anthropic messages protocol adapter
+feat(runtime): add JSON Lines transport for local models
+```
+
+### Phase 7 — Migrate the Production System Registry
+
+Goal: switch bundled configuration only after v2 behavior is proven equivalent.
+
+Implementation steps:
+
+1. Compile the existing bundled models into a reviewed Registry v2 bundle.
+2. Compare v1 and v2 resolved configurations and generated requests.
+3. Run network-free end-to-end fixtures for every bundled interface.
+4. Keep the v1 compatibility loader available for user registries.
+5. Switch the bundled default only after all equivalence gates pass.
+6. Do not rewrite user registry files.
+7. Provide an explicit, backup-producing migration tool only if persistent user migration is later required.
+
+Expected files:
+
+- Add or migrate the production Registry v2 bundle under `inst/registry/`.
+- Modify the internal registry loader.
+- Add complete bundled-registry regression tests.
+- Update roxygen source documentation and regenerate generated documentation when necessary.
+
+Exit criteria:
+
+- Every bundled model resolves and produces a valid request.
+- Existing v1 user registries still resolve.
+- Switching production Registry versions does not change experiment-facing results.
+- Rollback to the previous bundled Registry path remains straightforward for the release candidate.
+
+Suggested commit:
+
+```text
+feat(registry): migrate bundled models to Registry v2
+```
+
+### Phase 8 — Complete CRAN Release Validation
+
+Goal: produce a clean, portable 0.4.0 source tarball ready for CRAN submission. New query APIs are not part of this release gate and may be added later.
+
+Implementation steps:
+
+1. Confirm all existing exports remain documented and compatible; do not add release-only APIs without separate approval.
+2. Update roxygen2 source documentation and regenerate `NAMESPACE` and `man/*.Rd` through roxygen2 only.
+3. Make `DESCRIPTION` CRAN-ready, including `Authors@R`, informative `Title` and `Description`, correct dependency fields, minimum R version, `URL`, and `BugReports`.
+4. Review license, attribution, bundled fixtures, data files, registry content, and package size.
+5. Review `.Rbuildignore`, build the source tarball, and inspect its file list for archives, histories, IDE state, credentials, check output, and development-only files.
+6. Run the complete offline test suite and `R CMD check --as-cran` on the built tarball under the current R release.
+7. Check with R-devel on Win-builder and use multi-platform checks for Windows, macOS, and Linux when practical.
+8. Resolve every ERROR and WARNING and every significant NOTE; record a concise explanation only for findings that are genuinely unavoidable.
+9. Run explicitly enabled live smoke tests for maintained providers outside normal CRAN checks.
+10. Update the package version and release notes only after all engineering and CRAN acceptance criteria pass.
+
+Exit criteria:
+
+- No existing export is removed or silently changes contract.
+- Normal tests and examples require no network, credentials, or user-directory writes.
+- The built source tarball passes `R CMD check --as-cran` with no ERROR, no WARNING, and no unexplained significant NOTE.
+- Cross-platform check results do not reveal portability failures.
+- The final tarball contains only intended package files and the v0.4.0 acceptance criteria in this file are satisfied.
+
+Suggested commits:
+
+```text
+test(registry): complete Registry v2 compatibility coverage
+docs(package): prepare Registry v2 release documentation
+fix(package): satisfy CRAN release checks
+```
+
+### Phase Gate for Every Implementation Step
+
+Before editing:
+
+1. Confirm the work belongs to the active phase.
+2. Read the affected current-architecture sections.
+3. List files to add and modify.
+4. State the compatibility behavior being protected.
+5. State the focused tests that will prove the change.
+
+After editing:
+
+1. Run focused tests.
+2. Compare old and new behavior where applicable.
+3. Run the broader suite and package check when practical.
+4. Show the complete relevant Git diff.
+5. Report unrelated working-tree changes.
+6. Do not commit until the user approves the diff.
+
+If a phase cannot meet its exit criteria without broadening scope, stop and request review instead of silently continuing into the next phase.
+
+## Important Files
+
+Current architecture reference:
+
+- `inst/design/current-architecture-backup.md`
+
+Registry loading, compatibility, and validation:
+
+- `R/register_utils.R`
+- `R/register_read.R`
+- `R/register_io.R`
+- `R/register_entry.R`
+- `R/register_validate.R`
+- `R/get_registry_entry.R`
+- `R/get_model_config.R`
+- `R/registry_schema.R`
+- `R/registry_compatibility.R` when introduced
+- `R/registry_loader.R` when introduced
+- `R/registry_resolver.R` or `R/resolve_registry_entry.R` when introduced
+- `R/registry_query.R` when introduced
+
+Registration and discovery:
+
+- `R/register_orchestrator.R`
+- `R/register_probe_request.R`
+- `R/register_build_input.R`
+- `R/register_rank_endpoint.R`
+- `R/register_classify.R`
+- `R/register_preview.R`
+- Discovery-result, capability-analysis, and Registry-compiler files introduced later
+
+Runtime:
+
+- `R/llm_caller.R`
+- `R/llm_parser.R`
+- `R/json_utils.R`
+- `R/error_handling.R`
+- Request-builder, transport, response-parser, and result-normalizer files introduced later
+
+Experiment compatibility:
+
+- `R/trial_experiment.R`
+- `R/factorial_trial_experiment.R`
+- `R/conversation_experiment.R`
+- `R/conversation_experiment_with_feedback.R`
+- `R/multi_model.R`
+- `R/schema.R`
+
+Registry configuration and tests:
+
+- `inst/registry/system_registry.yaml`
+- Future Registry v2 bundle or domain files
+- `tests/testthat.R`
+- `tests/testthat/`
+- `tests/testthat/fixtures/`
+
+Package metadata and generated documentation:
+
+- `DESCRIPTION`
+- `NAMESPACE`
+- `man/`
+
+## R Package Rules
+
+- Follow standard R package structure and conventions.
+- Use snake_case for new function and argument names.
+- Follow tidyverse style unless a small compatibility-preserving deviation is necessary.
+- Use roxygen2 for all exported functions and public documentation.
+- Never manually edit generated `man/*.Rd` files.
+- Never manually edit generated `NAMESPACE`.
+- Regenerate documentation with roxygen2 after changing exported APIs or documentation.
+- Declare runtime dependencies in `Imports` and development/test dependencies in `Suggests`.
+- Use testthat edition 3 for new tests.
+- Do not add a dependency without explaining its architectural need.
+- Avoid unrelated formatting, renaming, or file rewrites during migration work.
+- Keep `DESCRIPTION`'s minimum R version aligned with every syntax feature and API used in production code.
+- Build and check the source tarball, not only the development directory.
+- Keep normal tests and examples offline, deterministic, credential-free, and confined to temporary files.
+- Treat CRAN portability and package-policy failures as correctness defects, not release housekeeping.
+- Follow current CRAN documentation checks. Use 0.3 documentation only as regression evidence, and verify generated Rd output whenever roxygen text changes.
+
+## Git and Change-Control Rules
 
 Use Conventional Commits:
 
+- `feat:` for new user-visible capability
+- `fix:` for bug fixes
+- `refactor:` for behavior-preserving structural changes
+- `test:` for test-only changes
+- `docs:` for documentation-only changes
 
+Keep commits atomic and scoped to one migration concern. Do not commit automatically.
 
-feat:
+Before a major change:
 
-fix:
+1. Read the applicable architecture documentation.
+2. Explain the planned change and why it belongs to the current phase.
+3. List files to add and modify.
+4. Identify compatibility and test risks.
 
-refactor:
+After a change:
 
-docs:
+1. Run focused tests.
+2. Run the full suite and package check when practical.
+3. Show `git diff` for review.
+4. Report pre-existing or unrelated working-tree changes.
+5. Wait for approval before committing.
 
-test:
-
-
-
-\## Registry v2 Migration Strategy
-
-
-
-Order:
-
-
-
-1\. Registry schema validation.
-
-2\. v1/v2 compatibility layer.
-
-3\. Unified registry resolver.
-
-4\. Request builder abstraction.
-
-5\. Transport abstraction.
-
-6\. Response parser abstraction.
-
-7\. Refactor llm\_caller() into orchestration layer.
-
-
-
-\## Development Workflow
-
-
-
-Before major changes:
-
-
-
-1\. Explain planned changes.
-
-2\. List affected files.
-
-3\. Show git diff after changes.
-
-4\. Do not commit automatically.
-
+Do not overwrite unrelated user changes or untracked work. If an existing change overlaps the task, stop and report the conflict before proceeding.
