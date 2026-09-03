@@ -2,7 +2,7 @@
 #'
 #' Look up a model first in the **user registry** (by default at
 #' `get_registry_path()`), and if not found, fall back to the **system
-#' registry** located at `inst/registry/model_registry.yaml`. Select an interface
+#' registry** located at `inst/registry/system_registry.yaml`. Select an interface
 #' (e.g., `"chat"`, `"completion"`) and return a **normalized** node ready for
 #' request assembly.
 #'
@@ -55,89 +55,35 @@ get_registry_entry <- function(model_key,
     stop("Package 'yaml' is required for get_registry_entry().")
   }
 
-  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
-
-  # --- helpers (local) ------------------------------------------------------
-  normalize_bool <- function(x) {
-    if (is.logical(x)) return(x)
-    if (is.numeric(x) && length(x) == 1) return(!is.na(x) && x != 0)
-    if (is.character(x) && length(x) == 1) {
-      s <- tolower(trimws(x))
-      if (s %in% c("true","t","yes","y","on","1"))  return(TRUE)
-      if (s %in% c("false","f","no","n","off","0","~","null","na","none","")) return(FALSE)
+  bundle <- load_registry_bundle(
+    system_path = get_system_registry_path(),
+    user_path = path
+  )
+  resolved <- tryCatch(
+    resolve_registry_entry(
+      model_key,
+      generation_interface = generation_interface,
+      registry = bundle
+    ),
+    registry_resolution_error = function(error) {
+      registry_entry_compatibility_abort(
+        error,
+        generation_interface,
+        bundle$merged$interfaces
+      )
     }
-    isTRUE(x)
+  )
+
+  legacy <- registry_find_legacy_entry(bundle, resolved)
+  if (!is.null(legacy)) {
+    return(normalize_registry_entry(
+      legacy$entry,
+      resolved$model$key,
+      legacy$interface
+    ))
   }
 
-  normalize_scalar <- function(v) {
-    if (is.null(v) || length(v) != 1) return(v)
-    if (is.logical(v) || is.numeric(v)) return(v)
-    if (is.character(v)) {
-      s <- trimws(v)
-      if (tolower(s) %in% c("true","t","yes","y","on","1"))  return(TRUE)
-      if (tolower(s) %in% c("false","f","no","n","off","0")) return(FALSE)
-      if (grepl("^[-+]?[0-9]+(\\.[0-9]+)?$", s)) return(as.numeric(s))
-      return(s)
-    }
-    v
-  }
-
-  normalize_role_mapping <- function(mp) {
-    # Keep as provided, but only accept known keys; allow NULLs (caller decides to apply).
-    out <- list(system = NULL, user = NULL, assistant = NULL, tool = NULL)
-    if (!is.list(mp)) return(out)
-    nm <- tolower(names(mp))
-    for (k in names(out)) {
-      i <- which(nm == k)[1]
-      if (length(i) && !is.na(i)) {
-        val <- mp[[i]]
-        if (is.character(val) && length(val) == 1 && nzchar(val)) out[[k]] <- val
-      }
-    }
-    out
-  }
-
-  read_yaml_safe <- function(p) {
-    if (!is.character(p) || !length(p) || is.na(p) || !file.exists(p)) return(NULL)
-    tryCatch(yaml::read_yaml(p), error = function(e) NULL)
-  }
-
-  select_interface <- function(node, iface) {
-    if (!is.list(node) || !length(node)) stop("Registry node is empty or invalid.")
-    iface_names <- names(node)
-    if (is.null(iface_names) || !length(iface_names)) stop("No interfaces found for this model.")
-    if (!is.null(iface)) {
-      if (is.null(node[[iface]])) {
-        stop(sprintf("Interface '%s' not found. Available: %s",
-                     iface, paste(iface_names, collapse = ", ")))
-      }
-      return(list(iface_name = iface, iface_node = node[[iface]], iface_names = iface_names))
-    }
-    if (length(iface_names) == 1) {
-      nm <- iface_names[[1]]
-      return(list(iface_name = nm, iface_node = node[[nm]], iface_names = iface_names))
-    }
-    stop(sprintf("Multiple interfaces available: %s. Please specify `generation_interface`.",
-                 paste(iface_names, collapse = ", ")))
-  }
-
-
-  # --- 1) user registry first ----------------------------------------------
-  user_reg <- read_yaml_safe(path)
-  if (!is.null(user_reg) && is.list(user_reg) && !is.null(user_reg[[model_key]])) {
-    sel <- select_interface(user_reg[[model_key]], generation_interface)
-    return(normalize_registry_entry(sel$iface_node, model_key, sel$iface_name))
-  }
-
-  # --- 2) system registry fallback ------------------------------------------
-  sys_path <- get_system_registry_path()
-  sys_reg  <- read_yaml_safe(sys_path)
-  if (!is.null(sys_reg) && is.list(sys_reg) && !is.null(sys_reg[[model_key]])) {
-    sel <- select_interface(sys_reg[[model_key]], generation_interface)
-    return(normalize_registry_entry(sel$iface_node, model_key, sel$iface_name))
-  }
-
-  stop(sprintf("Model '%s' not found in user or system registry.", model_key), call. = FALSE)
+  registry_project_resolved_entry(resolved)
 }
 
 # ---- internal helpers -------------------------------------------------------
@@ -220,4 +166,152 @@ normalize_registry_entry <- function(entry, model_key, generation_interface) {
     },
     interfaces = names(entry %||% list())
   )
+}
+
+registry_find_legacy_entry <- function(bundle, resolved) {
+  interface_name <- resolved$interface$metadata$legacy_interface
+  if (is.null(interface_name) || is.null(bundle$raw)) {
+    return(NULL)
+  }
+
+  for (source in c("user", "system", "default")) {
+    registry <- bundle$raw[[source]]
+    if (is.null(registry) || length(registry) == 0L) {
+      next
+    }
+    if ("schema_version" %in% names(registry)) {
+      if (!is.null(registry$models[[resolved$model$key]])) {
+        return(NULL)
+      }
+      next
+    }
+    model <- registry[[resolved$model$key]]
+    if (!is.null(model)) {
+      entry <- model[[interface_name]]
+      if (is.null(entry)) {
+        return(NULL)
+      }
+      return(list(entry = entry, interface = interface_name))
+    }
+  }
+
+  NULL
+}
+
+registry_project_resolved_entry <- function(resolved) {
+  request <- resolved$interface$request
+  selectors <- resolved$interface$response$selectors %||% list()
+  token_usage_path <- list(
+    prompt = registry_public_selector(selectors$usage_prompt),
+    completion = registry_public_selector(selectors$usage_completion)
+  )
+  if (all(vapply(token_usage_path, is.null, logical(1)))) {
+    token_usage_path <- NULL
+  }
+
+  list(
+    model_key = resolved$model$key,
+    interface = resolved$interface$id,
+    provider = tolower(resolved$provider$type),
+    reasoning = isTRUE(resolved$capabilities$values$reasoning),
+    input = list(
+      default_url = request$url %||% NULL,
+      headers = request$headers %||% list(),
+      body = request$body %||% list(),
+      fallback_body = request$fallback_body %||% NULL,
+      optional_defaults = resolved$defaults,
+      default_system = request$default_system %||% NULL,
+      role_mapping = registry_public_role_mapping(request$role_mapping)
+    ),
+    output = list(
+      respond_path = registry_public_selector(selectors$answer),
+      thinking_path = registry_public_selector(selectors$reasoning),
+      id_path = registry_public_selector(selectors$request_id),
+      object_path = registry_public_selector(selectors$object),
+      token_usage_path = token_usage_path
+    ),
+    streaming = list(
+      enabled = isTRUE(
+        resolved$interface$metadata$legacy_streaming_enabled
+      ),
+      delta_path = registry_public_selector(selectors$answer_delta),
+      thinking_delta_path = registry_public_selector(
+        selectors$reasoning_delta
+      ),
+      param_name = resolved$interface$streaming$request_parameter %||% NULL
+    ),
+    interfaces = resolved$model$available_interfaces
+  )
+}
+
+registry_public_selector <- function(selector) {
+  if (is.null(selector)) {
+    return(NULL)
+  }
+  segments <- as.list(selector)
+  lapply(segments, function(segment) {
+    if (identical(segment, "*")) "" else segment
+  })
+}
+
+registry_public_role_mapping <- function(mapping) {
+  out <- list(system = NULL, user = NULL, assistant = NULL, tool = NULL)
+  if (!is.list(mapping)) {
+    return(out)
+  }
+  for (name in intersect(names(out), tolower(names(mapping)))) {
+    index <- which(tolower(names(mapping)) == name)[[1L]]
+    value <- mapping[[index]]
+    if (is.character(value) && length(value) == 1L && nzchar(value)) {
+      out[[name]] <- value
+    }
+  }
+  out
+}
+
+registry_entry_compatibility_abort <- function(error, requested_interface,
+                                               interfaces) {
+  available <- registry_public_interface_labels(
+    error$candidates,
+    interfaces
+  )
+  if (identical(error$reason, "model_not_found")) {
+    stop(
+      sprintf(
+        "Model '%s' not found in user or system registry.",
+        error$model_key
+      ),
+      call. = FALSE
+    )
+  }
+  if (identical(error$reason, "interface_not_found")) {
+    stop(
+      sprintf(
+        "Interface '%s' not found. Available: %s",
+        requested_interface,
+        paste(available, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  if (identical(error$reason, "ambiguous_interface") &&
+      is.null(requested_interface)) {
+    stop(
+      sprintf(
+        paste0(
+          "Multiple interfaces available: %s. ",
+          "Please specify `generation_interface`."
+        ),
+        paste(available, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  stop(error)
+}
+
+registry_public_interface_labels <- function(ids, interfaces) {
+  vapply(ids %||% character(), function(id) {
+    interfaces[[id]]$metadata$legacy_interface %||% id
+  }, character(1))
 }

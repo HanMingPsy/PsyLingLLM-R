@@ -11,30 +11,44 @@
 get_model_config <- function(model_name, registry = NULL) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 
-  norm_key <- function(x) {
-    x <- tolower(x)
-    x <- gsub("[/:_\\s]+", "-", x)
-    x <- gsub("-{2,}", "-", x)
-    x <- sub("^-", "", x)
-    sub("-$", "", x)
+  registry_resolver_assert_string(model_name, "model_name")
+  if (is.null(registry)) {
+    registry <- load_registry()
+  }
+  if (!is.list(registry)) {
+    stop("[PsyLingLLM] FATAL - registry must be a list.", call. = FALSE)
   }
 
-  # Load new-style registry bundle and pick $merged, or accept a flat list.
-  reg_in <- registry
-  reg <- if (!is.null(reg_in$merged)) reg_in$merged else reg_in
+  is_bundle <- "merged" %in% names(registry) &&
+    is.list(registry$merged) &&
+    identical(registry$merged$schema_version, 2L)
+  is_v2 <- "schema_version" %in% names(registry)
+  if (is_bundle) {
+    validate_registry_schema(registry$merged)
+    reg <- registry$merged$models
+  } else if (is_v2) {
+    validate_registry_schema(registry)
+    reg <- registry$models
+  } else {
+    reg <- registry
+  }
 
-  # 1) exact
-  if (model_name %in% names(reg)) return(reg[[model_name]])
-
-  # 2) normalized / alias
-  keys_norm <- vapply(names(reg), norm_key, character(1))
-  name_norm <- norm_key(model_name)
-  hit <- which(keys_norm == name_norm)
-  if (length(hit) == 1) return(reg[[ names(reg)[hit] ]])
-
-  for (k in names(reg)) {
-    aliases <- reg[[k]]$aliases %||% character()
-    if (tolower(model_name) %in% tolower(aliases)) return(reg[[k]])
+  lookup_models <- lapply(reg, function(model) {
+    aliases <- if (is.list(model)) model$aliases else NULL
+    if (!is.character(aliases)) {
+      aliases <- character()
+    }
+    list(aliases = aliases)
+  })
+  match <- tryCatch(
+    registry_resolve_model_key(model_name, lookup_models),
+    registry_resolution_error = identity
+  )
+  if (!inherits(match, "registry_resolution_error")) {
+    return(reg[[match$key]])
+  }
+  if (!identical(match$reason, "model_not_found")) {
+    stop(match)
   }
 
   # 3) bare id

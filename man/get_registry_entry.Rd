@@ -37,7 +37,7 @@ A list with fields:
 \description{
 Look up a model first in the **user registry** (by default at
 `get_registry_path()`), and if not found, fall back to the **system
-registry** located at `inst/registry/model_registry.yaml`. Select an interface
+registry** located at `inst/registry/system_registry.yaml`. Select an interface
 (e.g., `"chat"`, `"completion"`) and return a **normalized** node ready for
 request assembly.
 }
