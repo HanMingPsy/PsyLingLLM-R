@@ -12,12 +12,11 @@ get_model_config <- function(model_name, registry = NULL) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 
   norm_key <- function(x) {
-    x |>
-      tolower() |>
-      gsub("[/:_\\s]+", "-", x = _) |>
-      gsub("-{2,}", "-", x = _) |>
-      sub("^-", "", x = _) |>
-      sub("-$", "", x = _)
+    x <- tolower(x)
+    x <- gsub("[/:_\\s]+", "-", x)
+    x <- gsub("-{2,}", "-", x)
+    x <- sub("^-", "", x)
+    sub("-$", "", x)
   }
 
   # Load new-style registry bundle and pick $merged, or accept a flat list.
