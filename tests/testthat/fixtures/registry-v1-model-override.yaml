@@ -1,0 +1,15 @@
+fixture-multi:
+  chat:
+    provider: user-proxy
+    reasoning: false
+    input:
+      default_url: https://example.invalid/user/chat/completions
+      headers: {}
+      body:
+        model: fixture-multi
+      optional_defaults: {}
+      role_mapping: {}
+    output:
+      respond_path: 'list("choices..message.content")'
+    streaming:
+      enabled: false

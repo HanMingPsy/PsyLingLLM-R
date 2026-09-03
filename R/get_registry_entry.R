@@ -142,19 +142,6 @@ get_registry_entry <- function(model_key,
 
 # ---- internal helpers -------------------------------------------------------
 
-#' Return the system registry path (internal helper)
-#'
-#' Default location: `inst/registry/model_registry.yaml` inside the installed package.
-#' Separated for safe test-time overriding without touching base::system.file().
-#' @return Character(1) absolute path, or "" if missing.
-#' @keywords internal
-get_system_registry_path <- function() {
-  # NOTE: If your package name is actually 'psylingllm', change below accordingly.
-  system.file("registry/model_registry.yaml", package = "PsyLingLLM")
-}
-
-
-
 #' Normalize a raw registry entry (internal, legacy/export-free)
 #'
 #' Backward-compatible alias kept for older tests/fixtures that call this directly.

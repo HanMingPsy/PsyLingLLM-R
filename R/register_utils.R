@@ -184,14 +184,6 @@ detect_embedded_think_tag <- function(x) {
 }
 
 
-#' Return the system registry path (internal helper)
-#'
-#' @return Character(1) absolute path to PsyLingLLM system registry file.
-#' @keywords internal
-get_system_registry_path <- function() {
-  system.file("registry/system_registry.yaml", package = "PsyLingLLM")
-}
-
 #' Load the system LLM registry
 #'
 #' This function loads the registry configuration from the internal
@@ -214,9 +206,13 @@ load_registry <- function() {
     return(NULL)
   }
 
-  # Load safely via yaml
   tryCatch(
-    yaml::read_yaml(path),
+    registry_read_source(
+      path,
+      source = "system",
+      missing_ok = FALSE,
+      empty_as_list = FALSE
+    ),
     error = function(e) {
       warning("Failed to parse registry YAML: ", conditionMessage(e))
       NULL
