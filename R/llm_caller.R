@@ -89,119 +89,29 @@ llm_caller <- function(model_key,
   if (debug) message("[llm_caller] provider: ", entry$provider,
                      " | interface: ", entry$interface)
 
-  # URL: user wins; official -> fallback; non-official -> required
-  url <- resolve_api_url(
-    api_url     = api_url,
-    provider    = entry$provider,
-    default_url = entry$input$default_url
-  )
-  if (debug) message("[llm_caller] url: ", url)
-
-  # --- Template & role gating -----------------------------------------------
-  body_tmpl <- entry$input$body %||% list()
-  msgs_meta  <- detect_message_keys_from_template(body_tmpl)
-  supports_roles <- isTRUE(msgs_meta$supports_roles)
-
-  if (!supports_roles && (!is.null(system_content) || !is.null(assistant_content))) {
-    warning("[llm_caller] Template has no ${ROLE}; system/assistant content will be ignored.")
-  }
-
-  # role mapping: disabled by default; apply only if user supplied
-  use_role_map <- is.list(role_mapping) && length(role_mapping)
-  map_role <- function(role) if (use_role_map) (role_mapping[[tolower(role)]] %||% role) else role
-
-  # --- Build user content ----------------------------------------------------
-  user_content <- build_user_content(trial_prompt, material)
-  if (!nzchar(user_content)) {
-    stop("At least one of 'trial_prompt' or 'material' must be provided.")
-  }
-
-  # --- Assemble messages -----------------------------------------------------
-  body <- body_tmpl
-  if (supports_roles) {
-    msg_list <- list()
-
-    # 1) system (user-specified > registry default_system)
-    sys_text <- system_content
-    if (is.null(sys_text)) sys_text <- entry$input$default_system %||% NULL
-    if (!is.null(sys_text)) {
-      msg_list[[length(msg_list) + 1]] <- list(
-        role    = map_role("system"),
-        content = sys_text
-      )
-    }
-
-    # 2) prior history / few-shots (could include user/assistant pairs)
-    hist_msgs <- normalize_history_messages(assistant_content, map_role)
-    if (length(hist_msgs)) {
-      msg_list <- c(msg_list, hist_msgs)
-    }
-
-    # 3) current user turn (always last)
-    msg_list[[length(msg_list) + 1]] <- list(
-      role    = map_role("user"),
-      content = user_content
-    )
-
-    # inject into template honoring vendor keys
-    container <- msgs_meta$container_key
-    role_key  <- msgs_meta$role_key
-    cont_key  <- msgs_meta$content_key
-
-    body[[container]] <- lapply(msg_list, function(m) {
-      lst <- list()
-      lst[[role_key]] <- m$role
-      lst[[cont_key]] <- m$content
-      lst
-    })
-  } else {
-    # ROLE-less template: fill ${CONTENT} via placeholder substitution only.
-    # - No role injection; system_content / assistant_content are ignored
-    #   (a warning is already emitted above when provided).
-    # - user_content was built from trial_prompt/material earlier.
-    body <- body_tmpl
-
-    # Substitute ${CONTENT} anywhere in the template body.
-    # (headers/API_KEY replacement still happens later, unchanged.)
-    body <- replace_placeholders(body, list(CONTENT = user_content))
-  }
-
-  # --- Optionals tri-state ---------------------------------------------------
-  # Missing -> defaults (if any) else none; NULL -> none; list -> user only
-  opt <- resolve_optionals_tristate(
+  call_context <- new_llm_call_context(
+    trial_prompt = trial_prompt,
+    material = material,
+    system_content = system_content,
+    assistant_content = assistant_content,
+    api_key = api_key,
     optionals_missing = missing(optionals),
-    optionals_value   = if (missing(optionals)) NULL else optionals,
-    defaults          = entry$input$optional_defaults %||% list()
+    optionals_value = if (missing(optionals)) NULL else optionals,
+    stream = stream,
+    role_mapping = role_mapping,
+    api_url = api_url,
+    timeout = timeout
   )
-  body <- inject_optionals_anchor(body, opt)
-
-  # stream precedence: param > opt$stream > registry streaming.enabled
-  resolved_stream <- if (!is.null(stream)) {
-    isTRUE(stream)
-  } else if ("stream" %in% names(opt)) {
-    isTRUE(opt$stream)
-  } else {
-    isTRUE(entry$streaming$enabled)
-  }
-  if (resolved_stream) {
-    stream_field <- entry$streaming$param_name
-    if (!is.null(stream_field) && is.character(stream_field) && nzchar(stream_field)) {
-      body[[stream_field]] <- TRUE
-    } else {
-      body$stream <- TRUE
-    }
-  }
-
-  # --- Headers & placeholder substitution -----------------------------------
-  headers <- entry$input$headers %||% list()
-  if (!is.null(api_key)) {
-    headers <- replace_placeholders(headers, list(API_KEY = api_key))
-    body    <- replace_placeholders(body,    list(API_KEY = api_key))
-  }
-
-  if (!supports_roles) {
-    body <- replace_placeholders(body, list(CONTENT = user_content))
-  }
+  request <- build_llm_request(
+    builder_id = "legacy_template_v1",
+    entry = entry,
+    context = call_context
+  )
+  url <- request$url
+  headers <- request$headers
+  body <- request$body
+  resolved_stream <- request$stream
+  if (debug) message("[llm_caller] url: ", url)
 
   # --- HTTP call -------------------------------------------------------------
   json_payload <- jsonlite::toJSON(body, auto_unbox = TRUE, null = "null", digits = NA)
@@ -210,7 +120,13 @@ llm_caller <- function(model_key,
 
   if (resolved_stream) {
     # ---- Streaming branch ----------------------------------------------------
-    st <- do_stream_request(url, headers, json_payload, timeout = timeout, debug = debug)
+    st <- do_stream_request(
+      url,
+      headers,
+      json_payload,
+      timeout = request$timeout,
+      debug = debug
+    )
 
     answer   <- stream_reconstruct_text(st$raw_json, entry$streaming$delta_path)
     thinking <- if (!is.null(entry$streaming$thinking_delta_path)) {
@@ -246,7 +162,13 @@ llm_caller <- function(model_key,
 
   } else {
     # ---- Non-streaming branch ------------------------------------------------
-    ns <- do_nonstream_request(url, headers, json_payload, timeout = timeout, debug = debug)
+    ns <- do_nonstream_request(
+      url,
+      headers,
+      json_payload,
+      timeout = request$timeout,
+      debug = debug
+    )
     parsed <- ns$parsed
 
     answer <- if (!is.null(entry$output$respond_path)) {
