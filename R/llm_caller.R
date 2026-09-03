@@ -114,19 +114,14 @@ llm_caller <- function(model_key,
   if (debug) message("[llm_caller] url: ", url)
 
   # --- HTTP call -------------------------------------------------------------
-  json_payload <- jsonlite::toJSON(body, auto_unbox = TRUE, null = "null", digits = NA)
+  transport_response <- send_llm_request(request, debug = debug)
+  json_payload <- transport_response$request_payload
 
   usage <- list(prompt = NULL, completion = NULL, id = NULL)
 
   if (resolved_stream) {
     # ---- Streaming branch ----------------------------------------------------
-    st <- do_stream_request(
-      url,
-      headers,
-      json_payload,
-      timeout = request$timeout,
-      debug = debug
-    )
+    st <- as_legacy_stream_response(transport_response)
 
     answer   <- stream_reconstruct_text(st$raw_json, entry$streaming$delta_path)
     thinking <- if (!is.null(entry$streaming$thinking_delta_path)) {
@@ -162,13 +157,7 @@ llm_caller <- function(model_key,
 
   } else {
     # ---- Non-streaming branch ------------------------------------------------
-    ns <- do_nonstream_request(
-      url,
-      headers,
-      json_payload,
-      timeout = request$timeout,
-      debug = debug
-    )
+    ns <- as_legacy_nonstream_response(transport_response)
     parsed <- ns$parsed
 
     answer <- if (!is.null(entry$output$respond_path)) {
@@ -376,163 +365,6 @@ extract_text_by_spec <- function(obj, path_spec) {
     }
   }
   ""
-}
-
-#' Minimal non-streaming POST (registry-strict headers)
-#' @keywords internal
-do_nonstream_request <- function(url,
-                                 headers,
-                                 json_payload,
-                                 timeout = 120,
-                                 debug = FALSE) {
-  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
-  parse_json_safely <- function(txt) {
-    tryCatch(jsonlite::fromJSON(txt, simplifyVector = FALSE), error = function(e) NULL)
-  }
-  to_payload <- function(x) {
-    if (is.list(x)) {
-      jsonlite::toJSON(x, auto_unbox = TRUE, null = "null", na = "null")
-    } else {
-      as.character(x %||% "")
-    }
-  }
-
-  # --- Strict: use headers exactly as given ---
-  payload <- to_payload(json_payload)
-  h <- curl::new_handle()
-  curl::handle_setheaders(h, .list = headers)
-
-  curl::handle_setopt(
-    h,
-    customrequest = "POST",
-    postfields = payload,
-    timeout = as.integer(timeout)
-  )
-
-  res <- tryCatch(curl::curl_fetch_memory(url, handle = h), error = function(e) e)
-  if (inherits(res, "error")) {
-    return(list(
-      status = 599L,
-      text = NULL,
-      parsed = NULL,
-      error = as.character(res$message)
-    ))
-  }
-
-  text <- rawToChar(res$content)
-  parsed <- parse_json_safely(text)
-
-  if (isTRUE(debug)) {
-    cat("----- [DEBUG non-stream] headers -----\n")
-    print(headers)
-    cat("----- [DEBUG non-stream] body -----\n")
-    cat(payload, "\n")
-  }
-
-  list(
-    status = res$status_code %||% 200L,
-    text = text,
-    parsed = parsed,
-    error = NULL
-  )
-}
-
-
-#' Minimal SSE streaming POST (registry-strict headers)
-#' @keywords internal
-do_stream_request <- function(url,
-                              headers,
-                              json_payload,
-                              timeout = 120,
-                              debug = FALSE) {
-  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
-  parse_json_safely <- function(txt) {
-    tryCatch(jsonlite::fromJSON(txt, simplifyVector = FALSE), error = function(e) NULL)
-  }
-  to_payload <- function(x) {
-    if (is.list(x)) {
-      jsonlite::toJSON(x, auto_unbox = TRUE, null = "null", na = "null")
-    } else {
-      as.character(x %||% "")
-    }
-  }
-
-  payload <- to_payload(json_payload)
-  raw_lines <- character()
-
-  json_events <- list()
-  cache <- ""
-  first_token_latency <- NA_real_
-  t_start <- Sys.time()
-
-  cb <- function(dat) {
-    chunk <- iconv(rawToChar(dat, multiple = FALSE), from = "UTF-8", to = "UTF-8", sub = "")
-    cache <<- paste0(cache, chunk)
-    lines <- strsplit(cache, "\n", fixed = TRUE)[[1]]
-    if (!endsWith(cache, "\n")) {
-      cache <<- utils::tail(lines, 1)
-      if (length(lines) > 1) lines <- utils::head(lines, -1) else lines <- character()
-    } else {
-      cache <<- ""
-    }
-
-    if (!length(lines)) return(TRUE)
-    raw_lines <<- c(raw_lines, lines)
-
-    data_lines <- grep("^data:", lines, value = TRUE)
-    if (!length(data_lines)) return(TRUE)
-
-    if (is.na(first_token_latency)) {
-      first_token_latency <<- as.numeric(difftime(Sys.time(), t_start, units = "secs"))
-    }
-
-    for (ln in data_lines) {
-      payload_txt <- sub("^data:\\s*", "", ln)
-      if (identical(payload_txt, "[DONE]")) next
-      obj <- parse_json_safely(payload_txt)
-      if (!is.null(obj)) {
-        json_events[[length(json_events) + 1]] <<- obj
-      }
-    }
-    TRUE
-  }
-
-  # --- Strict: use headers exactly as given ---
-  h <- curl::new_handle()
-  curl::handle_setheaders(h, .list = headers)
-
-  curl::handle_setopt(
-    h,
-    customrequest = "POST",
-    postfields = payload,
-    timeout = as.integer(timeout)
-  )
-
-  if (isTRUE(debug)) {
-    cat("----- [DEBUG stream] headers -----\n")
-    print(headers)
-    cat("----- [DEBUG stream] body -----\n")
-    cat(payload, "\n")
-  }
-
-  res <- tryCatch(curl::curl_fetch_stream(url, cb, handle = h), error = function(e) e)
-  if (inherits(res, "error")) {
-    return(list(
-      status = 599L,
-      raw_json = json_events,
-      raw_lines = if (isTRUE(debug)) raw_lines else NULL,
-      first_token_latency = first_token_latency,
-      error = as.character(res$message)
-    ))
-  }
-
-  list(
-    status = res$status_code %||% 200L,
-    raw_json = json_events,
-    raw_lines = if (isTRUE(debug)) raw_lines else NULL,
-    first_token_latency = first_token_latency,
-    error = NULL
-  )
 }
 
 #' @title Check if an object is a message object
