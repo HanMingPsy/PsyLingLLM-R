@@ -44,7 +44,7 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 1 complete — Phase 2 awaiting implementation**.
+Current phase: **Phase 2 complete — Phase 3A awaiting implementation**.
 
 Phase 1 delivered:
 
@@ -55,20 +55,56 @@ Phase 1 delivered:
 5. Add characterization tests for current registry behavior.
 6. Add equivalent v1/v2 fixtures and compare their normalized output.
 
-The following Phase 1 boundaries remain in force as compatibility guarantees:
+Phase 2 delivered:
 
-- Do not change `llm_caller()` production code during Phase 1. Its signature and behavior remain frozen until the Phase 3 extraction work has characterization tests and explicit review.
+1. A unified registry bundle loader with separate system, user, default, raw,
+   and merged views.
+2. Explicit whole-entry source precedence: default, then system, then user.
+3. One strict resolver for model keys, normalized keys, aliases, providers,
+   interfaces, capabilities, defaults, headers, and endpoints.
+4. One validated canonical runtime configuration for equivalent v1 and v2
+   registries.
+5. Compatibility delegation from `get_registry_entry()` and
+   `get_model_config()` without changing their public signatures.
+6. Network-free coverage for precedence, aliases, ambiguity, v1/v2
+   equivalence, public return structures, and failure diagnostics.
+
+Phase 2 was delivered through these atomic commits:
+
+- `ca9aeda refactor(registry): introduce unified registry loader`
+- `f30ba5a refactor(registry): introduce canonical model resolver`
+- `06f7242 refactor(registry): delegate public registry resolution`
+
+The Phase 2 source tarball passed `R CMD check` with `Status: OK`, and the full
+test suite passed 240 assertions without credentials or real API requests.
+
+The following boundaries remain in force as compatibility guarantees:
+
+- Keep the complete `llm_caller()` signature and behavior stable. Phase 3 may
+  change its production internals only through characterization-tested,
+  separately reviewed delegation.
 - Do not modify or refactor experiment functions during the Registry v2 runtime migration.
 - Do not migrate `inst/registry/system_registry.yaml`.
 - Do not automatically modify user registry files.
-- Request-builder, transport, parser, caller, and registration extraction were
-  not performed during Phase 1.
+- Do not combine request-builder, transport, parser, caller, or registration
+  extraction in one change.
 - Do not add provider-specific runtime branches.
 
-The next implementation phase is **Phase 2 — Unified Registry Resolver**. Begin
-with the internal registry bundle loader, then add the canonical resolver. Keep
-the public return contracts of `load_registry()`, `get_registry_entry()`, and
-`get_model_config()` unchanged while delegation is introduced incrementally.
+Phase 2 intentionally retains two explicit constraints:
+
+- A native v2 user source must currently be a self-contained valid bundle.
+  Partial v2 overlays that reference system-only providers or interfaces are
+  not supported until their merge-before-cross-reference-validation contract
+  is designed and tested. Existing v1 user overrides remain supported.
+- Invalid user YAML now fails with `registry_load_error` before model or network
+  execution instead of being silently ignored. This safety tightening prevents
+  an experiment from unexpectedly falling back to another registry source.
+
+The next implementation phase is **Phase 3A — Request Builder Boundary**. Move
+only existing request construction behind an internal, allowlisted builder
+interface. Preserve the complete `llm_caller()` signature and generated v1
+request behavior. Do not introduce new provider support, transport extraction,
+response parsing changes, or production YAML migration in the same change.
 
 ## CRAN Submission Standard
 
