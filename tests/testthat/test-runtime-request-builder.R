@@ -135,11 +135,52 @@ test_that("legacy builder preserves all three optionals states", {
 
   expect_identical(missing_request$body$temperature, 0.2)
   expect_identical(missing_request$body$stream, FALSE)
-  expect_true("${PARAMETER}" %in% names(null_request$body))
+  expect_false("${PARAMETER}" %in% names(null_request$body))
   expect_false("temperature" %in% names(null_request$body))
   expect_identical(named_request$body$top_p, 0.9)
   expect_false("temperature" %in% names(named_request$body))
   expect_false("${PARAMETER}" %in% names(named_request$body))
+
+  payloads <- lapply(
+    list(missing_request, null_request, named_request),
+    function(request) {
+      jsonlite::toJSON(request$body, auto_unbox = TRUE, null = "null")
+    }
+  )
+  expect_false(any(vapply(
+    payloads,
+    grepl,
+    logical(1),
+    pattern = "${PARAMETER}",
+    fixed = TRUE
+  )))
+  expect_false(any(vapply(
+    payloads,
+    grepl,
+    logical(1),
+    pattern = "${VALUE}",
+    fixed = TRUE
+  )))
+})
+
+test_that("missing optionals without defaults still removes the anchor", {
+  entry <- make_request_builder_entry()
+  entry$input$optional_defaults <- list()
+
+  request <- build_llm_request(
+    "legacy_template_v1",
+    entry,
+    make_request_context(optionals_missing = TRUE)
+  )
+  payload <- jsonlite::toJSON(
+    request$body,
+    auto_unbox = TRUE,
+    null = "null"
+  )
+
+  expect_false("${PARAMETER}" %in% names(request$body))
+  expect_false(grepl("${PARAMETER}", payload, fixed = TRUE))
+  expect_false(grepl("${VALUE}", payload, fixed = TRUE))
 })
 
 test_that("legacy builder preserves stream precedence", {

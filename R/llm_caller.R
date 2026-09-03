@@ -287,15 +287,21 @@ resolve_optionals_tristate <- function(optionals_missing, optionals_value, defau
 #' @param opt A named list of optional parameters to inject (e.g.,
 #'   \code{list(stream = TRUE, temperature = 0.7)}).
 #'
-#' @return A modified copy of \code{body} with the optional parameters merged in.
-#'   If no optionals are provided or the anchor is absent, the input is returned unchanged.
+#' @return A modified copy of \code{body} with the anchor removed and optional
+#'   parameters merged in. If the anchor is absent, the input is returned
+#'   unchanged.
 #'
 #' @keywords internal
 inject_optionals_anchor <- function(body, opt) {
-  if (!length(opt)) return(body)
-  if (is.list(body) && "${PARAMETER}" %in% names(body)) {
-    body[["${PARAMETER}"]] <- NULL
-    for (k in names(opt)) body[[k]] <- opt[[k]]
+  if (!is.list(body) || !"${PARAMETER}" %in% names(body)) {
+    return(body)
+  }
+
+  body[["${PARAMETER}"]] <- NULL
+  if (length(opt)) {
+    for (k in names(opt)) {
+      body[[k]] <- opt[[k]]
+    }
   }
   body
 }

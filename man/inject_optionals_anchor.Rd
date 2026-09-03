@@ -14,8 +14,9 @@ a standardization or analysis step.}
 \code{list(stream = TRUE, temperature = 0.7)}).}
 }
 \value{
-A modified copy of \code{body} with the optional parameters merged in.
-  If no optionals are provided or the anchor is absent, the input is returned unchanged.
+A modified copy of \code{body} with the anchor removed and optional
+  parameters merged in. If the anchor is absent, the input is returned
+  unchanged.
 }
 \description{
 This internal utility function merges a set of optional default values
