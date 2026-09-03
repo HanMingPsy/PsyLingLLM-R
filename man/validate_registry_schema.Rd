@@ -2,24 +2,24 @@
 % Please edit documentation in R/registry_schema.R
 \name{validate_registry_schema}
 \alias{validate_registry_schema}
-\title{Validate Registry v2 Schema}
+\title{Validate a PsyLingLLM Registry Document}
 \usage{
 validate_registry_schema(entry)
 }
 \arguments{
-\item{entry}{A registry entry as a named list.}
+\item{entry}{A complete registry document represented as a named list.}
 }
 \value{
-Logical value. Returns TRUE when valid.
+`TRUE`, invisibly, when the document is valid.
 }
 \description{
-Validates whether a registry entry follows PsyLingLLM
-Registry v2 structure.
+Detects the registry version and validates its structure. Existing Registry
+v1 documents are accepted through a compatibility-oriented structural check.
+Registry v2 documents are checked strictly, including allowed fields, value
+types, component identifiers, and cross-references.
 }
 \details{
-Registry v2 requires:
-- schema_version
-- provider
-- capabilities
-- interfaces
+This function only validates registry data. It does not read or write files,
+resolve credentials, check network access, or verify that a runtime component
+has already been implemented.
 }

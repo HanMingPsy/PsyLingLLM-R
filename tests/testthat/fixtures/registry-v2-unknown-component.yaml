@@ -1,0 +1,22 @@
+schema_version: 2
+providers:
+  fixture:
+    type: official
+interfaces:
+  custom_chat_v1:
+    protocol: openai_chat
+    request:
+      builder: arbitrary_r_function
+    transport:
+      non_stream: http_json
+    response:
+      parser: openai_chat
+capabilities: {}
+models:
+  fixture-model:
+    provider: fixture
+    model_id: fixture-model
+    interfaces:
+      - custom_chat_v1
+    default_interface: custom_chat_v1
+    capabilities: {}

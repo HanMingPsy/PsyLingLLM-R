@@ -1,0 +1,55 @@
+schema_version: 2
+
+providers:
+  fixture:
+    type: official
+    base_url: https://example.invalid
+    auth:
+      scheme: bearer
+      env_var: FIXTURE_API_KEY
+
+interfaces:
+  openai_chat_v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /v1/chat/completions
+      parameter_map:
+        temperature: temperature
+        max_tokens: max_tokens
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      temperature: 0.2
+
+capabilities:
+  reasoning:
+    value_type: logical
+    description: The model can return reasoning separately from answer text.
+    default: false
+
+models:
+  fixture-model:
+    provider: fixture
+    model_id: fixture-model
+    aliases:
+      - fixture
+    interfaces:
+      - openai_chat_v1
+    default_interface: openai_chat_v1
+    capabilities:
+      reasoning: true
+    defaults:
+      max_tokens: 256
