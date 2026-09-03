@@ -1,0 +1,34 @@
+fixture-model:
+  chat:
+    provider: Fixture-Provider
+    reasoning: "yes"
+    input:
+      default_url: https://example.invalid/v1/chat/completions
+      headers:
+        Content-Type: application/json
+      body:
+        model: fixture-model
+      optional_defaults:
+        temperature:
+          value: 0.25
+          type: numeric
+        enabled:
+          value: true
+          type: logical
+      default_system: Be concise.
+      role_mapping:
+        system: developer
+        user: user
+        assistant: assistant
+    output:
+      respond_path: 'list("choices..message.content")'
+      thinking_path: 'list("choices..message.reasoning_content")'
+      id_path: id
+      token_usage_path:
+        prompt: usage.prompt_tokens
+        completion: usage.completion_tokens
+    streaming:
+      enabled: "no"
+      delta_path: 'list("choices..delta.content")'
+      thinking_delta_path: 'list("choices..delta.reasoning_content")'
+      param_name: stream

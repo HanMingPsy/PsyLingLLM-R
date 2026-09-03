@@ -1,0 +1,15 @@
+deepseek-chat:
+  chat:
+    provider: fixture-proxy
+    reasoning: false
+    input:
+      default_url: https://example.invalid/proxy/chat/completions
+      headers: {}
+      body:
+        model: deepseek-chat
+      optional_defaults: {}
+      role_mapping: {}
+    output:
+      respond_path: 'list("choices..message.content")'
+    streaming:
+      enabled: false

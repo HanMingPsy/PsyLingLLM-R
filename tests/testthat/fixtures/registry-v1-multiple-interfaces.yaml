@@ -1,0 +1,27 @@
+fixture-multi:
+  chat:
+    provider: fixture-provider
+    reasoning: false
+    input:
+      default_url: https://example.invalid/v1/chat/completions
+      headers: {}
+      body: {}
+      optional_defaults: {}
+      role_mapping: {}
+    output:
+      respond_path: 'list("choices..message.content")'
+    streaming:
+      enabled: false
+  responses:
+    provider: fixture-provider
+    reasoning: false
+    input:
+      default_url: https://example.invalid/v1/responses
+      headers: {}
+      body: {}
+      optional_defaults: {}
+      role_mapping: {}
+    output:
+      respond_path: 'list("output..content..text")'
+    streaming:
+      enabled: false
