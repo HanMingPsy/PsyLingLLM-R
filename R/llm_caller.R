@@ -116,43 +116,35 @@ llm_caller <- function(model_key,
   # --- HTTP call -------------------------------------------------------------
   transport_response <- send_llm_request(request, debug = debug)
   json_payload <- transport_response$request_payload
-
-  usage <- list(prompt = NULL, completion = NULL, id = NULL)
+  parsed_response <- parse_llm_response(
+    response = transport_response,
+    parser_id = "legacy_paths_v1",
+    config = legacy_response_parser_config(entry),
+    streaming = resolved_stream
+  )
+  usage <- c(
+    parsed_response$usage,
+    list(id = parsed_response$request_id)
+  )
 
   if (resolved_stream) {
     # ---- Streaming branch ----------------------------------------------------
     st <- as_legacy_stream_response(transport_response)
 
-    answer   <- stream_reconstruct_text(st$raw_json, entry$streaming$delta_path)
-    thinking <- if (!is.null(entry$streaming$thinking_delta_path)) {
-      stream_reconstruct_text(st$raw_json, entry$streaming$thinking_delta_path)
-    } else NULL
-
-    if (is.list(entry$output$token_usage_path)) {
-      pu <- entry$output$token_usage_path$prompt
-      cu <- entry$output$token_usage_path$completion
-      if (!is.null(pu)) usage$prompt <- suppressWarnings(as.integer(stream_reconstruct_text(st$raw_json, entry$output$token_usage_path$prompt)))
-      if (!is.null(cu)) usage$completion <- suppressWarnings(as.integer(stream_reconstruct_text(st$raw_json, entry$output$token_usage_path$completion)))
-    }
-
-    if (!is.null(entry$output$id_path)) {
-      usage$id <- suppressWarnings(stream_reconstruct_text(st$raw_json, entry$output$id_path))
-    }
-
     return(list(
-      status    = st$status,
+      status    = parsed_response$status,
       interface = entry$interface,
       model_key = entry$model_key,
       streaming = TRUE,
       usage     = usage,
-      answer    = as.character(answer %||% ""),
-      thinking  = if (is.null(thinking)) NULL else as.character(thinking),
+      answer    = parsed_response$answer,
+      thinking  = parsed_response$reasoning,
       first_token_latency = st$first_token_latency,
       raw       = if (isTRUE(return_raw)) list(
         request = list(url = url, headers = headers, body = jsonlite::fromJSON(json_payload, simplifyVector = FALSE)),
         response = list(stream = st)
       ) else NULL,
-      error     = if (st$status >= 400L) list(code = st$status, message = st$error %||% "HTTP error") else NULL
+      error     = parsed_response$error
     ))
 
   } else {
@@ -160,38 +152,19 @@ llm_caller <- function(model_key,
     ns <- as_legacy_nonstream_response(transport_response)
     parsed <- ns$parsed
 
-    answer <- if (!is.null(entry$output$respond_path)) {
-      extract_text_by_spec(parsed, entry$output$respond_path)
-    } else ""
-    thinking <- if (!is.null(entry$output$thinking_path)) {
-      x <- extract_text_by_spec(parsed, entry$output$thinking_path)
-      if (nzchar(x)) x else NULL
-    } else NULL
-
-    if (is.list(entry$output$token_usage_path)) {
-      pu <- entry$output$token_usage_path$prompt
-      cu <- entry$output$token_usage_path$completion
-      if (!is.null(pu)) usage$prompt <- suppressWarnings(as.integer(extract_text_by_spec(parsed, pu)))
-      if (!is.null(cu)) usage$completion <- suppressWarnings(as.integer(extract_text_by_spec(parsed, cu)))
-    }
-
-    if (!is.null(entry$output$id_path)) {
-      usage$id <- suppressWarnings(as.character(extract_text_by_spec(parsed, entry$output$id_path)))
-    }
-
     return(list(
-      status    = ns$status,
+      status    = parsed_response$status,
       interface = entry$interface,
       model_key = entry$model_key,
       streaming = FALSE,
       usage     = usage,
-      answer    = as.character(answer %||% ""),
-      thinking  = thinking,
+      answer    = parsed_response$answer,
+      thinking  = parsed_response$reasoning,
       raw       = if (isTRUE(return_raw)) list(
         request = list(url = url, headers = headers, body = jsonlite::fromJSON(json_payload, simplifyVector = FALSE)),
         response = list(non_stream = list(status = ns$status, text = ns$text, parsed = parsed))
       ) else NULL,
-      error     = if (ns$status >= 400L) list(code = ns$status, message = ns$error %||% "HTTP error") else NULL
+      error     = parsed_response$error
     ))
   }
 }
@@ -347,25 +320,6 @@ replace_placeholders <- function(x, mapping) {
   x
 }
 
-
-#' Extract text by registry path spec (flat-key with optional ".." wildcard)
-#' @keywords internal
-extract_text_by_spec <- function(obj, path_spec) {
-  nr <- normalize_path_key_with_regex(path_spec)  # provided in register_utils.R
-  df <- tryCatch(flatten_json_paths(obj, keep_numeric = TRUE), error = function(e) data.frame())
-  if (!nrow(df)) return("")
-  hit <- df$value[df$path == nr$key]
-  if (length(hit)) {
-    ch <- suppressWarnings(as.character(hit[[1]])); return(if (length(ch)) ch else "")
-  }
-  if (!is.na(nr$regex)) {
-    hit <- df$value[grepl(nr$regex, df$path)]
-    if (length(hit)) {
-      ch <- suppressWarnings(as.character(hit[[1]])); return(if (length(ch)) ch else "")
-    }
-  }
-  ""
-}
 
 #' @title Check if an object is a message object
 #' @description
