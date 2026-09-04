@@ -289,3 +289,48 @@ test_that("request validation rejects invalid builder output", {
     class = "llm_request_builder_error"
   )
 })
+
+test_that("resolved interfaces select transport without provider branches", {
+  config <- list(interface = list(
+    protocol = "openai_chat",
+    request = list(builder = "openai_chat"),
+    transport = list(non_stream = "http_json", stream = "sse_json")
+  ))
+  non_stream_request <- build_llm_request(
+    "legacy_template_v1",
+    make_request_builder_entry(),
+    make_request_context(stream = FALSE)
+  )
+  stream_request <- build_llm_request(
+    "legacy_template_v1",
+    make_request_builder_entry(),
+    make_request_context(stream = TRUE)
+  )
+
+  non_stream <- configure_llm_request_transport(
+    non_stream_request,
+    config
+  )
+  stream <- configure_llm_request_transport(stream_request, config)
+
+  expect_identical(non_stream$transport_id, "http_json")
+  expect_identical(stream$transport_id, "sse_json")
+})
+
+test_that("native interfaces reject a missing stream transport", {
+  config <- list(interface = list(
+    protocol = "anthropic_messages",
+    request = list(builder = "anthropic_messages"),
+    transport = list(non_stream = "http_json")
+  ))
+  request <- build_llm_request(
+    "legacy_template_v1",
+    make_request_builder_entry(),
+    make_request_context(stream = TRUE)
+  )
+
+  expect_error(
+    configure_llm_request_transport(request, config),
+    class = "llm_request_builder_error"
+  )
+})

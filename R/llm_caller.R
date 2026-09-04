@@ -82,10 +82,16 @@ llm_caller <- function(model_key,
     stop("Packages 'jsonlite' and 'curl' are required for llm_caller().")
   }
 
-  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
-
-  # --- Load & select registry entry -----------------------------------------
-  entry <- get_registry_entry(model_key, generation_interface)
+  # --- Resolve registry configuration ---------------------------------------
+  registry_context <- registry_resolve_compatibility_context(
+    model_key,
+    generation_interface
+  )
+  config <- registry_context$resolved
+  entry <- registry_project_compatibility_entry(
+    registry_context$bundle,
+    config
+  )
   if (debug) message("[llm_caller] provider: ", entry$provider,
                      " | interface: ", entry$interface)
 
@@ -103,70 +109,29 @@ llm_caller <- function(model_key,
     timeout = timeout
   )
   request <- build_llm_request(
-    builder_id = "legacy_template_v1",
-    entry = entry,
+    builder_id = config$interface$request$builder,
+    entry = runtime_request_builder_input(config, entry),
     context = call_context
   )
-  url <- request$url
-  headers <- request$headers
-  body <- request$body
-  resolved_stream <- request$stream
-  if (debug) message("[llm_caller] url: ", url)
+  request <- configure_llm_request_transport(request, config)
+  if (debug) message("[llm_caller] url: ", request$url)
 
-  # --- HTTP call -------------------------------------------------------------
+  # --- Transport, parsing, and result normalization -------------------------
   transport_response <- send_llm_request(request, debug = debug)
-  json_payload <- transport_response$request_payload
   parsed_response <- parse_llm_response(
     response = transport_response,
-    parser_id = "legacy_paths_v1",
-    config = legacy_response_parser_config(entry),
-    streaming = resolved_stream
+    parser_id = config$interface$response$parser,
+    config = runtime_response_parser_config(config, entry),
+    streaming = request$stream
   )
-  usage <- c(
-    parsed_response$usage,
-    list(id = parsed_response$request_id)
+  normalize_llm_result(
+    config = config,
+    compatibility_entry = entry,
+    request = request,
+    transport_response = transport_response,
+    parsed_response = parsed_response,
+    return_raw = return_raw
   )
-
-  if (resolved_stream) {
-    # ---- Streaming branch ----------------------------------------------------
-    st <- as_legacy_stream_response(transport_response)
-
-    return(list(
-      status    = parsed_response$status,
-      interface = entry$interface,
-      model_key = entry$model_key,
-      streaming = TRUE,
-      usage     = usage,
-      answer    = parsed_response$answer,
-      thinking  = parsed_response$reasoning,
-      first_token_latency = st$first_token_latency,
-      raw       = if (isTRUE(return_raw)) list(
-        request = list(url = url, headers = headers, body = jsonlite::fromJSON(json_payload, simplifyVector = FALSE)),
-        response = list(stream = st)
-      ) else NULL,
-      error     = parsed_response$error
-    ))
-
-  } else {
-    # ---- Non-streaming branch ------------------------------------------------
-    ns <- as_legacy_nonstream_response(transport_response)
-    parsed <- ns$parsed
-
-    return(list(
-      status    = parsed_response$status,
-      interface = entry$interface,
-      model_key = entry$model_key,
-      streaming = FALSE,
-      usage     = usage,
-      answer    = parsed_response$answer,
-      thinking  = parsed_response$reasoning,
-      raw       = if (isTRUE(return_raw)) list(
-        request = list(url = url, headers = headers, body = jsonlite::fromJSON(json_payload, simplifyVector = FALSE)),
-        response = list(non_stream = list(status = ns$status, text = ns$text, parsed = parsed))
-      ) else NULL,
-      error     = parsed_response$error
-    ))
-  }
 }
 
 # ---- helpers (internal) -----------------------------------------------------

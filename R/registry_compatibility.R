@@ -146,7 +146,9 @@ convert_legacy_interface <- function(entry, interface_name) {
     request$default_system <- as.character(input$default_system)[[1L]]
   }
   if (!is.null(input$role_mapping)) {
-    request$role_mapping <- input$role_mapping
+    request$role_mapping <- registry_compatibility_role_mapping(
+      input$role_mapping
+    )
   }
 
   selectors <- registry_compatibility_selectors(output, stream)
@@ -179,6 +181,17 @@ convert_legacy_interface <- function(entry, interface_name) {
   }
 
   interface
+}
+
+registry_compatibility_role_mapping <- function(mapping) {
+  if (!is.list(mapping) || is.null(names(mapping))) {
+    return(list())
+  }
+  keep <- vapply(mapping, function(value) {
+    is.character(value) && length(value) == 1L &&
+      !is.na(value) && nzchar(value)
+  }, logical(1))
+  mapping[keep]
 }
 
 registry_compatibility_selectors <- function(output, stream) {

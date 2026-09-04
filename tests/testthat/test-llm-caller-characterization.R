@@ -46,6 +46,24 @@ make_characterization_entry <- function(streaming = FALSE,
   )
 }
 
+make_characterization_registry_context <- function(streaming = FALSE,
+                                                   provider = "official") {
+  entry <- make_characterization_entry(streaming, provider)
+  registry_v1 <- list(`fixture-model` = list(chat = entry))
+  registry_v2 <- as_registry_v2(registry_v1)
+  list(
+    bundle = list(
+      raw = list(user = registry_v1, system = list(), default = list()),
+      merged = registry_v2
+    ),
+    resolved = resolve_registry_entry(
+      "fixture-model",
+      generation_interface = "chat",
+      registry = registry_v2
+    )
+  )
+}
+
 make_nonstream_response <- function(status = 200L,
                                     error = NULL) {
   parsed <- list(
@@ -92,7 +110,9 @@ test_that("non-stream calls preserve message order and normalized results", {
   captured_request <- NULL
 
   local_mocked_bindings(
-    get_registry_entry = function(...) make_characterization_entry(),
+    registry_resolve_compatibility_context = function(...) {
+      make_characterization_registry_context()
+    },
     do_nonstream_request = function(url,
                                     headers,
                                     json_payload,
@@ -173,7 +193,9 @@ test_that("named optionals replace rather than merge registry defaults", {
   captured_body <- NULL
 
   local_mocked_bindings(
-    get_registry_entry = function(...) make_characterization_entry(),
+    registry_resolve_compatibility_context = function(...) {
+      make_characterization_registry_context()
+    },
     do_nonstream_request = function(url,
                                     headers,
                                     json_payload,
@@ -202,8 +224,8 @@ test_that("stream precedence favors the explicit argument", {
   transport_used <- NULL
 
   local_mocked_bindings(
-    get_registry_entry = function(...) {
-      make_characterization_entry(streaming = TRUE)
+    registry_resolve_compatibility_context = function(...) {
+      make_characterization_registry_context(streaming = TRUE)
     },
     do_nonstream_request = function(...) {
       transport_used <<- "nonstream"
@@ -252,8 +274,8 @@ test_that("streaming responses retain delta and latency behavior", {
   )
 
   local_mocked_bindings(
-    get_registry_entry = function(...) {
-      make_characterization_entry(streaming = TRUE)
+    registry_resolve_compatibility_context = function(...) {
+      make_characterization_registry_context(streaming = TRUE)
     },
     do_stream_request = function(...) stream_response,
     .package = "PsyLingLLM"
@@ -292,7 +314,9 @@ test_that("streaming responses retain delta and latency behavior", {
 
 test_that("status 599 remains a normalized transport error", {
   local_mocked_bindings(
-    get_registry_entry = function(...) make_characterization_entry(),
+    registry_resolve_compatibility_context = function(...) {
+      make_characterization_registry_context()
+    },
     do_nonstream_request = function(...) {
       make_nonstream_response(
         status = 599L,

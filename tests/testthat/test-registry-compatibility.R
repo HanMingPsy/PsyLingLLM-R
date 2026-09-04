@@ -60,6 +60,27 @@ test_that("legacy request templates and typed defaults remain explicit", {
   expect_identical(request$role_mapping$system, "developer")
 })
 
+test_that("legacy NULL role mappings remain compatible with strict v2", {
+  registry <- read_compatibility_fixture("registry-v1-minimal.yaml")
+  registry[["fixture-model"]]$chat$input$role_mapping <- list(
+    system = "developer",
+    user = "user",
+    assistant = "assistant",
+    tool = NULL
+  )
+
+  converted <- as_registry_v2(registry)
+  mapping <- converted$interfaces[[
+    "legacy.fixture-model.chat"
+  ]]$request$role_mapping
+
+  expect_identical(
+    mapping,
+    list(system = "developer", user = "user", assistant = "assistant")
+  )
+  expect_true(validate_registry_schema(converted))
+})
+
 test_that("legacy response paths become explicit selector segments", {
   registry <- read_compatibility_fixture("registry-v1-minimal.yaml")
   interface <- as_registry_v2(registry)$interfaces[[

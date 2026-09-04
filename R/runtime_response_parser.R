@@ -48,6 +48,14 @@ llm_response_parsers <- function() {
   )
 }
 
+runtime_response_parser_config <- function(config, compatibility_entry) {
+  parser_id <- config$interface$response$parser
+  if (identical(parser_id, "legacy_paths_v1")) {
+    return(legacy_response_parser_config(compatibility_entry))
+  }
+  config$interface$response
+}
+
 validate_response_parser_id <- function(parser_id) {
   valid <- is.character(parser_id) && length(parser_id) == 1L &&
     !is.na(parser_id) && nzchar(parser_id)

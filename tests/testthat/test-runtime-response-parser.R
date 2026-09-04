@@ -168,3 +168,31 @@ test_that("parser IDs and configuration fail before semantic parsing", {
     class = "llm_response_parser_error"
   )
 })
+
+test_that("resolved response configuration selects parser semantics", {
+  legacy_entry <- list(
+    output = list(
+      respond_path = 'list("choices..message.content")',
+      thinking_path = NULL,
+      id_path = "id",
+      token_usage_path = NULL
+    ),
+    streaming = list(delta_path = NULL, thinking_delta_path = NULL)
+  )
+  legacy_config <- list(interface = list(response = list(
+    parser = "legacy_paths_v1",
+    selectors = list(answer = c("ignored"))
+  )))
+  typed_config <- list(interface = list(response = list(
+    parser = "openai_chat"
+  )))
+
+  legacy <- runtime_response_parser_config(legacy_config, legacy_entry)
+  typed <- runtime_response_parser_config(typed_config, legacy_entry)
+
+  expect_identical(
+    legacy$selectors$answer,
+    'list("choices..message.content")'
+  )
+  expect_identical(typed, list(parser = "openai_chat"))
+})

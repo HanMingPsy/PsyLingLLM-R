@@ -68,6 +68,36 @@ llm_request_builders <- function() {
   list(legacy_template_v1 = build_legacy_template_request)
 }
 
+runtime_request_builder_input <- function(config, compatibility_entry) {
+  builder_id <- config$interface$request$builder
+  if (identical(builder_id, "legacy_template_v1")) {
+    return(compatibility_entry)
+  }
+  config
+}
+
+configure_llm_request_transport <- function(request, config) {
+  transport_id <- if (request$stream) {
+    config$interface$transport$stream
+  } else {
+    config$interface$transport$non_stream
+  }
+  if (is.null(transport_id) &&
+      identical(config$interface$protocol, "legacy_v1")) {
+    transport_id <- request$transport_id
+  }
+  if (is.null(transport_id)) {
+    llm_request_builder_abort(
+      "The selected interface does not define the required transport.",
+      builder_id = config$interface$request$builder,
+      reason = "missing_transport"
+    )
+  }
+  request$transport_id <- transport_id
+  validate_llm_request(request, config$interface$request$builder)
+  request
+}
+
 build_legacy_template_request <- function(entry, context) {
   url <- resolve_api_url(
     api_url = context$api_url,

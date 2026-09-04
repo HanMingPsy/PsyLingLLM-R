@@ -55,6 +55,18 @@ get_registry_entry <- function(model_key,
     stop("Package 'yaml' is required for get_registry_entry().")
   }
 
+  context <- registry_resolve_compatibility_context(
+    model_key,
+    generation_interface,
+    path
+  )
+  registry_project_compatibility_entry(context$bundle, context$resolved)
+}
+
+registry_resolve_compatibility_context <- function(
+    model_key,
+    generation_interface = NULL,
+    path = get_registry_path()) {
   bundle <- load_registry_bundle(
     system_path = get_system_registry_path(),
     user_path = path
@@ -73,7 +85,10 @@ get_registry_entry <- function(model_key,
       )
     }
   )
+  list(bundle = bundle, resolved = resolved)
+}
 
+registry_project_compatibility_entry <- function(bundle, resolved) {
   legacy <- registry_find_legacy_entry(bundle, resolved)
   if (!is.null(legacy)) {
     return(normalize_registry_entry(
