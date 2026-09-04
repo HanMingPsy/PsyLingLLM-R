@@ -155,10 +155,6 @@ test_that("parser IDs and configuration fail before semantic parsing", {
     class = "llm_response_parser_error"
   )
   expect_error(
-    parse_llm_response(response, "openai_chat", list()),
-    class = "llm_response_parser_error"
-  )
-  expect_error(
     parse_llm_response(response, "legacy_paths_v1", list()),
     class = "llm_response_parser_error"
   )

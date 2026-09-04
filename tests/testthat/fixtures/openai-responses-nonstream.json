@@ -1,0 +1,23 @@
+{
+  "id": "resp_fixture",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "id": "reason_fixture",
+      "type": "reasoning",
+      "summary": [{"type": "summary_text", "text": "Reasoning summary"}],
+      "content": []
+    },
+    {
+      "id": "message_fixture",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {"type": "output_text", "text": "First paragraph. "},
+        {"type": "output_text", "text": "Second paragraph."}
+      ]
+    }
+  ],
+  "usage": {"input_tokens": 15, "output_tokens": 9, "total_tokens": 24}
+}

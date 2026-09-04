@@ -1,0 +1,37 @@
+[
+  {
+    "type": "message_start",
+    "message": {
+      "id": "msg_stream_fixture",
+      "type": "message",
+      "content": [],
+      "usage": {"input_tokens": 13, "output_tokens": 1}
+    }
+  },
+  {
+    "type": "content_block_delta",
+    "index": 0,
+    "delta": {"type": "thinking_delta", "thinking": "Think "}
+  },
+  {
+    "type": "content_block_delta",
+    "index": 0,
+    "delta": {"type": "thinking_delta", "thinking": "carefully"}
+  },
+  {
+    "type": "content_block_delta",
+    "index": 1,
+    "delta": {"type": "text_delta", "text": "Hello"}
+  },
+  {
+    "type": "content_block_delta",
+    "index": 1,
+    "delta": {"type": "text_delta", "text": " Claude"}
+  },
+  {
+    "type": "message_delta",
+    "delta": {"stop_reason": "end_turn", "stop_sequence": null},
+    "usage": {"output_tokens": 8}
+  },
+  {"type": "message_stop"}
+]

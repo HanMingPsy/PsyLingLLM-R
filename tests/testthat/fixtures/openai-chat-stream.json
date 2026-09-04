@@ -1,0 +1,23 @@
+[
+  {
+    "id": "chatcmpl_stream_fixture",
+    "choices": [{"index": 0, "delta": {"reasoning_content": "Think "}}]
+  },
+  {
+    "id": "chatcmpl_stream_fixture",
+    "choices": [{"index": 0, "delta": {"reasoning_content": "first"}}]
+  },
+  {
+    "id": "chatcmpl_stream_fixture",
+    "choices": [{"index": 0, "delta": {"content": "Hello"}}]
+  },
+  {
+    "id": "chatcmpl_stream_fixture",
+    "choices": [{"index": 0, "delta": {"content": " world"}, "finish_reason": "stop"}]
+  },
+  {
+    "id": "chatcmpl_stream_fixture",
+    "choices": [],
+    "usage": {"prompt_tokens": 8, "completion_tokens": 4}
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "id": "msg_fixture",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {"type": "thinking", "thinking": "Fixture thought", "signature": "fixture-signature"},
+    {"type": "text", "text": "Fixture answer"}
+  ],
+  "stop_reason": "end_turn",
+  "usage": {"input_tokens": 10, "output_tokens": 7}
+}
