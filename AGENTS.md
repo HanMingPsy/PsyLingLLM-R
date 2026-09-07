@@ -44,7 +44,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 2 complete — Phase 3A awaiting implementation**.
+Current phase: **Phase 6 complete — Phase 7 production Registry migration
+awaiting approval**.
 
 Phase 1 delivered:
 
@@ -76,13 +77,21 @@ Phase 2 was delivered through these atomic commits:
 - `06f7242 refactor(registry): delegate public registry resolution`
 
 The Phase 2 source tarball passed `R CMD check` with `Status: OK`, and the full
-test suite passed 240 assertions without credentials or real API requests.
+test suite passed without credentials or real API requests.
+
+Phases 3 and 4 subsequently introduced tested request-builder, transport,
+response-parser, result-normalization, and orchestration boundaries. The
+current working tree contains uncommitted native OpenAI Chat/DeepSeek contract
+work that must be revised before it is eligible for commit: its parameter map,
+complete parameter-rule requirement, and rejection of undeclared parameters
+conflict with the provider-native parameter policy below.
 
 The following boundaries remain in force as compatibility guarantees:
 
-- Keep the complete `llm_caller()` signature and behavior stable. Phase 3 may
-  change its production internals only through characterization-tested,
-  separately reviewed delegation.
+- Preserve every existing `llm_caller()` argument, its order, default, and
+  behavior. The approved usability extension may append trailing `...` for
+  provider-native request parameters; this is an additive public signature
+  change and must have dedicated compatibility tests and documentation.
 - Do not modify or refactor experiment functions during the Registry v2 runtime migration.
 - Do not migrate `inst/registry/system_registry.yaml`.
 - Do not automatically modify user registry files.
@@ -100,11 +109,34 @@ Phase 2 intentionally retains two explicit constraints:
   execution instead of being silently ignored. This safety tightening prevents
   an experiment from unexpectedly falling back to another registry source.
 
-The next implementation phase is **Phase 3A — Request Builder Boundary**. Move
-only existing request construction behind an internal, allowlisted builder
-interface. Preserve the complete `llm_caller()` signature and generated v1
-request behavior. Do not introduce new provider support, transport extraction,
-response parsing changes, or production YAML migration in the same change.
+The Phase 6 readiness gate has now been implemented in the working tree in
+this order:
+
+1. Redact credentials and secret-like values from `return_raw`, debug output,
+   warnings, conditions, snapshots, and logs without altering the actual
+   transmitted request.
+2. Replace native v2 cross-provider parameter mapping and exhaustive parameter
+   allowlisting with provider-native request parameters. Preserve the v1
+   `${PARAMETER}` compatibility path unchanged.
+3. Allow named provider parameters through both the existing
+   `optionals = list(...)` form and trailing `...`. Undeclared and duplicate
+   parameters produce warnings, not local rejection; duplicate resolution is
+   deterministic and last-value-wins. Parameters are never renamed.
+4. Preserve complete provider error evidence, including HTTP status, message,
+   provider error type, parameter, provider code, response body, response
+   headers, and request ID when available, while retaining the existing public
+   `error$code` and `error$message` compatibility fields and status `599`.
+5. Revise the uncommitted native v2 fixtures and tests to use exact official
+   wire parameter names and nested structures. Run focused tests, the complete
+   offline suite, `R CMD build`, and `R CMD check` before requesting approval.
+
+The complete offline suite and a built-source `R CMD check --no-manual` pass
+with `Status: OK`. Network access and real credentials were not used. Phase 6
+contains protocol-scoped network-free contracts for OpenAI Chat, DeepSeek
+Chat, OpenAI Responses, and Anthropic Messages. Real-provider smoke tests
+remain deferred until the user explicitly supplies credentials and approves
+their use. Do not start production Registry YAML migration without separate
+approval.
 
 ## CRAN Submission Standard
 
@@ -145,7 +177,9 @@ CRAN compatibility is a continuous phase gate. A refactor that passes focused te
 Preserve the scientific and public contract of the package:
 
 - Keep all existing exported functions available.
-- Keep the complete `llm_caller()` signature unchanged.
+- Preserve every existing `llm_caller()` argument, order, default, and
+  behavior. A trailing `...` may be added only for the approved
+  provider-native parameter input described in this guide.
 - Keep experiment modules provider-independent.
 - Preserve experiment input semantics and output columns.
 - Preserve response, reasoning, timing, token, request-ID, streaming, and trial-status behavior.
@@ -206,7 +240,9 @@ Allowed work includes:
 
 Every `llm_caller()` change must preserve:
 
-- Its complete public function signature.
+- Every existing public formal argument, its order, and its default. The only
+  approved signature extension is trailing `...` for provider-native request
+  parameters.
 - The missing-versus-`NULL` semantics of `optionals`.
 - URL and streaming override precedence.
 - Message ordering and history behavior.
@@ -235,7 +271,8 @@ Describes model identity and references:
 - Supported interfaces
 - Default interface
 - Declared capabilities
-- Model defaults and validated, limited overrides
+- Provider-native model defaults and protection of protocol-owned structural
+  fields
 
 Models must not contain duplicated protocol implementations when an interface can be reused.
 
@@ -261,7 +298,7 @@ Describes a reusable, versioned API protocol:
 - HTTP method and body encoding
 - Endpoint path rules
 - Message/input structure
-- Parameter mappings
+- Provider-native parameter defaults and optional help metadata
 - Non-stream and stream transport IDs
 - Response decoder ID
 - Semantic response channels
@@ -270,6 +307,14 @@ Describes a reusable, versioned API protocol:
 Examples include OpenAI Chat-compatible, OpenAI Responses, Anthropic Messages, Ollama, and future protocols.
 
 Reuse interfaces by protocol. Do not create one adapter per model.
+
+Native Registry v2 interfaces must use the exact parameter names and nested
+request shapes documented by their upstream API. They must not map, alias,
+rename, normalize, or guess parameters across providers or API generations.
+For example, `max_tokens`, `max_completion_tokens`, and `max_output_tokens` are
+distinct wire parameters. Compatibility is provided by retaining old
+interfaces and the v1 template adapter, not by translating one parameter into
+another.
 
 ### Capability
 
@@ -327,13 +372,101 @@ Define merge behavior explicitly for each domain. Do not use unrestricted recurs
 - Reject ambiguous mixed v1/v2 documents.
 - Validate document, provider, interface, capability, and model structures.
 - Validate all cross-references before runtime.
-- Validate model defaults and overrides against their declared types and allowed fields.
+- Validate bundled and Registry-owned defaults for structural serializability,
+  but do not use parameter metadata as a runtime allowlist for user values.
 - Restrict request builders, transports, and response decoders to registered component IDs.
 - Reject unknown component IDs before making a network request.
 - Do not allow YAML to name or execute arbitrary R functions.
 - Do not silently fall back to an OpenAI response path when a validated v2 selector fails.
 - Keep permissive legacy parsing inside the v1 compatibility layer; do not copy legacy looseness into v2.
 - Fail with specific errors for YAML syntax, schema, reference, adapter, model, interface, authentication, transport, and response failures.
+
+## Provider-Native Parameter Policy
+
+PsyLingLLM does not define a cross-provider generation-parameter vocabulary.
+Native Registry v2 request parameters use upstream wire names and values
+exactly as supplied by the Registry or user. Do not add `parameter_map`,
+parameter aliases, automatic renaming, value translation, or fallback retries
+for native v2 interfaces. Any mapping retained for `legacy_template_v1` is an
+internal compatibility detail and must not influence native v2 behavior.
+
+The Registry may provide:
+
+- Provider-native defaults that make a bundled template usable.
+- Optional parameter help text for discovery and documentation.
+- Upstream source and verification metadata.
+
+Parameter help is advisory. It is not a send allowlist and does not determine
+whether a user-supplied value may reach the provider. If a Registry has no
+default for a parameter, PsyLingLLM does not invent one. Missing provider
+parameters and invalid user values normally reach the provider so the official
+API can return its authoritative error. Bundled templates remain maintainer
+responsibility and must include any defaults needed for their tested baseline
+request; custom Registry API correctness remains the user's responsibility
+after structural validation.
+
+Preserve the existing `optionals` three-state contract:
+
+```text
+missing optionals -> use Registry defaults when present, otherwise send none
+optionals = NULL  -> suppress Registry defaults
+named list        -> use user values only, without merging Registry defaults
+```
+
+The approved trailing `...` extension provides a second, more convenient input
+form. Named values captured from `...` are provider-native request parameters.
+Nested lists, vectors, logical values, and explicit named `NULL` values must
+remain JSON-serializable without flattening or coercive rewriting.
+
+Parameter handling rules:
+
+- User parameter names and values are transmitted unchanged.
+- Undeclared parameter names produce a warning and are still transmitted.
+- Values outside advisory Registry help metadata produce a warning and are
+  still transmitted.
+- Duplicate names produce a warning and resolve deterministically using the
+  last supplied value; never emit duplicate JSON object keys.
+- When both `optionals` and trailing `...` provide a name, the trailing `...`
+  value wins with a warning.
+- Existing formal arguments such as `stream`, `timeout`, `api_url`, and
+  `return_raw` remain runtime controls. A provider body parameter that collides
+  with a formal name must use `optionals`.
+- Protocol-owned structural fields such as `model`, `messages`, `input`, and
+  `system` must not be overridden through provider parameters because doing so
+  would make resolved and transmitted experiment metadata disagree.
+- Explicit `stream` precedence and the existing missing-versus-`NULL`
+  semantics remain unchanged.
+- Do not delete a rejected parameter, rename it, switch interfaces, or retry a
+  billable request automatically after a provider error.
+
+Registry structure remains strict even though provider parameters are open.
+Reject malformed YAML, broken references, unknown internal component IDs,
+unsupported authentication or HTTP structures, non-serializable Registry
+defaults, and invalid request envelopes before transport. This is the boundary
+between PsyLingLLM execution safety and user-owned upstream API correctness.
+
+## Provider Error and Diagnostic Safety Contract
+
+Provider errors are experimental evidence and must survive the complete
+transport, parser, and normalization path. Preserve, when available:
+
+- HTTP status and response headers.
+- Official message, error type, failing parameter, and provider error code.
+- Provider response body, including malformed or non-JSON error text.
+- Provider request ID from either body or headers.
+- Streaming error event details.
+
+Retain existing public `error$code` and `error$message` behavior and status
+`599` compatibility. Extend error details compatibly rather than replacing
+those fields. Never silently turn a provider error into an apparently
+successful empty answer.
+
+Credentials and secret-like fields must never appear in `return_raw`, debug
+output, warnings, conditions, snapshots, logs, or persisted results. Redact
+authorization headers, API-key headers, known credential placeholders, and
+secret-like body fields in diagnostic copies only. The actual transmitted
+request must retain the original credential. Secret redaction is a hard gate
+before any optional live API test.
 
 ## Response and Streaming Adaptability
 
@@ -414,7 +547,7 @@ The resolver must eventually handle:
 - Provider resolution
 - Interface selection
 - Capability lookup
-- Defaults and limited overrides
+- Provider-native defaults and protocol-owned structural-field protection
 - Cross-reference validation
 - Compilation into one canonical runtime configuration
 
@@ -456,7 +589,8 @@ Preserve the existing `llm_register()` public API while introducing these intern
 Future registration should support:
 
 - A simple mode for known provider/protocol profiles.
-- An advanced mode for explicit custom interfaces and capability mappings.
+- An advanced mode for explicit custom interfaces and semantic capability
+  declarations.
 
 Probe results are evidence, not guaranteed configuration. Store candidates, confidence, and warnings. Do not automatically compile or persist low-confidence discoveries.
 
@@ -512,6 +646,15 @@ For Registry v2, test:
 - Typed output items and events
 - Provider errors, malformed payloads, timeouts, and interrupted streams
 - Secret redaction
+- Provider-native parameters supplied through both `optionals` and trailing
+  `...`
+- Undeclared and advisory-value warnings without blocking transport
+- Duplicate parameter warnings and deterministic last-value-wins behavior
+- Exact preservation of nested objects, vectors, logicals, and named `NULL`
+- Protection of protocol-owned request fields
+- Complete provider error evidence and request IDs through normalization
+- Equivalence of legacy v1 `${PARAMETER}` injection before and after the
+  native v2 parameter changes
 
 Normal tests must not use real provider APIs or credentials. Prefer fixtures, injected mock transports, and a local mock HTTP server.
 
@@ -533,11 +676,18 @@ Run focused tests first, then the full test suite and `R CMD check` when practic
 - OpenAI-compatible, DeepSeek, and Anthropic-style scenarios have network-free contract tests. Add a local-runtime scenario only when PsyLingLLM claims that protocol as supported in 0.4.0.
 - Existing bundled models continue working.
 - Existing experiments, exported names, function signatures, and documented return contracts remain compatible.
+- All existing `llm_caller()` formals retain their order, defaults, and
+  behavior; the approved trailing `...` extension accepts provider-native
+  parameters without renaming them.
 - Existing v1 user registries remain readable and are not rewritten automatically.
 - Invalid registry configuration fails before network execution.
 - Request, transport, parsing, streaming, error, and timeout behavior are independently testable.
 - Public model/capability discovery can eventually be provided through `llm_models()`, `llm_capabilities()`, and `find_llm()`.
 - `llm_caller()` contains orchestration only.
+- `return_raw`, debug output, warnings, conditions, and logs never expose
+  credentials.
+- Undeclared provider parameters can reach the provider after a warning, and
+  official provider errors remain actionable after normalization.
 - The built source tarball passes `R CMD check --as-cran` with no ERROR, no WARNING, and no unexplained significant NOTE.
 - Normal tests and examples work without network access, credentials, or writes outside temporary directories.
 
@@ -549,9 +699,12 @@ The required 0.4.0 path is deliberately smaller than the complete long-term road
 2. Phase 2: introduce one strict resolver and canonical runtime configuration.
 3. Phase 3A through Phase 3C: extract request, transport, and response boundaries without behavior changes.
 4. Phase 4: reduce `llm_caller()` to orchestration.
-5. Phase 6 minimum proof: OpenAI-compatible/DeepSeek reuse plus one genuinely different Anthropic-style protocol.
-6. Phase 7: migrate only the bundled registry after equivalence is demonstrated.
-7. Phase 8: complete CRAN release validation.
+5. Phase 6 Readiness Gate: redact secrets, accept provider-native parameters,
+   remove native mappings/allowlists, and preserve provider errors.
+6. Phase 6 minimum proof: OpenAI-compatible and DeepSeek protocol-component
+   reuse plus one genuinely different Anthropic-style protocol.
+7. Phase 7: migrate only the bundled registry after equivalence is demonstrated.
+8. Phase 8: complete CRAN release validation.
 
 The following work is independently deferrable to 0.4.x and must not delay a stable 0.4.0 unless it becomes necessary for compatibility:
 
@@ -621,7 +774,9 @@ Implementation steps:
 3. Define the built-in component-ID vocabulary for request builders, transports, and response decoders without implementing runtime dispatch yet.
 4. Validate types, required fields, allowed values, and unknown fields.
 5. Validate all cross-references between models, providers, interfaces, and capabilities.
-6. Define explicit override allowlists rather than unrestricted recursive merging.
+6. Define explicit allowlists for Registry-owned structural overrides rather
+   than unrestricted recursive merging. These structural allowlists must not
+   become provider request-parameter allowlists.
 7. Define canonical error messages containing the registry domain, entry ID, and invalid field.
 8. Freeze the public contract of exported `validate_registry_schema()`: it must detect v1/v2 documents, dispatch to version-specific validation, return `TRUE` for valid supported documents, and fail with a stable `registry_validation_error` condition for invalid documents.
 9. Keep implementation-availability checks separate from structural schema checks until the built-in component dispatchers exist.
@@ -690,7 +845,9 @@ Implementation steps:
 2. Resolve model keys and aliases without heuristic provider fallbacks that can silently select the wrong model.
 3. Resolve provider identity and deployment metadata.
 4. Select the requested or default interface and reject ambiguity.
-5. Resolve capabilities, defaults, and allowed overrides.
+5. Resolve capabilities and provider-native defaults, and protect
+   protocol-owned structural fields without treating parameter metadata as an
+   allowlist.
 6. Compile the resolved entry into a strict canonical runtime configuration.
 7. Validate the compiled configuration before returning it.
 8. Make `get_registry_entry()`, `get_model_config()`, and `load_registry()` delegate incrementally while preserving their public return contracts.
@@ -827,7 +984,9 @@ Goal: simplify `llm_caller()` after its responsibilities have already moved behi
 
 Implementation steps:
 
-1. Retain the exact public signature.
+1. Retain all existing public arguments, order, defaults, and behavior. The
+   separately approved readiness work may append trailing `...` without
+   changing the historical arguments.
 2. Capture `missing(optionals)` at the public boundary.
 3. Resolve canonical configuration.
 4. Normalize call context.
@@ -896,19 +1055,152 @@ refactor(registration): separate discovery from registry compilation
 feat(registration): compile validated Registry v2 entries
 ```
 
+### Phase 6 Readiness Gate — Runtime Safety and Provider-Native Parameters
+
+Goal: correct the confirmed safety and adaptability gaps before adding more
+native protocol coverage. This gate is the active implementation phase and is
+not optional.
+
+Implement it through separately reviewable steps.
+
+#### Gate A — Diagnostic Secret Redaction
+
+1. Add one reusable recursive redaction helper for diagnostic copies.
+2. Redact authorization and API-key headers case-insensitively.
+3. Redact secret-like body fields and credential placeholders without changing
+   the request sent to transport.
+4. Apply redaction to `return_raw`, debug output, warnings, conditions, and any
+   persisted logs.
+5. Add tests using obvious fake secrets and assert that neither exact values
+   nor bearer-token fragments appear in captured output or returned objects.
+
+Expected files:
+
+- Modify `R/runtime_result.R`.
+- Modify `R/runtime_transport.R` or its debug helper.
+- Add a small internal redaction helper only if reuse justifies it.
+- Modify focused runtime-result and transport tests.
+
+Exit criteria:
+
+- Actual mock transport receives the unmodified fake credential.
+- Every diagnostic representation contains only redacted values.
+- Existing `return_raw` shape remains compatible.
+
+Suggested commit:
+
+```text
+fix(runtime): redact credentials from diagnostics
+```
+
+#### Gate B — Provider-Native Parameter Input
+
+1. Revise native v2 schema fields so parameter defaults and help use exact
+   upstream wire names; remove native `parameter_map` and exhaustive rule
+   coverage requirements.
+2. Keep legacy v1 template parameter injection unchanged.
+3. Append trailing `...` to `llm_caller()` while preserving every historical
+   formal argument, order, default, and behavior.
+4. Capture named values from `...` as provider-native request parameters.
+5. Preserve `optionals = list(...)` as the compatibility input form.
+6. Warn and transmit undeclared parameters unchanged.
+7. Warn on duplicates and use the last supplied value, with trailing `...`
+   taking precedence over `optionals`; do not emit duplicate JSON keys.
+8. Preserve nested lists, vectors, logicals, and explicit named `NULL` values.
+9. Reject only attempts to replace protocol-owned structural fields or values
+   that cannot be represented as a named parameter collection.
+10. Do not merge Registry defaults when either user parameter form is used.
+
+Expected files:
+
+- Modify `R/registry_schema.R`.
+- Modify `R/runtime_request_builder.R`.
+- Modify `R/llm_caller.R` only for trailing `...` capture and delegation.
+- Modify public-formals, request-builder, caller, and Registry schema tests.
+- Revise the uncommitted native Registry v2 fixtures.
+
+Exit criteria:
+
+- No native v2 request parameter is renamed or value-mapped.
+- A newly introduced upstream parameter can be sent without R source changes.
+- Unknown and duplicate parameters warn but do not prevent mock transport.
+- Existing `optionals` three-state and v1 `${PARAMETER}` tests remain green.
+- Experiment modules require no source edits.
+
+Suggested commits:
+
+```text
+refactor(registry): simplify native parameter metadata
+feat(runtime): accept provider-native request parameters
+```
+
+#### Gate C — Complete Provider Error Evidence
+
+1. Preserve HTTP status, response headers, raw/text body, and parsed body in
+   the transport response for successful and error responses.
+2. Extract provider message, type, failing parameter, provider code, and
+   request ID without assuming one provider shape.
+3. Obtain request IDs from typed body fields or provider response headers when
+   available.
+4. Preserve malformed and non-JSON provider error text.
+5. Extend normalized error details compatibly while retaining existing
+   `error$code`, `error$message`, public result fields, and status `599`.
+6. Ensure stream error events cannot normalize as successful empty results.
+
+Expected files:
+
+- Modify `R/runtime_transport.R` only where evidence is currently discarded.
+- Modify `R/runtime_response_parser.R`.
+- Modify `R/runtime_result.R` only through a compatibility-tested extension.
+- Add provider-error fixtures and focused transport/parser/result tests.
+
+Exit criteria:
+
+- OpenAI-style, DeepSeek-style, Anthropic-style, generic JSON, plain-text, and
+  streaming mock errors remain actionable after public normalization.
+- Request IDs survive whether supplied in the response body or headers.
+- No provider error triggers parameter deletion, interface fallback, or
+  automatic retry.
+- Error diagnostics are fully redacted.
+
+Suggested commit:
+
+```text
+fix(runtime): preserve provider error details
+```
+
+#### Readiness Review
+
+After Gates A through C:
+
+1. Run focused schema, builder, transport, parser, result, caller, and public
+   API tests.
+2. Run the complete offline test suite.
+3. Build the source tarball and run `R CMD check` on it.
+4. Show the complete relevant diff and report all pre-existing working-tree
+   changes.
+5. Obtain explicit approval before committing the final gate change or
+   resuming Phase 6.
+
 ### Phase 6 — Add Native Registry v2 Protocol Coverage
 
 Goal: prove adaptability with a small set of real protocol families before migrating production configuration.
 
 Implementation steps:
 
-1. Add one native OpenAI-compatible interface fixture.
-2. Add a DeepSeek model fixture reusing that interface where compatible.
+1. Add one native OpenAI Chat Completions-compatible interface fixture using
+   exact official wire parameter names.
+2. Add a DeepSeek fixture that reuses builders, transports, or parsers only
+   where the actual contract is compatible. Use a distinct versioned interface
+   when endpoints, roles, parameters, reasoning fields, or tool-call history
+   requirements differ.
 3. Add one typed OpenAI Responses fixture using item/event semantics.
 4. Add one Anthropic-style fixture using content-block/event semantics.
 5. Add a local-runtime fixture only if that protocol is part of the approved 0.4.0 support matrix; otherwise defer it rather than adding an unused transport.
 6. Verify that a newly named model using an existing interface requires no R runtime change.
 7. Add optional, explicit live smoke tests separately from normal package tests.
+8. Do not add native parameter mappings or treat advisory parameter help as an
+   allowlist.
 
 Expected files:
 
@@ -1035,9 +1327,9 @@ Registry loading, compatibility, and validation:
 - `R/get_registry_entry.R`
 - `R/get_model_config.R`
 - `R/registry_schema.R`
-- `R/registry_compatibility.R` when introduced
-- `R/registry_loader.R` when introduced
-- `R/registry_resolver.R` or `R/resolve_registry_entry.R` when introduced
+- `R/registry_compatibility.R`
+- `R/registry_loader.R`
+- `R/registry_resolver.R`
 - `R/registry_query.R` when introduced
 
 Registration and discovery:
@@ -1056,7 +1348,10 @@ Runtime:
 - `R/llm_parser.R`
 - `R/json_utils.R`
 - `R/error_handling.R`
-- Request-builder, transport, response-parser, and result-normalizer files introduced later
+- `R/runtime_request_builder.R`
+- `R/runtime_transport.R`
+- `R/runtime_response_parser.R`
+- `R/runtime_result.R`
 
 Experiment compatibility:
 
