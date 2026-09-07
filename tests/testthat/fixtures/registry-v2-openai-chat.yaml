@@ -1,0 +1,105 @@
+schema_version: 2
+
+providers:
+  openai-fixture:
+    type: official
+    base_url: https://openai.example.invalid/v1
+    auth:
+      scheme: bearer
+      env_var: OPENAI_FIXTURE_API_KEY
+    headers:
+      Content-Type: application/json
+  deepseek-fixture:
+    type: official
+    base_url: https://deepseek.example.invalid
+    auth:
+      scheme: bearer
+      env_var: DEEPSEEK_FIXTURE_API_KEY
+    headers:
+      Content-Type: application/json
+
+interfaces:
+  openai-chat-openai-v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
+      parameters:
+        temperature:
+          description: Native sampling temperature.
+        max_completion_tokens:
+          description: Native OpenAI Chat Completions output-token limit.
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    defaults:
+      temperature: 0.2
+  openai-chat-deepseek-v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
+      body:
+        thinking:
+          type: enabled
+      parameters:
+        reasoning_effort:
+          description: Native DeepSeek reasoning effort.
+        max_tokens:
+          description: Native DeepSeek Chat output-token limit.
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      temperature: 0.2
+
+capabilities:
+  reasoning:
+    value_type: logical
+    description: The model may return reasoning separately from answer text.
+    default: false
+
+models:
+  openai-chat-fixture:
+    provider: openai-fixture
+    model_id: openai-chat-fixture
+    aliases:
+      - openai-fixture
+    interfaces:
+      - openai-chat-openai-v1
+    default_interface: openai-chat-openai-v1
+    capabilities:
+      reasoning: false
+    defaults:
+      max_completion_tokens: 128
+  deepseek-v4-pro-fixture:
+    provider: deepseek-fixture
+    model_id: deepseek-v4-pro
+    aliases:
+      - deepseek-fixture
+    interfaces:
+      - openai-chat-deepseek-v1
+    default_interface: openai-chat-deepseek-v1
+    capabilities:
+      reasoning: true
+    defaults:
+      max_tokens: 256

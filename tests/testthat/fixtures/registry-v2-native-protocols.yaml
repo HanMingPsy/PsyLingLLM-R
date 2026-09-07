@@ -1,0 +1,95 @@
+schema_version: 2
+
+providers:
+  openai-responses-fixture:
+    type: official
+    base_url: https://openai.example.invalid/v1
+    auth:
+      scheme: bearer
+      env_var: OPENAI_FIXTURE_API_KEY
+    headers:
+      Content-Type: application/json
+  anthropic-fixture:
+    type: official
+    base_url: https://anthropic.example.invalid
+    auth:
+      scheme: header
+      header: x-api-key
+      env_var: ANTHROPIC_FIXTURE_API_KEY
+    headers:
+      Content-Type: application/json
+      anthropic-version: "2023-06-01"
+
+interfaces:
+  openai-responses-v1:
+    protocol: openai_responses
+    request:
+      builder: openai_responses
+      method: POST
+      encoding: json
+      path: /responses
+      parameters:
+        max_output_tokens:
+          description: Native Responses API output-token limit.
+        reasoning:
+          description: Native Responses API reasoning configuration.
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_responses
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+  anthropic-messages-2023-06-01:
+    protocol: anthropic_messages
+    request:
+      builder: anthropic_messages
+      method: POST
+      encoding: json
+      path: /v1/messages
+      parameters:
+        max_tokens:
+          description: Native Anthropic Messages output-token limit.
+        thinking:
+          description: Native Anthropic thinking configuration.
+        output_config:
+          description: Native Anthropic output configuration.
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: anthropic_messages
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+
+capabilities:
+  reasoning:
+    value_type: logical
+    description: The model may expose a separate reasoning channel.
+    default: false
+
+models:
+  openai-responses-fixture:
+    provider: openai-responses-fixture
+    model_id: gpt-fixture
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+    defaults:
+      max_output_tokens: 128
+  anthropic-messages-fixture:
+    provider: anthropic-fixture
+    model_id: claude-fixture
+    interfaces:
+      - anthropic-messages-2023-06-01
+    default_interface: anthropic-messages-2023-06-01
+    capabilities:
+      reasoning: true
+    defaults:
+      max_tokens: 128

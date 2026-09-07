@@ -113,7 +113,7 @@ parse_legacy_paths_response <- function(response, config, streaming) {
       answer = values$answer,
       reasoning = values$reasoning,
       usage = values$usage,
-      request_id = values$request_id,
+      request_id = values$request_id %||% response_request_id(response),
       finish_reason = NULL,
       error = legacy_response_error(response)
     ),
@@ -200,8 +200,7 @@ legacy_response_error <- function(response) {
   if (response$status < 400L) {
     return(NULL)
   }
-  message <- response$legacy$error %||% "HTTP error"
-  list(code = response$status, message = message)
+  build_provider_error(response, status = response$status)
 }
 
 parse_openai_chat_response <- function(response, config, streaming) {
@@ -494,9 +493,13 @@ parse_anthropic_message_events <- function(events) {
 }
 
 new_typed_parsed_response <- function(response, streaming, values) {
-  error_message <- values$error_message
+  provider_error <- response_provider_error(response)
+  error_message <- values$error_message %||% provider_error$message
   if (is.null(error_message) && response$status >= 400L) {
-    error_message <- response$legacy$error %||% "HTTP error"
+    error_message <- response$legacy$error %||%
+      nonempty_response_text(response$text) %||%
+      response$error$message %||%
+      "HTTP error"
   }
   status <- response$status
   if (!is.null(error_message) && status < 400L) {
@@ -505,7 +508,12 @@ new_typed_parsed_response <- function(response, streaming, values) {
   error <- if (is.null(error_message)) {
     NULL
   } else {
-    list(code = status, message = error_message)
+    build_provider_error(
+      response,
+      status = status,
+      message = error_message,
+      provider_error = provider_error
+    )
   }
 
   structure(
@@ -515,7 +523,7 @@ new_typed_parsed_response <- function(response, streaming, values) {
       answer = values$answer %||% "",
       reasoning = values$reasoning %||% NULL,
       usage = values$usage %||% list(prompt = NULL, completion = NULL),
-      request_id = values$request_id %||% NULL,
+      request_id = values$request_id %||% response_request_id(response),
       finish_reason = values$finish_reason %||% NULL,
       error = error
     ),
@@ -591,6 +599,153 @@ typed_error_message <- function(error) {
   NULL
 }
 
+response_provider_error <- function(response) {
+  candidates <- list()
+  if (is.list(response$parsed)) {
+    candidates[[length(candidates) + 1L]] <- response$parsed$error %||%
+      if (identical(response$parsed$type, "error")) response$parsed else NULL
+  }
+  if (is.list(response$events)) {
+    for (event in response$events) {
+      if (!is.list(event)) {
+        next
+      }
+      candidate <- event$error %||%
+        if (identical(event$type, "error")) event else NULL
+      if (!is.null(candidate)) {
+        candidates[[length(candidates) + 1L]] <- candidate
+      }
+    }
+  }
+  candidates <- Filter(Negate(is.null), candidates)
+  if (length(candidates) == 0L) {
+    return(list(
+      message = NULL,
+      type = NULL,
+      param = NULL,
+      code = NULL
+    ))
+  }
+  candidate <- candidates[[1L]]
+  if (is.character(candidate)) {
+    return(list(
+      message = typed_character(candidate),
+      type = NULL,
+      param = NULL,
+      code = NULL
+    ))
+  }
+  if (!is.list(candidate)) {
+    return(list(message = NULL, type = NULL, param = NULL, code = NULL))
+  }
+  list(
+    message = typed_character(candidate$message),
+    type = typed_character(candidate$type),
+    param = typed_character(candidate$param),
+    code = typed_error_code(candidate$code)
+  )
+}
+
+typed_error_code <- function(value) {
+  if (is.character(value)) {
+    return(typed_character(value))
+  }
+  if (is.numeric(value) && length(value) > 0L && !is.na(value[[1L]])) {
+    return(value[[1L]])
+  }
+  NULL
+}
+
+build_provider_error <- function(response, status, message = NULL,
+                                 provider_error = NULL) {
+  provider_error <- provider_error %||% response_provider_error(response)
+  message <- message %||% provider_error$message %||%
+    response$legacy$error %||%
+    nonempty_response_text(response$text) %||%
+    response$error$message %||%
+    "HTTP error"
+  list(
+    code = as.integer(status),
+    message = as.character(message),
+    type = provider_error$type,
+    param = provider_error$param,
+    provider_code = provider_error$code,
+    body = response_error_body(response),
+    headers = response$headers,
+    request_id = response_request_id(response)
+  )
+}
+
+response_error_body <- function(response) {
+  if (!is.null(response$parsed)) {
+    return(response$parsed)
+  }
+  if (is.list(response$events) && length(response$events) > 0L) {
+    return(response$events)
+  }
+  response$text %||% response$raw_body
+}
+
+nonempty_response_text <- function(value) {
+  if (!is.character(value) || length(value) == 0L || is.na(value[[1L]]) ||
+      !nzchar(value[[1L]])) {
+    return(NULL)
+  }
+  value[[1L]]
+}
+
+response_request_id <- function(response) {
+  body_id <- if (is.list(response$parsed)) {
+    typed_character(response$parsed$request_id) %||%
+      typed_character(response$parsed$id)
+  } else {
+    NULL
+  }
+  body_id %||% response_header_value(
+    response$headers,
+    c("x-request-id", "request-id", "request_id")
+  )
+}
+
+response_header_value <- function(headers, candidates) {
+  if (is.null(headers)) {
+    return(NULL)
+  }
+  if (is.raw(headers)) {
+    headers <- rawToChar(headers)
+  }
+  if (is.character(headers) && is.null(names(headers))) {
+    lines <- unlist(strsplit(headers, "\\r?\\n"), use.names = FALSE)
+    for (candidate in candidates) {
+      match <- grep(
+        paste0("^", candidate, "\\s*:"),
+        lines,
+        ignore.case = TRUE,
+        value = TRUE
+      )
+      if (length(match) > 0L) {
+        return(trimws(sub("^[^:]+:", "", match[[1L]])))
+      }
+    }
+    return(NULL)
+  }
+  header_names <- names(headers)
+  if (is.null(header_names)) {
+    return(NULL)
+  }
+  normalized <- tolower(header_names)
+  for (candidate in candidates) {
+    index <- match(tolower(candidate), normalized)
+    if (!is.na(index)) {
+      value <- headers[[index]]
+      if (is.character(value) && length(value) > 0L && !is.na(value[[1L]])) {
+        return(value[[1L]])
+      }
+    }
+  }
+  NULL
+}
+
 anthropic_error_status <- function(type) {
   statuses <- c(
     invalid_request_error = 400L,
@@ -636,7 +791,7 @@ validate_llm_parsed_response <- function(response, parser_id = NULL) {
     optional_integer(response$usage$completion)
   valid_error <- is.null(response$error) || (
     is.list(response$error) &&
-      identical(names(response$error), c("code", "message")) &&
+      all(c("code", "message") %in% names(response$error)) &&
       is.integer(response$error$code) && length(response$error$code) == 1L &&
       !is.na(response$error$code) &&
       is.character(response$error$message) &&

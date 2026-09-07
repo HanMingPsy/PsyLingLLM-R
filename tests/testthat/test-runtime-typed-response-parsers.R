@@ -9,10 +9,12 @@ make_typed_transport_response <- function(parsed = NULL,
                                           events = list(),
                                           streaming = FALSE,
                                           status = 200L,
-                                          error = NULL) {
+                                          error = NULL,
+                                          headers = NULL) {
   legacy <- if (streaming) {
     list(
       status = status,
+      headers = headers,
       raw_json = events,
       raw_lines = NULL,
       first_token_latency = 0.1,
@@ -21,6 +23,7 @@ make_typed_transport_response <- function(parsed = NULL,
   } else {
     list(
       status = status,
+      headers = headers,
       text = if (is.null(parsed)) NULL else jsonlite::toJSON(
         parsed, auto_unbox = TRUE
       ),
@@ -140,7 +143,7 @@ test_that("typed parsers surface provider errors and ignore unknown events", {
   error_result <- parse_llm_response(openai_error, "openai_chat")
 
   expect_identical(
-    error_result$error,
+    error_result$error[c("code", "message")],
     list(code = 429L, message = "Rate limited")
   )
 
@@ -164,7 +167,7 @@ test_that("typed parsers surface provider errors and ignore unknown events", {
   expect_identical(anthropic_error$answer, "")
   expect_identical(anthropic_error$status, 529L)
   expect_identical(
-    anthropic_error$error,
+    anthropic_error$error[c("code", "message")],
     list(code = 529L, message = "Overloaded")
   )
 })
@@ -186,9 +189,49 @@ test_that("unknown streaming provider errors cannot appear successful", {
 
   expect_identical(result$status, 500L)
   expect_identical(
-    result$error,
+    result$error[c("code", "message")],
     list(code = 500L, message = "Stream failed")
   )
+})
+
+test_that("provider error evidence and header request IDs survive parsing", {
+  body <- list(error = list(
+    message = "Unsupported value",
+    type = "invalid_request_error",
+    param = "future_parameter",
+    code = "unsupported_value"
+  ))
+  response <- make_typed_transport_response(
+    parsed = body,
+    status = 400L,
+    headers = c(`x-request-id` = "request-from-header")
+  )
+
+  result <- parse_llm_response(response, "openai_chat")
+
+  expect_identical(result$request_id, "request-from-header")
+  expect_identical(result$error$code, 400L)
+  expect_identical(result$error$message, "Unsupported value")
+  expect_identical(result$error$type, "invalid_request_error")
+  expect_identical(result$error$param, "future_parameter")
+  expect_identical(result$error$provider_code, "unsupported_value")
+  expect_identical(result$error$body, body)
+  expect_identical(result$error$headers[["x-request-id"]], "request-from-header")
+  expect_identical(result$error$request_id, "request-from-header")
+})
+
+test_that("plain-text provider errors remain actionable", {
+  response <- normalize_llm_transport_response(
+    list(status = 502L, text = "upstream gateway failed", error = NULL),
+    "http_json",
+    "{}"
+  )
+
+  result <- parse_llm_response(response, "openai_chat")
+
+  expect_identical(result$error$code, 502L)
+  expect_identical(result$error$message, "upstream gateway failed")
+  expect_identical(result$error$body, "upstream gateway failed")
 })
 
 test_that("typed parsers normalize empty and malformed provider payloads", {

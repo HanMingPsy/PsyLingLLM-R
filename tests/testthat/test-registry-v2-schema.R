@@ -145,9 +145,42 @@ test_that("Registry v2 validates capability allowed value types", {
   )
 })
 
-test_that("Registry v2 defaults use an explicit parameter allowlist", {
+test_that("native Registry v2 accepts provider-native defaults", {
   registry <- read_registry_fixture("registry-v2-valid.yaml")
-  registry$models[["fixture-model"]]$defaults$undeclared <- 1
+  registry$models[["fixture-model"]]$defaults$future_parameter <- list(
+    mode = "high"
+  )
+
+  expect_true(validate_registry_schema(registry))
+})
+
+test_that("Registry v2 parameter help is advisory metadata", {
+  registry <- read_registry_fixture("registry-v2-valid.yaml")
+  registry$interfaces$openai_chat_v1$request$parameters <- list(
+    future_parameter = list(
+      description = "An upstream provider parameter.",
+      docs_url = "https://example.invalid/api"
+    )
+  )
+
+  expect_true(validate_registry_schema(registry))
+})
+
+test_that("native Registry v2 rejects cross-provider parameter maps", {
+  registry <- read_registry_fixture("registry-v2-valid.yaml")
+  registry$interfaces$openai_chat_v1$request$parameter_map <- list(
+    max_tokens = "max_completion_tokens"
+  )
+
+  expect_registry_validation_error(
+    validate_registry_schema(registry),
+    "request.parameter_map"
+  )
+})
+
+test_that("Registry v2 rejects non-serializable defaults", {
+  registry <- read_registry_fixture("registry-v2-valid.yaml")
+  registry$models[["fixture-model"]]$defaults$invalid <- environment()
 
   expect_registry_validation_error(
     validate_registry_schema(registry),

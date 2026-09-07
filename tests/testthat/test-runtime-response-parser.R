@@ -142,7 +142,7 @@ test_that("legacy parser preserves transport error compatibility", {
 
   expect_identical(result$status, 599L)
   expect_identical(
-    result$error,
+    result$error[c("code", "message")],
     list(code = 599L, message = "Fixture timeout")
   )
 })

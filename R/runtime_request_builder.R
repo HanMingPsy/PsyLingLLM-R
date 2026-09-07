@@ -12,7 +12,8 @@ new_llm_call_context <- function(trial_prompt = NULL,
                                  stream = NULL,
                                  role_mapping = NULL,
                                  api_url = NULL,
-                                 timeout = 120) {
+                                 timeout = 120,
+                                 provider_parameters = list()) {
   list(
     trial_prompt = trial_prompt,
     material = material,
@@ -24,7 +25,8 @@ new_llm_call_context <- function(trial_prompt = NULL,
     stream = stream,
     role_mapping = role_mapping,
     api_url = api_url,
-    timeout = timeout
+    timeout = timeout,
+    provider_parameters = provider_parameters
   )
 }
 
@@ -65,7 +67,12 @@ build_llm_request <- function(builder_id, entry, context) {
 }
 
 llm_request_builders <- function() {
-  list(legacy_template_v1 = build_legacy_template_request)
+  list(
+    legacy_template_v1 = build_legacy_template_request,
+    openai_chat = build_openai_chat_request,
+    openai_responses = build_openai_responses_request,
+    anthropic_messages = build_anthropic_messages_request
+  )
 }
 
 runtime_request_builder_input <- function(config, compatibility_entry) {
@@ -96,6 +103,465 @@ configure_llm_request_transport <- function(request, config) {
   request$transport_id <- transport_id
   validate_llm_request(request, config$interface$request$builder)
   request
+}
+
+build_openai_chat_request <- function(config, context) {
+  builder_id <- "openai_chat"
+  request_config <- config$interface$request
+  url <- context$api_url %||% request_config$url
+  if (!is.character(url) || length(url) != 1L || is.na(url) || !nzchar(url)) {
+    llm_request_builder_abort(
+      "The resolved interface does not define a request URL.",
+      builder_id = builder_id,
+      reason = "missing_url"
+    )
+  }
+
+  user_content <- build_user_content(
+    context$trial_prompt,
+    context$material
+  )
+  if (!nzchar(user_content)) {
+    llm_request_builder_abort(
+      "At least one of `trial_prompt` or `material` must be provided.",
+      builder_id = builder_id,
+      reason = "missing_user_content"
+    )
+  }
+
+  role_mapping <- request_config$role_mapping %||% list()
+  if (is.list(context$role_mapping) && length(context$role_mapping) > 0L) {
+    role_mapping <- context$role_mapping
+  }
+  map_role <- function(role) {
+    role_mapping[[tolower(role)]] %||% role
+  }
+
+  messages <- list()
+  system_text <- context$system_content %||% request_config$default_system
+  if (!is.null(system_text)) {
+    messages[[length(messages) + 1L]] <- list(
+      role = map_role("system"),
+      content = system_text
+    )
+  }
+  history <- normalize_history_messages(context$assistant_content, map_role)
+  if (length(history) > 0L) {
+    messages <- c(messages, history)
+  }
+  messages[[length(messages) + 1L]] <- list(
+    role = map_role("user"),
+    content = user_content
+  )
+
+  if (!isTRUE(context$optionals_missing) &&
+      !is.null(context$optionals_value) &&
+      !is.list(context$optionals_value)) {
+    llm_request_builder_abort(
+      "Optional parameters must be a named list or NULL.",
+      builder_id = builder_id,
+      reason = "invalid_optionals"
+    )
+  }
+  optionals <- resolve_native_request_parameters(
+    context = context,
+    defaults = config$defaults,
+    declared_names = unique(c(
+      names(config$defaults %||% list()),
+      names(request_config$body %||% list()),
+      names(request_config$parameters %||% list())
+    )),
+    protected_names = c("model", "messages", "input", "system"),
+    builder_id = builder_id
+  )
+  stream <- if (!is.null(context$stream)) {
+    isTRUE(context$stream)
+  } else if ("stream" %in% names(optionals)) {
+    isTRUE(optionals$stream)
+  } else {
+    FALSE
+  }
+  optionals$stream <- NULL
+
+  if (stream && !isTRUE(config$interface$streaming$supported)) {
+    llm_request_builder_abort(
+      "The selected interface does not support streaming.",
+      builder_id = builder_id,
+      reason = "unsupported_streaming"
+    )
+  }
+
+  body <- request_config$body %||% list()
+  body$model <- config$model$id
+  body$messages <- messages
+  for (name in names(optionals)) {
+    body[name] <- list(optionals[[name]])
+  }
+  stream_parameter <- config$interface$streaming$request_parameter
+  if (!is.null(stream_parameter)) {
+    body[[stream_parameter]] <- NULL
+  }
+  if (stream) {
+    if (is.null(stream_parameter)) {
+      llm_request_builder_abort(
+        "The streaming request parameter is not configured.",
+        builder_id = builder_id,
+        reason = "missing_stream_parameter"
+      )
+    }
+    body[[stream_parameter]] <-
+      config$interface$streaming$request_value %||% TRUE
+  }
+
+  headers <- apply_registry_auth(
+    request_config$headers %||% list(),
+    config$provider$auth,
+    context$api_key,
+    builder_id
+  )
+
+  structure(
+    list(
+      method = request_config$method %||% "POST",
+      url = url,
+      headers = headers,
+      body = body,
+      encoding = request_config$encoding %||% "json",
+      stream = stream,
+      transport_id = if (stream) {
+        config$interface$transport$stream
+      } else {
+        config$interface$transport$non_stream
+      },
+      timeout = context$timeout
+    ),
+    class = c("psylingllm_request", "list")
+  )
+}
+
+build_openai_responses_request <- function(config, context) {
+  builder_id <- "openai_responses"
+  request_config <- config$interface$request
+  url <- native_request_url(request_config, context, builder_id)
+  user_content <- native_user_content(context, builder_id)
+  map_role <- native_role_mapper(request_config, context)
+
+  input <- normalize_history_messages(context$assistant_content, map_role)
+  input[[length(input) + 1L]] <- list(
+    role = map_role("user"),
+    content = user_content
+  )
+  optionals <- resolve_native_request_parameters(
+    context = context,
+    defaults = config$defaults,
+    declared_names = unique(c(
+      names(config$defaults %||% list()),
+      names(request_config$body %||% list()),
+      names(request_config$parameters %||% list())
+    )),
+    protected_names = c("model", "input", "instructions", "messages", "system"),
+    builder_id = builder_id
+  )
+  stream <- native_stream_value(optionals, context, config, builder_id)
+  optionals$stream <- NULL
+
+  body <- request_config$body %||% list()
+  body$model <- config$model$id
+  body$input <- input
+  instructions <- context$system_content %||% request_config$default_system
+  if (!is.null(instructions)) {
+    body$instructions <- instructions
+  }
+  body <- append_native_parameters(body, optionals)
+  body <- apply_native_stream(body, stream, config, builder_id)
+
+  new_native_request(
+    request_config,
+    config,
+    context,
+    body,
+    url,
+    stream,
+    builder_id
+  )
+}
+
+build_anthropic_messages_request <- function(config, context) {
+  builder_id <- "anthropic_messages"
+  request_config <- config$interface$request
+  url <- native_request_url(request_config, context, builder_id)
+  user_content <- native_user_content(context, builder_id)
+  map_role <- native_role_mapper(request_config, context)
+
+  messages <- normalize_history_messages(context$assistant_content, map_role)
+  if (any(vapply(
+    messages,
+    function(message) identical(message$role, "system"),
+    logical(1)
+  ))) {
+    llm_request_builder_abort(
+      "Anthropic message history cannot contain the `system` role.",
+      builder_id = builder_id,
+      reason = "invalid_history_role"
+    )
+  }
+  messages[[length(messages) + 1L]] <- list(
+    role = map_role("user"),
+    content = user_content
+  )
+  optionals <- resolve_native_request_parameters(
+    context = context,
+    defaults = config$defaults,
+    declared_names = unique(c(
+      names(config$defaults %||% list()),
+      names(request_config$body %||% list()),
+      names(request_config$parameters %||% list())
+    )),
+    protected_names = c("model", "messages", "system", "input", "instructions"),
+    builder_id = builder_id
+  )
+  stream <- native_stream_value(optionals, context, config, builder_id)
+  optionals$stream <- NULL
+
+  body <- request_config$body %||% list()
+  body$model <- config$model$id
+  body$messages <- messages
+  system_text <- context$system_content %||% request_config$default_system
+  if (!is.null(system_text)) {
+    body$system <- system_text
+  }
+  body <- append_native_parameters(body, optionals)
+  body <- apply_native_stream(body, stream, config, builder_id)
+
+  new_native_request(
+    request_config,
+    config,
+    context,
+    body,
+    url,
+    stream,
+    builder_id
+  )
+}
+
+native_request_url <- function(request_config, context, builder_id) {
+  url <- context$api_url %||% request_config$url
+  if (!is.character(url) || length(url) != 1L || is.na(url) || !nzchar(url)) {
+    llm_request_builder_abort(
+      "The resolved interface does not define a request URL.",
+      builder_id = builder_id,
+      reason = "missing_url"
+    )
+  }
+  url
+}
+
+native_user_content <- function(context, builder_id) {
+  content <- build_user_content(context$trial_prompt, context$material)
+  if (!nzchar(content)) {
+    llm_request_builder_abort(
+      "At least one of `trial_prompt` or `material` must be provided.",
+      builder_id = builder_id,
+      reason = "missing_user_content"
+    )
+  }
+  content
+}
+
+native_role_mapper <- function(request_config, context) {
+  role_mapping <- request_config$role_mapping %||% list()
+  if (is.list(context$role_mapping) && length(context$role_mapping) > 0L) {
+    role_mapping <- context$role_mapping
+  }
+  function(role) role_mapping[[tolower(role)]] %||% role
+}
+
+native_stream_value <- function(optionals, context, config, builder_id) {
+  stream <- if (!is.null(context$stream)) {
+    isTRUE(context$stream)
+  } else if ("stream" %in% names(optionals)) {
+    isTRUE(optionals$stream)
+  } else {
+    FALSE
+  }
+  if (stream && !isTRUE(config$interface$streaming$supported)) {
+    llm_request_builder_abort(
+      "The selected interface does not support streaming.",
+      builder_id = builder_id,
+      reason = "unsupported_streaming"
+    )
+  }
+  stream
+}
+
+append_native_parameters <- function(body, parameters) {
+  for (name in names(parameters)) {
+    body[name] <- list(parameters[[name]])
+  }
+  body
+}
+
+apply_native_stream <- function(body, stream, config, builder_id) {
+  stream_parameter <- config$interface$streaming$request_parameter
+  if (!is.null(stream_parameter)) {
+    body[[stream_parameter]] <- NULL
+  }
+  if (!stream) {
+    return(body)
+  }
+  if (is.null(stream_parameter)) {
+    llm_request_builder_abort(
+      "The streaming request parameter is not configured.",
+      builder_id = builder_id,
+      reason = "missing_stream_parameter"
+    )
+  }
+  body[[stream_parameter]] <-
+    config$interface$streaming$request_value %||% TRUE
+  body
+}
+
+new_native_request <- function(request_config, config, context, body, url,
+                               stream, builder_id) {
+  headers <- apply_registry_auth(
+    request_config$headers %||% list(),
+    config$provider$auth,
+    context$api_key,
+    builder_id
+  )
+  structure(
+    list(
+      method = request_config$method %||% "POST",
+      url = url,
+      headers = headers,
+      body = body,
+      encoding = request_config$encoding %||% "json",
+      stream = stream,
+      transport_id = if (stream) {
+        config$interface$transport$stream
+      } else {
+        config$interface$transport$non_stream
+      },
+      timeout = context$timeout
+    ),
+    class = c("psylingllm_request", "list")
+  )
+}
+
+resolve_native_request_parameters <- function(context, defaults,
+                                              declared_names,
+                                              protected_names,
+                                              builder_id) {
+  dots <- context$provider_parameters %||% list()
+  validate_parameter_collection(dots, "Provider parameters", builder_id)
+  optionals <- context$optionals_value
+  if (!isTRUE(context$optionals_missing) && !is.null(optionals)) {
+    validate_parameter_collection(optionals, "Optional parameters", builder_id)
+  }
+
+  user_supplied <- !isTRUE(context$optionals_missing) || length(dots) > 0L
+  values <- if (!user_supplied) {
+    defaults %||% list()
+  } else if (is.null(optionals)) {
+    list()
+  } else {
+    optionals
+  }
+  values <- c(values, dots)
+
+  duplicate_names <- unique(names(values)[duplicated(names(values))])
+  if (length(duplicate_names) > 0L) {
+    warning(
+      sprintf(
+        "Duplicate provider parameter(s) use the last value: %s.",
+        paste(duplicate_names, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  values <- collapse_named_parameters(values)
+
+  protected <- intersect(names(values), protected_names)
+  if (length(protected) > 0L) {
+    llm_request_builder_abort(
+      sprintf(
+        "Provider parameters cannot replace protocol field(s): %s.",
+        paste(protected, collapse = ", ")
+      ),
+      builder_id = builder_id,
+      reason = "protected_parameter"
+    )
+  }
+
+  unknown <- setdiff(names(values), c(declared_names, "stream"))
+  if (length(unknown) > 0L) {
+    warning(
+      sprintf(
+        paste0(
+          "Provider parameter(s) are not documented by this Registry ",
+          "entry and will be sent unchanged: %s."
+        ),
+        paste(unknown, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  values
+}
+
+validate_parameter_collection <- function(value, label, builder_id) {
+  valid <- is.list(value) &&
+    (length(value) == 0L || (
+      !is.null(names(value)) && !anyNA(names(value)) &&
+      all(nzchar(names(value)))
+    ))
+  if (!valid) {
+    llm_request_builder_abort(
+      sprintf("%s must be a named list.", label),
+      builder_id = builder_id,
+      reason = "invalid_optionals"
+    )
+  }
+  invisible(TRUE)
+}
+
+collapse_named_parameters <- function(values) {
+  result <- list()
+  for (index in seq_along(values)) {
+    result[names(values)[[index]]] <- list(values[[index]])
+  }
+  result
+}
+
+apply_registry_auth <- function(headers, auth, api_key, builder_id) {
+  if (is.null(auth) || identical(auth$scheme, "none")) {
+    return(headers)
+  }
+  valid_key <- is.character(api_key) && length(api_key) == 1L &&
+    !is.na(api_key) && nzchar(api_key)
+  if (!valid_key) {
+    llm_request_builder_abort(
+      "The selected provider requires an API key.",
+      builder_id = builder_id,
+      reason = "missing_api_key"
+    )
+  }
+
+  if (identical(auth$scheme, "bearer")) {
+    header <- auth$header %||% "Authorization"
+    prefix <- auth$prefix %||% "Bearer "
+  } else if (identical(auth$scheme, "header")) {
+    header <- auth$header
+    prefix <- auth$prefix %||% ""
+  } else {
+    llm_request_builder_abort(
+      "The selected provider uses an unsupported authentication scheme.",
+      builder_id = builder_id,
+      reason = "unsupported_auth"
+    )
+  }
+  headers[[header]] <- paste0(prefix, api_key)
+  headers
 }
 
 build_legacy_template_request <- function(entry, context) {
@@ -178,6 +644,21 @@ build_legacy_template_request <- function(entry, context) {
     optionals_value = context$optionals_value,
     defaults = entry$input$optional_defaults %||% list()
   )
+  dots <- context$provider_parameters %||% list()
+  validate_parameter_collection(dots, "Provider parameters", "legacy_template_v1")
+  if (length(dots) > 0L) {
+    duplicate_names <- intersect(names(optionals), names(dots))
+    if (length(duplicate_names) > 0L) {
+      warning(
+        sprintf(
+          "Duplicate provider parameter(s) use the last value: %s.",
+          paste(unique(duplicate_names), collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+    optionals <- collapse_named_parameters(c(optionals, dots))
+  }
   body <- inject_optionals_anchor(body, optionals)
 
   stream <- if (!is.null(context$stream)) {

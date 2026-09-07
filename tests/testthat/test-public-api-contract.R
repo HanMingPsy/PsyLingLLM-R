@@ -83,7 +83,8 @@ test_that("critical public function signatures remain stable", {
       "role_mapping",
       "timeout",
       "return_raw",
-      "debug"
+      "debug",
+      "..."
     )
   )
   expect_identical(formals(llm_caller)$optionals, quote(expr = ))

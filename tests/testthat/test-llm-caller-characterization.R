@@ -220,6 +220,43 @@ test_that("named optionals replace rather than merge registry defaults", {
   expect_false("temperature" %in% names(captured_body))
 })
 
+test_that("legacy callers may add provider parameters through dots", {
+  captured_body <- NULL
+
+  local_mocked_bindings(
+    registry_resolve_compatibility_context = function(...) {
+      make_characterization_registry_context()
+    },
+    do_nonstream_request = function(url,
+                                    headers,
+                                    json_payload,
+                                    timeout,
+                                    debug) {
+      captured_body <<- jsonlite::fromJSON(
+        json_payload,
+        simplifyVector = FALSE
+      )
+      make_nonstream_response()
+    },
+    .package = "PsyLingLLM"
+  )
+
+  expect_warning(
+    llm_caller(
+      model_key = "fixture-model",
+      material = "Material",
+      optionals = list(top_p = 0.8),
+      top_p = 0.9,
+      future_nested = list(mode = "high")
+    ),
+    "last value"
+  )
+
+  expect_identical(captured_body$top_p, 0.9)
+  expect_identical(captured_body$future_nested, list(mode = "high"))
+  expect_false("temperature" %in% names(captured_body))
+})
+
 test_that("stream precedence favors the explicit argument", {
   transport_used <- NULL
 
@@ -334,7 +371,7 @@ test_that("status 599 remains a normalized transport error", {
 
   expect_identical(result$status, 599L)
   expect_identical(
-    result$error,
+    result$error[c("code", "message")],
     list(code = 599L, message = "Fixture timeout")
   )
 })

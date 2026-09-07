@@ -18,14 +18,14 @@ normalize_llm_result <- function(config,
     list(id = parsed_response$request_id)
   )
   raw_request <- if (isTRUE(return_raw)) {
-    list(
+    redact_llm_diagnostics(list(
       url = request$url,
       headers = request$headers,
       body = jsonlite::fromJSON(
         transport_response$request_payload,
         simplifyVector = FALSE
       )
-    )
+    ))
   } else {
     NULL
   }
@@ -42,14 +42,14 @@ normalize_llm_result <- function(config,
       thinking = parsed_response$reasoning,
       first_token_latency = transport_response$timing$first_token_latency,
       raw = if (isTRUE(return_raw)) {
-        list(
+        redact_llm_diagnostics(list(
           request = raw_request,
           response = list(stream = legacy_response)
-        )
+        ))
       } else {
         NULL
       },
-      error = parsed_response$error
+      error = redact_llm_diagnostics(parsed_response$error)
     ))
   }
 
@@ -63,18 +63,18 @@ normalize_llm_result <- function(config,
     answer = parsed_response$answer,
     thinking = parsed_response$reasoning,
     raw = if (isTRUE(return_raw)) {
-      list(
+      redact_llm_diagnostics(list(
         request = raw_request,
         response = list(non_stream = list(
           status = legacy_response$status,
           text = legacy_response$text,
           parsed = legacy_response$parsed
         ))
-      )
+      ))
     } else {
       NULL
     },
-    error = parsed_response$error
+    error = redact_llm_diagnostics(parsed_response$error)
   )
 }
 

@@ -18,7 +18,8 @@ llm_caller(
   role_mapping = NULL,
   timeout = 120,
   return_raw = FALSE,
-  debug = FALSE
+  debug = FALSE,
+  ...
 )
 }
 \arguments{
@@ -66,13 +67,19 @@ present; \code{NULL} → none; named list → user keys only (no merge).}
 in the result.}
 
 \item{debug}{Logical(1), default = \code{FALSE}. If \code{TRUE}, print diagnostic information.}
+
+\item{...}{Named provider-native request parameters. Names and values are
+sent unchanged. When the same name also appears in \code{optionals}, the
+value in \code{...} wins with a warning.}
 }
 \value{
 A list with fields: \code{status}, \code{interface}, \code{model_key}, \code{streaming},
   \code{usage}, \code{answer}, \code{thinking}, and optionally \code{raw} or \code{error}.
 }
 \description{
-Builds a request strictly from the model registry entry (no ad-hoc headers/body/messages).
+Builds a protocol request from the resolved model registry entry. Provider-native
+request parameters may be supplied through \code{optionals} or \code{...};
+protocol-owned request fields remain controlled by the selected interface.
 The user message is composed from \code{trial_prompt} and \code{material}. Optional
 \code{system_content} and \code{assistant_content} are inserted before the user message
 *only* if the registry template actually supports \code{"\${ROLE}"} in the messages shape.

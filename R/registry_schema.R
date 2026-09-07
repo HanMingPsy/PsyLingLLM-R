@@ -220,7 +220,7 @@ validate_registry_v2_interface <- function(interface, id, capability_ids) {
     allowed = c(
       "builder", "method", "encoding", "path", "url", "headers", "body",
       "fallback_body", "default_system", "role_mapping", "parameter_map",
-      "defaults"
+      "parameters", "defaults"
     ),
     domain = "interfaces",
     entry_id = id,
@@ -269,6 +269,17 @@ validate_registry_v2_interface <- function(interface, id, capability_ids) {
   registry_schema_assert_optional_string_map(
     request$parameter_map, "interfaces", id, "request.parameter_map"
   )
+  if (!identical(request$builder, "legacy_template_v1") &&
+      length(request$parameter_map %||% list()) > 0L) {
+    registry_schema_abort(
+      paste0(
+        "Native request parameters must use their upstream wire names; ",
+        "`parameter_map` is reserved for legacy compatibility."
+      ),
+      "interfaces", id, "request.parameter_map"
+    )
+  }
+  registry_schema_assert_parameter_help(request$parameters, id)
   if (!is.null(request$defaults)) {
     registry_schema_assert_overrides(
       request$defaults, request, "interfaces", id, "request.defaults"
@@ -675,15 +686,86 @@ registry_schema_assert_references <- function(value, known_ids, domain,
 registry_schema_assert_overrides <- function(defaults, request, domain,
                                              entry_id, field) {
   registry_schema_assert_named_list(defaults, domain, entry_id, field)
-  unknown <- setdiff(names(defaults), names(request$parameter_map))
-  if (length(unknown) > 0L) {
+  if (identical(request$builder, "legacy_template_v1")) {
+    unknown <- setdiff(names(defaults), names(request$parameter_map))
+    if (length(unknown) > 0L) {
+      registry_schema_abort(
+        sprintf(
+          "Defaults contain undeclared legacy parameter(s): %s.",
+          paste(unknown, collapse = ", ")
+        ),
+        domain, entry_id, field
+      )
+    }
+  } else {
+    protected <- intersect(
+      names(defaults),
+      c("model", "messages", "input", "system", "stream")
+    )
+    if (length(protected) > 0L) {
+      registry_schema_abort(
+        sprintf(
+          "Defaults cannot replace protocol field(s): %s.",
+          paste(protected, collapse = ", ")
+        ),
+        domain, entry_id, field
+      )
+    }
+  }
+  serializable <- tryCatch(
+    {
+      jsonlite::toJSON(defaults, auto_unbox = TRUE, null = "null", digits = NA)
+      TRUE
+    },
+    error = function(error) FALSE
+  )
+  if (!serializable) {
     registry_schema_abort(
-      sprintf(
-        "Defaults contain undeclared parameter(s): %s.",
-        paste(unknown, collapse = ", ")
-      ),
+      "Defaults must be representable as JSON values.",
       domain, entry_id, field
     )
+  }
+  invisible(TRUE)
+}
+
+registry_schema_assert_parameter_help <- function(parameters, interface_id) {
+  if (is.null(parameters)) {
+    return(invisible(TRUE))
+  }
+  registry_schema_assert_named_list(
+    parameters, "interfaces", interface_id, "request.parameters"
+  )
+  for (name in names(parameters)) {
+    item <- parameters[[name]]
+    field <- paste0("request.parameters.", name)
+    registry_schema_assert_fields(
+      item,
+      required = "description",
+      allowed = c("description", "docs_url", "deprecated", "replacement"),
+      domain = "interfaces",
+      entry_id = interface_id,
+      field = field
+    )
+    registry_schema_assert_string(
+      item$description, "interfaces", interface_id,
+      paste0(field, ".description")
+    )
+    registry_schema_assert_optional_string(
+      item$docs_url, "interfaces", interface_id,
+      paste0(field, ".docs_url")
+    )
+    registry_schema_assert_optional_string(
+      item$replacement, "interfaces", interface_id,
+      paste0(field, ".replacement")
+    )
+    if (!is.null(item$deprecated) &&
+        (!is.logical(item$deprecated) || length(item$deprecated) != 1L ||
+         is.na(item$deprecated))) {
+      registry_schema_abort(
+        "`deprecated` must be TRUE or FALSE.",
+        "interfaces", interface_id, paste0(field, ".deprecated")
+      )
+    }
   }
   invisible(TRUE)
 }

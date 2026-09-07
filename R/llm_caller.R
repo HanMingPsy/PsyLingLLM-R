@@ -1,6 +1,8 @@
 #' Call an LLM via the registry
 #'
-#' Builds a request strictly from the model registry entry (no ad-hoc headers/body/messages).
+#' Builds a protocol request from the resolved model registry entry. Provider-native
+#' request parameters may be supplied through \code{optionals} or \code{...};
+#' protocol-owned request fields remain controlled by the selected interface.
 #' The user message is composed from \code{trial_prompt} and \code{material}. Optional
 #' \code{system_content} and \code{assistant_content} are inserted before the user message
 #' *only* if the registry template actually supports \code{"\${ROLE}"} in the messages shape.
@@ -58,6 +60,9 @@
 #' @param return_raw Logical(1), default = \code{FALSE}. If \code{TRUE}, include raw request/response
 #'   in the result.
 #' @param debug Logical(1), default = \code{FALSE}. If \code{TRUE}, print diagnostic information.
+#' @param ... Named provider-native request parameters. Names and values are
+#'   sent unchanged. When the same name also appears in \code{optionals}, the
+#'   value in \code{...} wins with a warning.
 #'
 #' @return A list with fields: \code{status}, \code{interface}, \code{model_key}, \code{streaming},
 #'   \code{usage}, \code{answer}, \code{thinking}, and optionally \code{raw} or \code{error}.
@@ -76,7 +81,8 @@ llm_caller <- function(model_key,
                        role_mapping = NULL,
                        timeout = 120,
                        return_raw = FALSE,
-                       debug = FALSE) {
+                       debug = FALSE,
+                       ...) {
   if (!requireNamespace("jsonlite", quietly = TRUE) ||
       !requireNamespace("curl", quietly = TRUE)) {
     stop("Packages 'jsonlite' and 'curl' are required for llm_caller().")
@@ -106,7 +112,8 @@ llm_caller <- function(model_key,
     stream = stream,
     role_mapping = role_mapping,
     api_url = api_url,
-    timeout = timeout
+    timeout = timeout,
+    provider_parameters = list(...)
   )
   request <- build_llm_request(
     builder_id = config$interface$request$builder,

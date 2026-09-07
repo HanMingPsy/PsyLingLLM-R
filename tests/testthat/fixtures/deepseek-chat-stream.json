@@ -1,0 +1,44 @@
+[
+  {
+    "id": "deepseek_stream_fixture",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {"reasoning_content": "Think ", "role": "assistant"},
+        "finish_reason": null
+      }
+    ],
+    "usage": null
+  },
+  {
+    "id": "deepseek_stream_fixture",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {"reasoning_content": "first"},
+        "finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "deepseek_stream_fixture",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {"content": "Hello"},
+        "finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "deepseek_stream_fixture",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {"content": " world"},
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {"prompt_tokens": 8, "completion_tokens": 4, "total_tokens": 12}
+  }
+]

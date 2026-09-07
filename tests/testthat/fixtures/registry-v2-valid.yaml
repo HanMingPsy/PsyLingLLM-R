@@ -16,9 +16,6 @@ interfaces:
       method: POST
       encoding: json
       path: /v1/chat/completions
-      parameter_map:
-        temperature: temperature
-        max_tokens: max_tokens
     transport:
       non_stream: http_json
       stream: sse_json

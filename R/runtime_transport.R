@@ -289,6 +289,9 @@ parse_transport_json <- function(text) {
 }
 
 # Compatibility executors retained for existing internal mocks.
+#
+#' Minimal non-streaming POST (registry-strict headers)
+#' @keywords internal
 do_nonstream_request <- function(url,
                                  headers,
                                  json_payload,
@@ -323,9 +326,9 @@ do_nonstream_request <- function(url,
   parsed <- parse_transport_json(text)
   if (isTRUE(debug)) {
     cat("----- [DEBUG non-stream] headers -----\n")
-    print(headers)
+    print(redact_llm_diagnostics(headers))
     cat("----- [DEBUG non-stream] body -----\n")
-    cat(payload, "\n")
+    cat(diagnostic_request_payload(payload), "\n")
   }
 
   list(
@@ -338,6 +341,8 @@ do_nonstream_request <- function(url,
   )
 }
 
+#' Minimal SSE streaming POST (registry-strict headers)
+#' @keywords internal
 do_stream_request <- function(url,
                               headers,
                               json_payload,
@@ -356,9 +361,9 @@ do_stream_request <- function(url,
 
   if (isTRUE(debug)) {
     cat("----- [DEBUG stream] headers -----\n")
-    print(headers)
+    print(redact_llm_diagnostics(headers))
     cat("----- [DEBUG stream] body -----\n")
-    cat(payload, "\n")
+    cat(diagnostic_request_payload(payload), "\n")
   }
 
   response <- tryCatch(
