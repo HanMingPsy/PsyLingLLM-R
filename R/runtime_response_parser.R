@@ -209,6 +209,9 @@ parse_openai_chat_response <- function(response, config, streaming) {
   } else {
     parse_openai_chat_body(response$parsed)
   }
+  if (identical(config$capabilities$values$reasoning, FALSE)) {
+    values$reasoning <- NULL
+  }
   new_typed_parsed_response(response, streaming, values)
 }
 

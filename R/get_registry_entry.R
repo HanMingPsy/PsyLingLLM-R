@@ -215,7 +215,19 @@ registry_find_legacy_entry <- function(bundle, resolved) {
 
 registry_project_resolved_entry <- function(resolved) {
   request <- resolved$interface$request
+  headers <- request$headers %||% list()
+  auth <- resolved$provider$auth %||% list(scheme = "none")
+  if (identical(auth$scheme, "bearer")) {
+    header <- auth$header %||% "Authorization"
+    headers[[header]] <- paste0(auth$prefix %||% "Bearer ", "${API_KEY}")
+  } else if (identical(auth$scheme, "header")) {
+    headers[[auth$header]] <- paste0(auth$prefix %||% "", "${API_KEY}")
+  }
   selectors <- resolved$interface$response$selectors %||% list()
+  if (identical(resolved$capabilities$values$reasoning, FALSE)) {
+    selectors$reasoning <- NULL
+    selectors$reasoning_delta <- NULL
+  }
   token_usage_path <- list(
     prompt = registry_public_selector(selectors$usage_prompt),
     completion = registry_public_selector(selectors$usage_completion)
@@ -226,12 +238,13 @@ registry_project_resolved_entry <- function(resolved) {
 
   list(
     model_key = resolved$model$key,
-    interface = resolved$interface$id,
+    interface = resolved$interface$metadata$legacy_interface %||%
+      resolved$interface$id,
     provider = tolower(resolved$provider$type),
     reasoning = isTRUE(resolved$capabilities$values$reasoning),
     input = list(
       default_url = request$url %||% NULL,
-      headers = request$headers %||% list(),
+      headers = headers,
       body = request$body %||% list(),
       fallback_body = request$fallback_body %||% NULL,
       optional_defaults = resolved$defaults,
@@ -255,8 +268,115 @@ registry_project_resolved_entry <- function(resolved) {
       ),
       param_name = resolved$interface$streaming$request_parameter %||% NULL
     ),
-    interfaces = resolved$model$available_interfaces
+    interfaces = resolved$model$metadata$legacy_interfaces %||%
+      resolved$model$available_interfaces
   )
+}
+
+registry_project_v2_flat <- function(registry) {
+  validate_registry_schema(registry)
+  projected <- list()
+
+  for (model_key in names(registry$models)) {
+    model <- registry$models[[model_key]]
+    labels <- model$metadata$legacy_interfaces %||% model$interfaces
+    entries <- list()
+
+    for (index in seq_along(model$interfaces)) {
+      interface_id <- model$interfaces[[index]]
+      label <- labels[[index]] %||% interface_id
+      resolved <- resolve_registry_entry(
+        model_key,
+        generation_interface = interface_id,
+        registry = registry
+      )
+      entry <- registry_project_resolved_entry(resolved)
+      entry$model_key <- NULL
+      entry$interface <- NULL
+      entry$interfaces <- NULL
+      if (isTRUE(resolved$interface$metadata$legacy_streaming_enabled)) {
+        entry$input$optional_defaults <- c(
+          list(stream = TRUE),
+          entry$input$optional_defaults
+        )
+      }
+      entry$input$optional_defaults <- wrap_typed_defaults(
+        entry$input$optional_defaults
+      )
+
+      if (identical(resolved$interface$request$builder, "openai_chat")) {
+        entry$input$body <- list(
+          model = resolved$model$id,
+          messages = list(list(role = "${ROLE}", content = "${CONTENT}")),
+          "${PARAMETER}" = "${VALUE}"
+        )
+        entry$input$fallback_body <- list(
+          model = resolved$model$id,
+          messages = list(
+            list(
+              role = "system",
+              content = resolved$interface$request$default_system
+            ),
+            list(role = "user", content = "${CONTENT}")
+          ),
+          stream = FALSE
+        )
+      }
+
+      entry$output$respond_path <- registry_legacy_selector_string(
+        resolved$interface$response$selectors$answer
+      )
+      entry$output$thinking_path <- registry_legacy_selector_string(
+        resolved$interface$response$selectors$reasoning
+      )
+      entry$output$id_path <- registry_legacy_selector_string(
+        resolved$interface$response$selectors$request_id
+      )
+      entry$output$object_path <- registry_legacy_selector_string(
+        resolved$interface$response$selectors$object
+      )
+      usage <- list(
+        prompt = registry_legacy_selector_string(
+          resolved$interface$response$selectors$usage_prompt
+        ),
+        completion = registry_legacy_selector_string(
+          resolved$interface$response$selectors$usage_completion
+        )
+      )
+      entry$output$token_usage_path <- if (
+        all(vapply(usage, is.null, logical(1)))
+      ) NULL else usage
+      entry$streaming$delta_path <- registry_legacy_selector_string(
+        resolved$interface$response$selectors$answer_delta
+      )
+      entry$streaming$thinking_delta_path <- registry_legacy_selector_string(
+        resolved$interface$response$selectors$reasoning_delta
+      )
+      if (identical(resolved$capabilities$values$reasoning, FALSE)) {
+        entry$output$thinking_path <- NULL
+        entry$streaming$thinking_delta_path <- NULL
+      }
+      entry$streaming$require_accept_header <- FALSE
+      entry$streaming$param_name <- NULL
+      entries[[label]] <- entry
+    }
+    projected[[model_key]] <- entries
+  }
+
+  projected
+}
+
+registry_legacy_selector_string <- function(selector) {
+  if (is.null(selector)) {
+    return(NULL)
+  }
+  selector <- as.character(selector)
+  if ("*" %in% selector) {
+    path <- paste(ifelse(selector == "*", "", selector), collapse = ".")
+    return(sprintf('list("%s")', path))
+  }
+  quoted <- paste(sprintf('"%s"', selector), collapse = ",")
+  sprintf("list(%s)", quoted)
 }
 
 registry_public_selector <- function(selector) {

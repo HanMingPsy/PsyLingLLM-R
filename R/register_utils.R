@@ -206,13 +206,18 @@ load_registry <- function() {
     return(NULL)
   }
 
-  tryCatch(
-    registry_read_source(
+  tryCatch({
+    registry <- registry_read_source(
       path,
       source = "system",
       missing_ok = FALSE,
       empty_as_list = FALSE
-    ),
+    )
+    if (!is.null(registry) && registry_source_version(registry) == 2L) {
+      registry <- registry_project_v2_flat(registry)
+    }
+    registry
+  },
     error = function(e) {
       warning("Failed to parse registry YAML: ", conditionMessage(e))
       NULL

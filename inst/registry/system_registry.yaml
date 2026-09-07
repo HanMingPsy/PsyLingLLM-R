@@ -1,170 +1,141 @@
-# =====================
-# Model: deepseek-chat
+schema_version: 2
 
-deepseek-chat:
-  chat:
-    provider: official
-    reasoning: no
-    input:
-      default_url: https://api.deepseek.com/chat/completions
-      headers:
-        Content-Type: application/json
-        Authorization: Bearer ${API_KEY}
-      body:
-        model: deepseek-chat
-        messages:
-        - role: ${ROLE}
-          content: ${CONTENT}
-        ${PARAMETER}: ${VALUE}
-      fallback_body:
-        model: deepseek-chat
-        messages:
-        - role: system
-          content: You are a helpful assistant.
-        - role: user
-          content: ${CONTENT}
-        stream: no
-      optional_defaults:
-        stream:
-          value: yes
-          type: logical
-        max_tokens:
-          value: 1024.0
-          type: numeric
-        temperature:
-          value: 0.7
-          type: numeric
+providers:
+  deepseek:
+    type: official
+    base_url: https://api.deepseek.com
+    auth:
+      scheme: bearer
+      env_var: DEEPSEEK_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
+      verified_on: "2026-09-07"
+  openai:
+    type: official
+    base_url: https://api.openai.com/v1
+    auth:
+      scheme: bearer
+      env_var: OPENAI_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://platform.openai.com/docs/api-reference
+      verified_on: "2026-09-07"
+
+interfaces:
+  deepseek-chat-v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
       default_system: You are a helpful assistant.
       role_mapping:
         system: system
         user: user
         assistant: assistant
-    output:
-      respond_path: list("choices..message.content")
-      thinking_path: ~
-      id_path: list("id")
-      object_path: list("object")
-      token_usage_path:
-        prompt: list("usage","prompt_tokens")
-        completion: list("usage","completion_tokens")
-    streaming:
-      enabled: yes
-      delta_path: list("choices..delta.content")
-      require_accept_header: no
-
-# =====================
-# Model: deepseek-reasoner
-
-deepseek-reasoner:
-  chat:
-    provider: official
-    reasoning: yes
-    input:
-      default_url: https://api.deepseek.com/chat/completions
-      headers:
-        Content-Type: application/json
-        Authorization: Bearer ${API_KEY}
-      body:
-        model: deepseek-reasoner
-        messages:
-        - role: ${ROLE}
-          content: ${CONTENT}
-        ${PARAMETER}: ${VALUE}
-      fallback_body:
-        model: deepseek-reasoner
-        messages:
-        - role: system
-          content: You are a helpful assistant.
-        - role: user
-          content: ${CONTENT}
-        stream: no
-      optional_defaults:
-        stream:
-          value: yes
-          type: logical
+      parameters:
         max_tokens:
-          value: 1024.0
-          type: numeric
+          description: Native DeepSeek Chat output-token limit.
+          docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
         temperature:
-          value: 0.7
-          type: numeric
+          description: Native DeepSeek sampling temperature.
+          docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
+        thinking:
+          description: Native DeepSeek thinking-mode configuration.
+          docs_url: https://api-docs.deepseek.com/guides/thinking_mode/
+        reasoning_effort:
+          description: Native DeepSeek reasoning-effort control.
+          docs_url: https://api-docs.deepseek.com/guides/thinking_mode/
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+      selectors:
+        answer: [choices, "*", message, content]
+        reasoning: [choices, "*", message, reasoning_content]
+        request_id: [id]
+        object: [object]
+        usage_prompt: [usage, prompt_tokens]
+        usage_completion: [usage, completion_tokens]
+        answer_delta: [choices, "*", delta, content]
+        reasoning_delta: [choices, "*", delta, reasoning_content]
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_tokens: 1024
+      temperature: 0.7
+    metadata:
+      legacy_interface: chat
+      legacy_streaming_enabled: true
+      docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
+      verified_on: "2026-09-07"
+
+  openai-chat-completions-v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
       default_system: You are a helpful assistant.
       role_mapping:
         system: system
         user: user
         assistant: assistant
-    output:
-      respond_path: list("choices..message.content")
-      thinking_path: list("choices..message.reasoning_content")
-      id_path: list("id")
-      object_path: list("object")
-      token_usage_path:
-        prompt: list("usage","prompt_tokens")
-        completion: list("usage","completion_tokens")
-    streaming:
-      enabled: yes
-      delta_path: list("choices..delta.content")
-      thinking_delta_path: list("choices..delta.reasoning_content")
-      require_accept_header: no
-
-# =====================
-# Model: gpt-4o
-
-gpt-4o:
-  chat:
-    provider: official
-    reasoning: no
-    input:
-      default_url: https://api.openai.com/v1/chat/completions
-      headers:
-        Content-Type: application/json
-        Authorization: Bearer ${API_KEY}
-      body:
-        model: gpt-4o
-        messages:
-        - role: ${ROLE}
-          content: ${CONTENT}
-        ${PARAMETER}: ${VALUE}
-      fallback_body:
-        model: gpt-4o
-        messages:
-        - role: system
-          content: You are a helpful assistant.
-        - role: user
-          content: ${CONTENT}
-        stream: no
-      optional_defaults:
-        stream:
-          value: yes
-          type: logical
+      parameters:
         max_tokens:
-          value: 1024.0
-          type: numeric
+          description: Legacy-compatible Chat Completions output-token limit.
+          docs_url: https://platform.openai.com/docs/api-reference/chat/create
+          deprecated: true
+          replacement: max_completion_tokens
+        max_completion_tokens:
+          description: Native Chat Completions output-token limit.
+          docs_url: https://platform.openai.com/docs/api-reference/chat/create
         temperature:
-          value: 0.7
-          type: numeric
-      default_system: You are a helpful assistant.
-      role_mapping:
-        system: system
-        user: user
-        assistant: assistant
-    output:
-      respond_path: list("choices..message.content")
-      thinking_path: ~
-      id_path: list("id")
-      object_path: list("object")
-      token_usage_path:
-        prompt: list("usage","prompt_tokens")
-        completion: list("usage","completion_tokens")
+          description: Native Chat Completions sampling temperature.
+          docs_url: https://platform.openai.com/docs/api-reference/chat/create
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+      selectors:
+        answer: [choices, "*", message, content]
+        request_id: [id]
+        object: [object]
+        usage_prompt: [usage, prompt_tokens]
+        usage_completion: [usage, completion_tokens]
+        answer_delta: [choices, "*", delta, content]
     streaming:
-      enabled: yes
-      delta_path: list("choices..delta.content")
-      require_accept_header: no
-  responses:
-    provider: official
-    reasoning: no
-    input:
-      default_url: https://api.openai.com/v1/responses
+      supported: true
+      request_parameter: stream
+      request_value: true
+    defaults:
+      max_tokens: 1024
+      temperature: 0.7
+    metadata:
+      legacy_interface: chat
+      legacy_streaming_enabled: true
+      docs_url: https://platform.openai.com/docs/api-reference/chat/create
+      verified_on: "2026-09-07"
+
+  openai-responses-legacy-v1:
+    protocol: legacy_v1
+    request:
+      builder: legacy_template_v1
+      method: POST
+      encoding: json
+      url: https://api.openai.com/v1/responses
       headers:
         Content-Type: application/json
         Authorization: Bearer ${API_KEY}
@@ -175,29 +146,79 @@ gpt-4o:
       fallback_body:
         model: gpt-4o
         input: ${CONTENT}
-        stream: no
-      optional_defaults:
-        stream:
-          value: yes
-          type: logical
-        max_output_tokens:
-          value: 1024.0
-          type: numeric
-        temperature:
-          value: 0.7
-          type: numeric
-      default_system: ~
+        stream: false
       role_mapping:
         system: system
         user: user
         assistant: assistant
-    output:
-      respond_path: list("output..content..text")
-      thinking_path: ~
-      id_path: list("id")
-      object_path: list("object")
+      parameter_map:
+        stream: stream
+        max_output_tokens: max_output_tokens
+        temperature: temperature
+      defaults:
+        max_output_tokens: 1024
+        temperature: 0.7
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: legacy_paths_v1
+      selectors:
+        answer: [output, "*", content, "*", text]
+        request_id: [id]
+        object: [object]
+        answer_delta: [response, output, "*", content, "*", text]
     streaming:
-      enabled: yes
-      delta_path: list("response.output..content..text")
-      require_accept_header: no
+      supported: true
+      request_parameter: stream
+      request_value: true
+    metadata:
+      legacy_interface: responses
+      legacy_streaming_enabled: true
+      docs_url: https://platform.openai.com/docs/api-reference/responses
+      verified_on: "2026-09-07"
 
+capabilities:
+  reasoning:
+    value_type: logical
+    description: The model may expose reasoning separately from answer text.
+    default: false
+  streaming:
+    value_type: logical
+    description: The model interface supports streamed responses.
+    default: false
+
+models:
+  deepseek-chat:
+    provider: deepseek
+    model_id: deepseek-chat
+    interfaces:
+      - deepseek-chat-v1
+    default_interface: deepseek-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      legacy_interfaces: [chat]
+  deepseek-reasoner:
+    provider: deepseek
+    model_id: deepseek-reasoner
+    interfaces:
+      - deepseek-chat-v1
+    default_interface: deepseek-chat-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      legacy_interfaces: [chat]
+  gpt-4o:
+    provider: openai
+    model_id: gpt-4o
+    interfaces:
+      - openai-chat-completions-v1
+      - openai-responses-legacy-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      legacy_interfaces: [chat, responses]

@@ -179,7 +179,7 @@ build_openai_chat_request <- function(config, context) {
   } else if ("stream" %in% names(optionals)) {
     isTRUE(optionals$stream)
   } else {
-    FALSE
+    isTRUE(config$interface$metadata$legacy_streaming_enabled)
   }
   optionals$stream <- NULL
 
@@ -382,7 +382,7 @@ native_stream_value <- function(optionals, context, config, builder_id) {
   } else if ("stream" %in% names(optionals)) {
     isTRUE(optionals$stream)
   } else {
-    FALSE
+    isTRUE(config$interface$metadata$legacy_streaming_enabled)
   }
   if (stream && !isTRUE(config$interface$streaming$supported)) {
     llm_request_builder_abort(

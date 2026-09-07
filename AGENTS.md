@@ -44,8 +44,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 6 complete — Phase 7 production Registry migration
-awaiting approval**.
+Current phase: **Phase 7 complete in the working tree — Phase 8 CRAN release
+validation awaiting review and approval**.
 
 Phase 1 delivered:
 
@@ -80,11 +80,10 @@ The Phase 2 source tarball passed `R CMD check` with `Status: OK`, and the full
 test suite passed without credentials or real API requests.
 
 Phases 3 and 4 subsequently introduced tested request-builder, transport,
-response-parser, result-normalization, and orchestration boundaries. The
-current working tree contains uncommitted native OpenAI Chat/DeepSeek contract
-work that must be revised before it is eligible for commit: its parameter map,
-complete parameter-rule requirement, and rejection of undeclared parameters
-conflict with the provider-native parameter policy below.
+response-parser, result-normalization, and orchestration boundaries. Phase 6
+then delivered native OpenAI Chat, DeepSeek-compatible Chat, OpenAI Responses,
+and Anthropic Messages protocol contracts together with provider-native
+parameter forwarding, structured provider errors, and secret redaction.
 
 The following boundaries remain in force as compatibility guarantees:
 
@@ -93,7 +92,8 @@ The following boundaries remain in force as compatibility guarantees:
   provider-native request parameters; this is an additive public signature
   change and must have dedicated compatibility tests and documentation.
 - Do not modify or refactor experiment functions during the Registry v2 runtime migration.
-- Do not migrate `inst/registry/system_registry.yaml`.
+- Keep the migrated `inst/registry/system_registry.yaml` as one validated v2
+  bundle; do not split it into multiple production files during Phase 8.
 - Do not automatically modify user registry files.
 - Do not combine request-builder, transport, parser, caller, or registration
   extraction in one change.
@@ -109,8 +109,7 @@ Phase 2 intentionally retains two explicit constraints:
   execution instead of being silently ignored. This safety tightening prevents
   an experiment from unexpectedly falling back to another registry source.
 
-The Phase 6 readiness gate has now been implemented in the working tree in
-this order:
+The Phase 6 readiness gate was implemented in this order:
 
 1. Redact credentials and secret-like values from `return_raw`, debug output,
    warnings, conditions, snapshots, and logs without altering the actual
@@ -130,13 +129,35 @@ this order:
    wire parameter names and nested structures. Run focused tests, the complete
    offline suite, `R CMD build`, and `R CMD check` before requesting approval.
 
-The complete offline suite and a built-source `R CMD check --no-manual` pass
-with `Status: OK`. Network access and real credentials were not used. Phase 6
-contains protocol-scoped network-free contracts for OpenAI Chat, DeepSeek
-Chat, OpenAI Responses, and Anthropic Messages. Real-provider smoke tests
-remain deferred until the user explicitly supplies credentials and approves
-their use. Do not start production Registry YAML migration without separate
-approval.
+Phase 7 migrated the bundled system registry to a single Registry v2 bundle.
+DeepSeek Chat and DeepSeek Reasoner share one native OpenAI Chat-compatible
+interface; GPT-4o Chat uses its native Chat component. The historical GPT-4o
+Responses entry remains on the `legacy_template_v1` compatibility component
+inside the v2 bundle because changing its historical string-input request
+shape would be a behavior change. The native OpenAI Responses component remains
+available for new, explicitly configured v2 entries.
+
+`load_registry()` continues to expose its documented flat v1-compatible public
+shape through a read-only projection. Internal runtime resolution consumes the
+strict v2 bundle directly. Registry v1 user files remain readable, retain
+whole-entry precedence over the bundled v2 model, and are never rewritten.
+Compatibility metadata preserves legacy interface labels and the bundled
+default-stream behavior without treating `stream` as a provider parameter
+default. Reasoning extraction is capability-gated so models that do not declare
+reasoning retain their historical result behavior even when they share a typed
+protocol parser with reasoning-capable models.
+
+Phase 7 adds an exact previous-system-registry v1 fixture plus network-free
+tests covering schema validation, all bundled model/interface resolutions,
+public projection equivalence, all three `optionals` states, request
+equivalence, v1 user precedence, and the complete non-stream caller pipeline
+for every bundled interface. The complete offline suite passes, and the built
+source tarball passes `R CMD check --no-manual` with `Status: OK` under the
+Windows `C` locale. Network access and real credentials were not used.
+
+Real-provider smoke tests remain deferred until the user explicitly supplies
+credentials and approves their use. Do not start Phase 8 release metadata or
+documentation changes before the Phase 7 diff is reviewed and approved.
 
 ## CRAN Submission Standard
 
