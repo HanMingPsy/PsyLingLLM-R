@@ -1,10 +1,20 @@
 Package: PsyLingLLM
 Type: Package
 Title: Tools for Psycholinguistic Experiments with Large Language Models
-Version: 0.3.0
-Author: Han Ming
-Maintainer: Han Ming <hanmingpsy@gmail.com>
-Description: A toolkit to design, run, and analyze psycholinguistic, psychological, and educational experiments with large language models in R.
+Version: 0.4.0
+Authors@R: person(
+    given = "Han",
+    family = "Ming",
+    email = "hanmingpsy@gmail.com",
+    role = c("aut", "cre")
+  )
+Description: Provides tools for designing and running controlled
+    psycholinguistic, psychological, cognitive, and educational experiments
+    with large language models. Registry-based configuration separates models,
+    providers, and application programming interfaces so that compatible
+    services can share experimental designs. Functions support randomized and
+    factorial trials, multi-turn conversations, response and reasoning capture,
+    timing and token measurements, and structured result export.
 Depends: R (>= 4.0)
 Imports:
     curl,
@@ -25,7 +35,10 @@ Suggests:
     testthat (>= 3.0.0),
     withr
 License: MIT + file LICENSE
+URL: https://github.com/HanMingPsy/PsyLingLLM-R
+BugReports: https://github.com/HanMingPsy/PsyLingLLM-R/issues
 Encoding: UTF-8
+Language: en-US
 RoxygenNote: 7.3.2
 Config/testthat/edition: 3
 

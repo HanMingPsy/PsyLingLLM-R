@@ -44,8 +44,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 7 complete in the working tree — Phase 8 CRAN release
-validation awaiting review and approval**.
+Current phase: **Phase 8 local release validation in progress — external
+R-devel and multi-platform checks awaiting approval**.
 
 Phase 1 delivered:
 
@@ -156,8 +156,35 @@ source tarball passes `R CMD check --no-manual` with `Status: OK` under the
 Windows `C` locale. Network access and real credentials were not used.
 
 Real-provider smoke tests remain deferred until the user explicitly supplies
-credentials and approves their use. Do not start Phase 8 release metadata or
-documentation changes before the Phase 7 diff is reviewed and approved.
+credentials and approves their use. Phase 7 was reviewed and committed before
+Phase 8 release metadata and documentation work began.
+
+Phase 8 local release preparation has now:
+
+1. Raised the package version to 0.4.0 and added `Authors@R`, `URL`,
+   `BugReports`, `Language`, and an expanded CRAN-facing description.
+2. Added `NEWS.md` and corrected only release-relevant README content,
+   including Registry v2 behavior, role mapping, Markdown structure, and
+   obvious typographical errors.
+3. Regenerated documentation with roxygen2 7.3.2; no generated `NAMESPACE` or
+   `.Rd` changes were required.
+4. Passed the complete network-free test suite and built the source tarball.
+5. Verified that the tarball excludes development plans, architecture backups,
+   check directories, histories, session data, and credentials.
+6. Passed independent URL validation for the repository and issue tracker.
+7. Passed local `R CMD check --as-cran --no-manual` on the final source tarball
+   with `Status: OK` when CRAN incoming remote checks were disabled. A separate
+   incoming-check run completed every package check and reported only the
+   expected new-submission NOTE plus one transient GitHub connection reset;
+   the same URLs passed the dedicated URL checker.
+
+The full local `--as-cran` run reached all package checks successfully, but PDF
+manual generation was blocked by the host MiKTeX installation lacking
+`stringenc.sty`; Rd validation and the HTML manual passed. This is an external
+toolchain limitation, not evidence of an Rd defect. Phase 8 is not complete
+until the final tarball is checked with R-devel/Win-builder and a practical
+multi-platform service. Real-provider smoke tests remain separately opt-in and
+require user-provided credentials.
 
 ## CRAN Submission Standard
 

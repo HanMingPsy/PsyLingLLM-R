@@ -1,9 +1,11 @@
-**PsyLingLLM** is an experimental toolkit for studying **human-like language processing** with Large Language Models (LLMs) in **R**.  
+# PsyLingLLM
+
+PsyLingLLM is an experimental toolkit for studying **human-like language processing** with Large Language Models (LLMs) in **R**.
 It provides functions to **design, execute, and analyze** psycholinguistic, psychological, and educational experiments using LLMs.
 
----
-- v0.3 Update: **New Registry System**<br>
-The latest release introduces a comprehensive registry system that significantly streamlines model configuration and experimental setup. This architecture enhances reproducibility while maintaining flexibility across diverse LLM providers.<br>
+***
+- v0.4 Update: **Registry v2 Runtime Architecture**<br>
+The 0.4 release separates model resolution, request construction, transport, and response parsing while preserving the existing experiment APIs and Registry v1 user files.<br>
 
     **YAML-Based Configuration Registry**<br>
     Structured Experiment Definitions: All model API parameters and interface specifications stored in standardized YAML format
@@ -17,19 +19,19 @@ The latest release introduces a comprehensive registry system that significantly
     Standardized Interfaces: Unified access patterns across different API specifications
     Rapid Deployment: Quick-start configurations requiring minimal customization
 
-    **Automatic Regist System**<br>
+    **Automatic Registration System**<br>
     Automated Registration Pipeline: A streamlined workflow systematically analyzes API endpoints, standardizes request templates, and generates optimized configuration files through intelligent path detection and structural inference.<br>
     Interactive Preview Interface: Prior to finalization, researchers can comprehensively review all details through a structured preview that highlights potential inconsistencies or missing elements.<br>
 
-    Link：Prat II Register system
----
+    See Part II for the registry system.
+***
 
 ## 📖 Background
 
 LLMs are increasingly used to study **human language processing**, **cognitive science**, and **education**.  
 Yet, designing controlled experiments with LLMs often involves substantial work: creating structured prompts, randomizing trials, and collecting results consistently.
 
-**PsyLingLLM**simplifies this process by providing an **R package** that seamlessly integrates:
+**PsyLingLLM** simplifies this process by providing an **R package** that seamlessly integrates:
 
 - Flexible experiment designs: `factorial`, `repeated trials`, and `conversation-based` paradigms
 - Automated API interactions with multiple LLM providers
@@ -38,7 +40,7 @@ Yet, designing controlled experiments with LLMs often involves substantial work:
 
 This enables researchers to focus on theory and analysis rather than experiment logistics.
 
----
+***
 
 ## 📥 Installation
 
@@ -51,8 +53,8 @@ install.packages("devtools")
 # Install PsyLingLLM from the GitHub repository
 devtools::install_github("HanMingPsy/PsyLingLLM-R")
 ```
-Verification
-```
+Verification:
+
 After installation, verify successful installation by loading the package and checking its version:
 
 ```r
@@ -60,7 +62,7 @@ library(PsyLingLLM)
 packageVersion("PsyLingLLM")
 ```
 
----
+***
 # 📚 Features
 
 - ✅ **Registry-first Reproducibility**
@@ -87,7 +89,7 @@ packageVersion("PsyLingLLM")
       Full UTF-8 and Excel/CSV compatibility ensures smooth multilingual data handling,
       Structured logging and schema-standardized outputs allow direct cross-model comparison — turning raw model runs into analyzable experimental data.
 
----
+***
 
 # 📑 Table of Contents
 
@@ -106,10 +108,10 @@ packageVersion("PsyLingLLM")
 - [10. Configuration Management](#1-single-trial-experiment)
 
 
----
+***
 
 
-# Prat 1 Experiment System
+# Part I: Experiment System
 
 
 
@@ -135,7 +137,7 @@ To run any experiment, you need to prepare the following three items **from your
       Self-hosted models: Local server address (e.g., `http://localhost:8080/v1/chat/completions`)<br>
  **Note**: Registered official providers are automatically configured—no URL specification required.
 
-⚠️ **Important**: Never expose your API keys in publicly accessible code. For enhanced security, consider store credentials as variables instead of save them in scripts. e.g.:
+⚠️ **Important**: Never expose API keys in publicly accessible code. Store credentials in environment variables instead of saving them in scripts. For example:
 
 ```r
         # Use variables
@@ -149,7 +151,7 @@ Or
         api_key = Sys.getenv("deepseek_api_key")
 ```
 
----
+***
 
 ## 1. Single-Trial Experiment
 `trial_experiment()` represents the most fundamental paradigm for testing LLM behavior, analogous to presenting one stimulus to a human participant in psychological research. 
@@ -185,7 +187,7 @@ Or
    
    print(result$Response)
 ```
----
+***
 
 ### 🖥️ Console Output & File Management
 
@@ -271,10 +273,10 @@ and includes comprehensive diagnostic metadata and trial execution states:
 **Timestamp** → timestamp of when the trial was completed.  
 **RequestID** → Unique identifier assigned to the request for reproducibility and traceability.  
 
-Leran more in Schema section
+Learn more in the schema section.
 
 
----
+***
 
 
 ## ⚙️Full Function Arguments: `trial_experiment()`
@@ -334,7 +336,7 @@ Leran more in Schema section
   >
   >  Link:Learn more in Data Handling section
 #### Experiment Control Parameters
-- **`repeats`** → The repeats parameter controls how many times the entire experiment dataset (all rows in data) should be duplicated. Optional (defualt = 1). 
+- **`repeats`** → The repeats parameter controls how many times the entire experiment dataset (all rows in data) should be duplicated. Optional (default = 1).
    >How it works
    ```r
          df <- df[rep(seq_len(nrow(df)), repeats), , drop = FALSE]
@@ -417,8 +419,7 @@ Leran more in Schema section
    >
 - **`role_mapping`** → Optional mapping of abstract conversation roles (system, user, assistant) to the provider’s native role labels defined in the model’s API schema.<br>
    >The `role_mapping` parameter specifies how PsyLingLLM translates between its internal role names and the role identifiers expected by your LLM provider’s API.<br>
-   >In most cases, you **do not need to specify** this argument manually —PsyLingLLM automatically uses the default role mapping defined in the model’s **registry entry**.<br>
-   >You may optionally supply a custom mapping to **override** the registry defaults, forcing PsyLingLLM to use your specified `role_mapping` instead.<br>
+   >By default, PsyLingLLM preserves the abstract role names. Supply this argument only when an interface requires different provider role labels.<br>
    >**Example:**<br>
    ```r
          role_mapping = list(
@@ -429,26 +430,30 @@ Leran more in Schema section
    ```
    >_Note_: If your custom mapping does not match the provider’s expected role labels, the request may fail or certain message parts (e.g., `system` or `assistant` prompts) may be ignored by the model.
    >
-- **`optionals`** → Optional named list controlling optional parameters for the LLM request (**except** stream).<br>
-   >The `optionals` argument allows you to specify **user-provided optional fields** that may be included in the request body if supported by the model registry.<br>
+- **`optionals`** → Optional named list of provider-native request parameters.<br>
+   >Parameter names and values are sent unchanged. Registry parameter entries provide defaults and help text; they are not a cross-provider translation layer. Undeclared parameters produce a warning and are still forwarded so that the provider remains authoritative.<br>
    >PsyLingLLM uses a tri-state logic to handle these optionals:<br>
    >`Missing (not supplied)` → PsyLingLLM uses the registry defaults (input.optional_defaults) if present; otherwise, no optional parameters are sent.<br>
    >`NULL` → Do not send any optional parameters; the API defaults are used.<br>
    >`Named list` → Only the keys you provide are injected into the request; registry defaults are not merged.<br>
+   >An explicit `stream` argument takes precedence over `optionals$stream` and the registry streaming default.<br>
    >
-   >**OpenAI Common Optionals**<br>
-      `max_tokens`	Controls the length of the model’s response. Useful for experiments where you want consistent response size or to avoid overly long outputs that may bias response times or token-based measures.<br>
-      `temperature`	Sampling temperature (0–2); Higher temperature increases variability in responses, useful for studying model creativity or variability in judgments. Low temperature ensures deterministic, reproducible outputs for controlled experiments.<br>
-      `top_p`	Nucleus sampling probability (0–1).Together with temperature, controls response diversity. Useful in experiments examining model uncertainty or probabilistic decision-making.<br>
-      `presence_penalty`	Penalizes new tokens based on presence in prior text (−2.0–2.0).Reduces repetitive responses. Useful in multi-turn experiments where repeated wording could confound response evaluation.<br>
-      `frequency_penalty`	Penalizes new tokens based on frequency in prior text (−2.0–2.0).Encourages variety in responses. Helps experimental designs where lexical diversity is relevant, e.g., studying sentence generation or semantic novelty.<br>
+   >Use the exact parameter names documented for the selected provider and interface. The same parameters can also be supplied directly through trailing `...`; when a name appears in both forms, the value in `...` wins with a warning.<br>
    >
-   >**Example:**<br>
+   >**Examples:**<br>
    ```r
         optionals = list(
-          max_tokens = 150,
+          max_completion_tokens = 150,
           temperature = 0.7,
           top_p = 0.9
+        )
+
+        llm_caller(
+          model_key = "gpt-4o",
+          generation_interface = "chat",
+          material = "Example",
+          optionals = NULL,
+          max_completion_tokens = 150
         )
    ```
    >
@@ -506,7 +511,7 @@ Leran more in Schema section
    >This option is useful for debugging, model comparison, or advanced post-hoc analyses where you need to inspect the exact input/output exchanged with the LLM API.<br>
 
   
----
+***
 <br>
 <br>
 ## 2. Garden Path Sentences Judgment Task
@@ -678,7 +683,7 @@ In reasoning models, the results show human-like processing patterns: `GardenPat
    > Ferreira, F., & Henderson, J. M. (1991). Recovery from misanalyses of garden-path sentences. Journal of Memory and Language, 30(6), 725–745.
    > Christianson, K., Hollingworth, A., Halliwell, J. F., & Ferreira, F. (2001). Thematic roles assigned along the garden path linger. Cognitive Psychology, 42(4), 368–407.
 
----
+***
 <br>
 <br>
 
@@ -723,7 +728,7 @@ Outputs in experiment_results.csv:
 <img width="2475" height="648" alt="image" src="https://github.com/user-attachments/assets/01c8a328-ae4c-425f-8da1-375c5a347a13" />
 
 
----
+***
 ## 4. Factorial Designs
 This example demonstrates a 2 × 2 factorial design manipulating:
 Each trial uses a **Carrier Sentence** with a placeholder `{AUX}`, which is automatically
@@ -739,7 +744,7 @@ filled by the `fill_grammar` function according to the experimental condition:
 
 **Step 1. Prepare carrier sentences (stimulus templates)**
 >These are carrier sentences with a placeholder {OBJ}.
->Templates help control the context while manipulating only the critical word, ensuring effects can be attributed to the intended factors automaticly.
+>Templates help control the context while manipulating only the critical word, ensuring effects can be attributed to the intended factors automatically.
 >
 ```r
     # Carrier sentences with placeholders
@@ -814,7 +819,7 @@ results <- factorial_trial_experiment(
 <img width="2013" height="351" alt="image" src="https://github.com/user-attachments/assets/3dbaf657-6254-49aa-8f26-c90adb4c1ad9" />
 
 
----
+***
 # 5. Conversation-style Experiment
 
 This example demonstrates how to run a **conversation-style experiment** using `conversation_experiment()`,  
@@ -832,7 +837,7 @@ see sequential questions and the conversation flows naturally.
 > - **Fatigue or adaptation** (e.g., does accuracy drift over multiple trials?)  
 > - **Sequential dependencies** (e.g., consistency of responses across context)  
 
----
+***
 
 ### Prepare the data
 
@@ -897,7 +902,7 @@ results <- conversation_experiment(
   {"role":"assistant","content":"Got it! I’ve read the sentence: **“The children are playing in the park.”** Is there something specific you’d like me to do with it—analyze it, compare it to the first sentence, or something else?"}
 ```
 
----
+***
 
 # 6. Conversation Experiment with Feedback
 
@@ -998,7 +1003,7 @@ This design mimics adaptive testing paradigms in psychology,
 where difficulty is adjusted dynamically according to participant performance.
 <img width="2246" height="924" alt="image" src="https://github.com/user-attachments/assets/93195edc-78ef-4854-878e-9580024ea237" />
 
----
+***
 # 7. Multi-Model Experiment
 
 This example demonstrates how to run the **same experiment across multiple models**  
@@ -1007,7 +1012,7 @@ using `multi_model_experiment()`.
 This function automates **batch comparison** by looping over a list of models (from a CSV/XLSX file)  
 and applying a chosen experiment function (e.g., `trial_experiment`).  
 
----
+***
 
 **Prepare the model list**
 
@@ -1020,7 +1025,7 @@ The model file (`Model.xlsx`) must contain at least the following columns:
 
 > Additional metadata columns (e.g., Temperature, Notes) can also be included.
 
----
+***
 
 **Run the multi-model experiment**
 
@@ -1052,7 +1057,7 @@ results <- multi_model_experiment(
 <img width="1719" height="288" alt="image" src="https://github.com/user-attachments/assets/65d44bef-73e8-4a23-916c-e27aa5ba8d6b" />
 <img width="2163" height="489" alt="image" src="https://github.com/user-attachments/assets/8e6f610e-ab98-4bc1-b391-e7841216f5f2" />
 
----
+***
 ...
 
 
@@ -1076,7 +1081,7 @@ Experiment system
 │       └── Sentence_Completion.csv
 ```
 
-Register system
+Registry system
 ```
 ├── R/
 │ ├── register_orchestrator.R                  # llm_register(): end-to-end analysis → registry
@@ -1092,7 +1097,7 @@ Register system
 │ └── register_utils.R                         # helpers (internal-only)
 ├── inst/
 │   └── registry/
-│       └── system_registry.yaml               # default registry file (pre-regist)
+│       └── system_registry.yaml               # bundled Registry v2 configuration
 ```
 
 Utils

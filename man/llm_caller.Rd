@@ -95,15 +95,17 @@ URL resolution
   \item Otherwise (non-official), \code{api_url} is required.
 }
 
-Optionals (tri-state, injected via \code{"\${PARAMETER}"} if present)
+Provider parameters use a three-state contract:
 \itemize{
   \item Missing: use registry \code{input.optional_defaults} if present; otherwise inject nothing;
   \item \code{NULL}: inject nothing;
   \item Named list: use user keys only (do not merge defaults).
 }
+Native Registry v2 builders send provider parameter names and values unchanged.
+The legacy Registry v1 compatibility builder injects them through the
+\code{"\${PARAMETER}"} template anchor when present.
 
-Non-streaming extraction uses flat-key equality and wildcard ("..") regex fallback via
-\code{flatten_json_paths()} and \code{normalize_path_key_with_regex()}.
-Streaming reconstruction uses \code{stream_reconstruct_text()} and the registry
-\code{delta_path} (and optional \code{thinking_delta_path}).
+Response parsing is selected by the resolved registry interface. Native Registry v2
+parsers interpret protocol-specific response and streaming event semantics; the
+Registry v1 compatibility parser retains the historical path-based extraction rules.
 }
