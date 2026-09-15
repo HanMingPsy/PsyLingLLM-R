@@ -44,8 +44,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 8 external release validation in progress — corrected
-R-devel manual check and macOS check pending**.
+Current phase: **Phase 8 external release validation in progress — R-devel
+passed and macOS check is blocked by the external submission service**.
 
 Phase 1 delivered:
 
@@ -182,16 +182,22 @@ Phase 8 local release preparation has now:
    generation because two roxygen lines used the unsupported Unicode character
    `⇒`. The source comments were replaced with ASCII prose, the affected `.Rd`
    file was regenerated with roxygen2, and the rebuilt tarball again passed the
-   complete local `--as-cran --no-manual` check. External revalidation remains
-   required.
+   complete local `--as-cran --no-manual` check. The corrected tarball then
+   passed the complete Win-builder R-devel check, including PDF and HTML manual
+   generation, with only the expected new-submission and domain-spelling NOTE.
+9. Attempted the official macOS package builder after explicit approval. Local
+   package construction succeeded on every attempt, but the remote
+   `/macbuilder/v1/submit` endpoint returned HTTP 502. No macOS check job was
+   created; this remains an external-service blocker rather than a package
+   failure.
 
 The full local `--as-cran` run reached all package checks successfully, but PDF
 manual generation was blocked by the host MiKTeX installation lacking
 `stringenc.sty`; Rd validation and the HTML manual passed. This is an external
-toolchain limitation, not evidence of an Rd defect. Phase 8 is not complete
-until the final tarball is checked with R-devel/Win-builder and a practical
-multi-platform service. Real-provider smoke tests remain separately opt-in and
-require user-provided credentials.
+toolchain limitation, not evidence of an Rd defect. The final tarball has now
+passed R-devel/Win-builder. Phase 8 is not complete until a practical
+multi-platform check can run successfully. Real-provider smoke tests remain
+separately opt-in and require user-provided credentials.
 
 ## CRAN Submission Standard
 
