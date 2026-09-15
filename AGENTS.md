@@ -45,7 +45,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 ## Current Migration Phase
 
 Current phase: **Phase 8 external release validation in progress — R-devel
-passed and macOS check is blocked by the external submission service**.
+passed and GitHub Actions multi-platform checks are being introduced because
+the official macOS submission service is unavailable**.
 
 Phase 1 delivered:
 
@@ -190,6 +191,10 @@ Phase 8 local release preparation has now:
    `/macbuilder/v1/submit` endpoint returned HTTP 502. No macOS check job was
    created; this remains an external-service blocker rather than a package
    failure.
+10. Prepared the official `r-lib/actions` standard R package check workflow for
+    macOS release, Windows release, and Ubuntu devel/release/oldrel. The
+    workflow is excluded from the CRAN source tarball through `.Rbuildignore`,
+    performs no live model API calls, and requires no provider credentials.
 
 The full local `--as-cran` run reached all package checks successfully, but PDF
 manual generation was blocked by the host MiKTeX installation lacking

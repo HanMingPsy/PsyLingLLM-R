@@ -4,6 +4,7 @@
 ^\.Rapp\.history$
 ^\.RData$
 ^\.Ruserdata$
+^\.github$
 ^\.Renviron$
 ^R/\.RData$
 ^R/\.Rhistory$
