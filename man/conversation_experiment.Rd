@@ -100,6 +100,7 @@ History policy:
   If `"all"`, you can cap with `max_history_turns` (number of past turns; each turn adds 2 messages).
 
 Errors / timeouts:
-- Timeout inside \code{llm_caller()} → `status = 599` ⇒ `TrialStatus = "TIMEOUT"` (continues).
-- HTTP error (`status >= 400`) ⇒ `TrialStatus = "ERROR"` (continues).
+- Timeout inside \code{llm_caller()} produces `status = 599` and
+  `TrialStatus = "TIMEOUT"` (continues).
+- HTTP error (`status >= 400`) produces `TrialStatus = "ERROR"` (continues).
 }

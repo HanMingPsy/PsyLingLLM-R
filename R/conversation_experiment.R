@@ -22,8 +22,9 @@
 #'   If `"all"`, you can cap with `max_history_turns` (number of past turns; each turn adds 2 messages).
 #'
 #' Errors / timeouts:
-#' - Timeout inside \code{llm_caller()} → `status = 599` ⇒ `TrialStatus = "TIMEOUT"` (continues).
-#' - HTTP error (`status >= 400`) ⇒ `TrialStatus = "ERROR"` (continues).
+#' - Timeout inside \code{llm_caller()} produces `status = 599` and
+#'   `TrialStatus = "TIMEOUT"` (continues).
+#' - HTTP error (`status >= 400`) produces `TrialStatus = "ERROR"` (continues).
 #'
 #' @param model_key Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").
 #' @param generation_interface Character(1). Interface name; default "chat".

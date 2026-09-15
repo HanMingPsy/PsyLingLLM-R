@@ -44,8 +44,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 8 local release validation in progress — external
-R-devel and multi-platform checks awaiting approval**.
+Current phase: **Phase 8 external release validation in progress — corrected
+R-devel manual check and macOS check pending**.
 
 Phase 1 delivered:
 
@@ -177,6 +177,13 @@ Phase 8 local release preparation has now:
    incoming-check run completed every package check and reported only the
    expected new-submission NOTE plus one transient GitHub connection reset;
    the same URLs passed the dedicated URL checker.
+8. Submitted the release candidate to Win-builder R-devel. The first external
+   run passed installation, code, examples, and tests but failed PDF manual
+   generation because two roxygen lines used the unsupported Unicode character
+   `⇒`. The source comments were replaced with ASCII prose, the affected `.Rd`
+   file was regenerated with roxygen2, and the rebuilt tarball again passed the
+   complete local `--as-cran --no-manual` check. External revalidation remains
+   required.
 
 The full local `--as-cran` run reached all package checks successfully, but PDF
 manual generation was blocked by the host MiKTeX installation lacking
