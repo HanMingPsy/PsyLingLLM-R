@@ -44,9 +44,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 8 external release validation in progress — R-devel
-passed and GitHub Actions multi-platform checks are being introduced because
-the official macOS submission service is unavailable**.
+Current phase: **Phase 8 release validation complete — final CRAN submission
+awaiting explicit approval**.
 
 Phase 1 delivered:
 
@@ -195,14 +194,21 @@ Phase 8 local release preparation has now:
     macOS release, Windows release, and Ubuntu devel/release/oldrel. The
     workflow is excluded from the CRAN source tarball through `.Rbuildignore`,
     performs no live model API calls, and requires no provider credentials.
+11. Passed all five GitHub Actions matrix jobs: macOS release, Windows release,
+    Ubuntu devel, Ubuntu release, and Ubuntu oldrel-1. The multi-platform run is
+    recorded at <https://github.com/HanMingPsy/PsyLingLLM-R/actions/runs/34935311192>.
+12. Prepared `cran-comments.md` to summarize the release checks and explain the
+    expected new-submission and domain-spelling NOTE. The file is excluded from
+    the CRAN source tarball.
 
 The full local `--as-cran` run reached all package checks successfully, but PDF
 manual generation was blocked by the host MiKTeX installation lacking
 `stringenc.sty`; Rd validation and the HTML manual passed. This is an external
 toolchain limitation, not evidence of an Rd defect. The final tarball has now
-passed R-devel/Win-builder. Phase 8 is not complete until a practical
-multi-platform check can run successfully. Real-provider smoke tests remain
-separately opt-in and require user-provided credentials.
+passed R-devel/Win-builder and practical Windows, macOS, and Linux checks.
+Phase 8 release validation is complete. Formal CRAN submission remains a
+separate external action requiring explicit user approval. Real-provider smoke
+tests remain separately opt-in and require user-provided credentials.
 
 ## CRAN Submission Standard
 

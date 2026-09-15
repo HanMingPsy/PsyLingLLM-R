@@ -10,6 +10,7 @@
 ^R/\.Rhistory$
 ^R\.zip$
 ^AGENTS\.md$
+^cran-comments\.md$
 ^inst/design/current-architecture-backup\.md$
 ^.*\.Rcheck$
 ^.*\.tar\.gz$
