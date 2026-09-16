@@ -23,8 +23,9 @@
 #'
 #' Errors / timeouts:
 #' - Timeout inside \code{llm_caller()} produces `status = 599` and
-#'   `TrialStatus = "TIMEOUT"` (continues).
-#' - HTTP error (`status >= 400`) produces `TrialStatus = "ERROR"` (continues).
+#'   `TrialStatus = "TIMEOUT"`.
+#' - A provider HTTP error retains public `status = 599`, preserves its
+#'   original status in `error$code`, and produces `TrialStatus = "ERROR"`.
 #'
 #' @param model_key Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").
 #' @param generation_interface Character(1). Interface name; default "chat".
@@ -235,11 +236,12 @@ conversation_experiment <- function(
     )
 
     t1 <- Sys.time()
-    status_num <- suppressWarnings(as.integer(llm_resp$status %||% NA_integer_))
-    err_msg <- safe_chr(llm_resp$error)
+    result_status <- classify_llm_result(llm_resp)
+    status_num <- result_status$provider_status
+    err_msg <- result_status$message
 
     # ---- TIMEOUT (599) ----
-    if (!is.na(status_num) && status_num == 599L) {
+    if (identical(result_status$category, "TIMEOUT")) {
       data$Response[ri] <- NA_character_
       data$AssistantContext[ri] <- NA_character_
       data$HistoryMode <- history_mode
@@ -264,7 +266,7 @@ conversation_experiment <- function(
     }
 
     # ---- HTTP ERROR (>=400) ----
-    if (!is.na(status_num) && status_num >= 400L) {
+    if (identical(result_status$category, "ERROR")) {
       data$Response[ri] <- NA_character_
       data$AssistantContext[ri] <- NA_character_
       data$HistoryMode <- history_mode
@@ -294,6 +296,7 @@ conversation_experiment <- function(
     data$Think[ri] <- safe_chr(llm_resp$thinking)
     data$AssistantContext[ri] <- safe_chr(as_json(hist_use))
     data$HistoryMode <- history_mode
+    data$HistoryUsedMsgs[ri] <- length(hist_use)
     data$TotalResponseTime[ri] <- as.numeric(difftime(t1, t0, units = "secs"))
 
     # Unconditional read (same as trial_experiment); may be NA if not available

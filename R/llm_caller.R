@@ -66,8 +66,11 @@
 #'   sent unchanged. When the same name also appears in \code{optionals}, the
 #'   value in \code{...} wins with a warning.
 #'
-#' @return A list with fields: \code{status}, \code{interface}, \code{model_key}, \code{streaming},
-#'   \code{usage}, \code{answer}, \code{thinking}, and optionally \code{raw} or \code{error}.
+#' @return A list with fields: \code{status}, \code{interface}, \code{model_key},
+#'   \code{streaming}, \code{usage}, \code{answer}, \code{thinking}, and
+#'   optionally \code{raw} or \code{error}. Transport and provider failures
+#'   retain the compatibility status \code{599}; the original HTTP status and
+#'   provider evidence remain available in \code{error}.
 #'
 #' @export
 llm_caller <- function(model_key,

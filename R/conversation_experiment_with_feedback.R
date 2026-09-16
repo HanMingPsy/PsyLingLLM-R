@@ -11,6 +11,10 @@
 #'
 #' All request assembly (URL/headers/body/messages/defaults) is registry-driven
 #' by `llm_caller()`; this function never mutates headers.
+#' Transport timeouts and provider HTTP errors both retain the caller's public
+#' compatibility status \code{599}; provider errors are distinguished through
+#' their original \code{error$code} and recorded as experiment errors rather
+#' than timeouts.
 #'
 #' @param model_key Character(1).
 #' @param generation_interface Character(1). Default "chat".
@@ -264,11 +268,12 @@ conversation_experiment_with_feedback <- function(
       steps_target <- executed
     }
 
-    status_num <- suppressWarnings(as.integer(llm_resp$status %||% NA_integer_))
-    err_msg <- safe_chr(llm_resp$error)
+    result_status <- classify_llm_result(llm_resp)
+    status_num <- result_status$provider_status
+    err_msg <- result_status$message
 
     # Timeout
-    if (!is.na(status_num) && status_num == 599L) {
+    if (identical(result_status$category, "TIMEOUT")) {
       data$Response[i] <- NA_character_
       data$AssistantContext[i] <- NA_character_
       data$HistoryMode[i] <- history_mode
@@ -297,7 +302,7 @@ conversation_experiment_with_feedback <- function(
     }
 
     # HTTP error
-    if (!is.na(status_num) && status_num >= 400L) {
+    if (identical(result_status$category, "ERROR")) {
       data$Response[i] <- NA_character_
       data$AssistantContext[i] <- NA_character_
       data$HistoryMode[i] <- history_mode

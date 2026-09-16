@@ -16,12 +16,14 @@ redact_llm_diagnostics <- function(value, field_name = NULL) {
   }
 
   if (is.character(value)) {
-    return(vapply(
+    result <- vapply(
       value,
       redact_diagnostic_text,
       character(1),
       USE.NAMES = FALSE
-    ))
+    )
+    names(result) <- names(value)
+    return(result)
   }
 
   if (is.raw(value)) {

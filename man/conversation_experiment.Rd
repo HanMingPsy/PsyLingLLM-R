@@ -101,6 +101,7 @@ History policy:
 
 Errors / timeouts:
 - Timeout inside \code{llm_caller()} produces `status = 599` and
-  `TrialStatus = "TIMEOUT"` (continues).
-- HTTP error (`status >= 400`) produces `TrialStatus = "ERROR"` (continues).
+  `TrialStatus = "TIMEOUT"`.
+- A provider HTTP error retains public `status = 599`, preserves its
+  original status in `error$code`, and produces `TrialStatus = "ERROR"`.
 }

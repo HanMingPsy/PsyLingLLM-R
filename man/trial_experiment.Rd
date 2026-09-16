@@ -81,5 +81,6 @@ Columns in `data`:
 Error/timeout handling:
 - Network/SSE timeout inside \code{llm_caller()} returns \code{status = 599}
   and is marked as \code{"TIMEOUT"} without stopping the loop.
-- HTTP errors (\code{status >= 400}) are marked as \code{"ERROR"} and also continue.
+- Provider HTTP errors retain public \code{status = 599}, preserve the
+  original status in \code{error$code}, and are marked as \code{"ERROR"}.
 }

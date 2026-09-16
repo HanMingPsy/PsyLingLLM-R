@@ -11,7 +11,8 @@
 #' Error/timeout handling:
 #' - Network/SSE timeout inside \code{llm_caller()} returns \code{status = 599}
 #'   and is marked as \code{"TIMEOUT"} without stopping the loop.
-#' - HTTP errors (\code{status >= 400}) are marked as \code{"ERROR"} and also continue.
+#' - Provider HTTP errors retain public \code{status = 599}, preserve the
+#'   original status in \code{error$code}, and are marked as \code{"ERROR"}.
 #'
 #' @param model_key Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").
 #' @param generation_interface Character(1). Interface name; defaults to "chat".
@@ -138,11 +139,12 @@ trial_experiment <- function(
     )
 
     t1 <- Sys.time()
-    status_num <- suppressWarnings(as.integer(llm_resp$status %||% NA_integer_))
-    err_msg <- safe_chr(llm_resp$error)
+    result_status <- classify_llm_result(llm_resp)
+    status_num <- result_status$provider_status
+    err_msg <- result_status$message
 
     # ---- Timeout handling (599) ---------------------------------------------
-    if (!is.na(status_num) && status_num == 599L) {
+    if (identical(result_status$category, "TIMEOUT")) {
       data$Response[i] <- NA_character_
       data$Think[i] <- NA_character_
       data$TotalResponseTime[i] <- as.numeric(difftime(t1, t0, units = "secs"))
@@ -164,7 +166,7 @@ trial_experiment <- function(
     }
 
     # ---- HTTP error handling (>=400) ----------------------------------------
-    if (!is.na(status_num) && status_num >= 400L) {
+    if (identical(result_status$category, "ERROR")) {
       data$Response[i] <- NA_character_
       data$Think[i] <- NA_character_
       data$TotalResponseTime[i] <- as.numeric(difftime(t1, t0, units = "secs"))

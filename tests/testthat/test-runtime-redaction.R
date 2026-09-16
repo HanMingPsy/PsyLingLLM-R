@@ -14,6 +14,19 @@ test_that("diagnostic redaction is recursive and leaves source unchanged", {
   expect_false(grepl("echoed-secret|echoed-key", redacted$text))
 })
 
+test_that("diagnostic redaction preserves character-vector names", {
+  headers <- c(
+    `x-request-id` = "request-123",
+    authorization = "Bearer provider-secret"
+  )
+
+  redacted <- redact_llm_diagnostics(headers)
+
+  expect_identical(names(redacted), names(headers))
+  expect_identical(redacted[["x-request-id"]], "request-123")
+  expect_identical(redacted[["authorization"]], "Bearer [REDACTED]")
+})
+
 test_that("raw diagnostic headers redact credential-bearing lines", {
   headers <- charToRaw(paste0(
     "HTTP/1.1 400 Bad Request\r\n",

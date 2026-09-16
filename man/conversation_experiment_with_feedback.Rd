@@ -94,4 +94,8 @@ Feedback semantics:
 
 All request assembly (URL/headers/body/messages/defaults) is registry-driven
 by `llm_caller()`; this function never mutates headers.
+Transport timeouts and provider HTTP errors both retain the caller's public
+compatibility status \code{599}; provider errors are distinguished through
+their original \code{error$code} and recorded as experiment errors rather
+than timeouts.
 }

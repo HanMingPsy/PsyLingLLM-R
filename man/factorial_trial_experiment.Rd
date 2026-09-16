@@ -120,6 +120,9 @@ This function then produces a per-row user message (stimulus) and executes the t
   3) Otherwise, just \code{Material}.
 
 ## Error & timeout handling
-- Timeout inside \code{llm_caller()} returns \code{status = 599} → \code{TrialStatus = "TIMEOUT"} (continue).
-- HTTP error (\code{status >= 400}) → \code{TrialStatus = "ERROR"} (continue).
+- A transport timeout uses public \code{status = 599} and becomes
+  \code{TrialStatus = "TIMEOUT"}.
+- A provider HTTP error also retains public \code{status = 599}, preserves
+  its original status in \code{error$code}, and becomes
+  \code{TrialStatus = "ERROR"}.
 }

@@ -304,7 +304,8 @@ do_nonstream_request <- function(url,
     handle,
     customrequest = "POST",
     postfields = payload,
-    timeout = as.integer(timeout)
+    timeout = as.integer(timeout),
+    connecttimeout = as.integer(timeout)
   )
 
   response <- tryCatch(
@@ -356,7 +357,8 @@ do_stream_request <- function(url,
     handle,
     customrequest = "POST",
     postfields = payload,
-    timeout = as.integer(timeout)
+    timeout = as.integer(timeout),
+    connecttimeout = as.integer(timeout)
   )
 
   if (isTRUE(debug)) {

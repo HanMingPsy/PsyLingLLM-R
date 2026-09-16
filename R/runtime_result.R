@@ -17,6 +17,11 @@ normalize_llm_result <- function(config,
     parsed_response$usage,
     list(id = parsed_response$request_id)
   )
+  public_status <- if (is.null(parsed_response$error)) {
+    parsed_response$status
+  } else {
+    599L
+  }
   raw_request <- if (isTRUE(return_raw)) {
     redact_llm_diagnostics(list(
       url = request$url,
@@ -33,7 +38,7 @@ normalize_llm_result <- function(config,
   if (request$stream) {
     legacy_response <- as_legacy_stream_response(transport_response)
     return(list(
-      status = parsed_response$status,
+      status = public_status,
       interface = compatibility_entry$interface,
       model_key = compatibility_entry$model_key,
       streaming = TRUE,
@@ -55,7 +60,7 @@ normalize_llm_result <- function(config,
 
   legacy_response <- as_legacy_nonstream_response(transport_response)
   list(
-    status = parsed_response$status,
+    status = public_status,
     interface = compatibility_entry$interface,
     model_key = compatibility_entry$model_key,
     streaming = FALSE,

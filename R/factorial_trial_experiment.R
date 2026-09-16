@@ -28,8 +28,11 @@
 #'   3) Otherwise, just \code{Material}.
 #'
 #' ## Error & timeout handling
-#' - Timeout inside \code{llm_caller()} returns \code{status = 599} → \code{TrialStatus = "TIMEOUT"} (continue).
-#' - HTTP error (\code{status >= 400}) → \code{TrialStatus = "ERROR"} (continue).
+#' - A transport timeout uses public \code{status = 599} and becomes
+#'   \code{TrialStatus = "TIMEOUT"}.
+#' - A provider HTTP error also retains public \code{status = 599}, preserves
+#'   its original status in \code{error$code}, and becomes
+#'   \code{TrialStatus = "ERROR"}.
 #'
 #' @param model_key Character(1). Registry key (e.g., \code{"deepseek-chat"} or \code{"deepseek-chat@proxy"}).
 #' @param generation_interface Character(1). Interface name; default \code{"chat"}.
@@ -217,11 +220,12 @@ factorial_trial_experiment <- function(
     )
 
     t1 <- Sys.time()
-    status_num <- suppressWarnings(as.integer(parsed_resp$status %||% NA_integer_))
-    err_msg <- safe_chr(parsed_resp$error)
+    result_status <- classify_llm_result(parsed_resp)
+    status_num <- result_status$provider_status
+    err_msg <- result_status$message
 
     # ---- TIMEOUT (599) ------------------------------------------------------
-    if (!is.na(status_num) && status_num == 599L) {
+    if (identical(result_status$category, "TIMEOUT")) {
       trials$Response[i] <- NA_character_
       trials$Think[i] <- NA_character_
       trials$TotalResponseTime[i] <- as.numeric(difftime(t1, t0, units = "secs"))
@@ -243,7 +247,7 @@ factorial_trial_experiment <- function(
     }
 
     # ---- HTTP ERROR (>=400) -------------------------------------------------
-    if (!is.na(status_num) && status_num >= 400L) {
+    if (identical(result_status$category, "ERROR")) {
       trials$Response[i] <- NA_character_
       trials$Think[i] <- NA_character_
       trials$TotalResponseTime[i] <- as.numeric(difftime(t1, t0, units = "secs"))

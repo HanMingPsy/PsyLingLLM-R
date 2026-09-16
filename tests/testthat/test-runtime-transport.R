@@ -153,6 +153,45 @@ test_that("HTTP error status receives a structured generic error", {
   expect_identical(response$parsed$error, "rate limited")
 })
 
+test_that("HTTP transports apply the caller timeout to connection setup", {
+  captured <- list()
+  local_mocked_bindings(
+    new_handle = function() structure(list(), class = "curl_handle"),
+    handle_setheaders = function(...) invisible(NULL),
+    handle_setopt = function(handle, ...) {
+      captured[[length(captured) + 1L]] <<- list(...)
+      invisible(NULL)
+    },
+    curl_fetch_memory = function(url, handle) {
+      list(status_code = 200L, headers = raw(), content = charToRaw("{}"))
+    },
+    curl_fetch_stream = function(url, fun, handle) {
+      fun(charToRaw("data: [DONE]\n\n"))
+      list(status_code = 200L, headers = raw())
+    },
+    .package = "curl"
+  )
+
+  do_nonstream_request(
+    "https://example.invalid",
+    list(`Content-Type` = "application/json"),
+    "{}",
+    timeout = 73L
+  )
+  do_stream_request(
+    "https://example.invalid",
+    list(`Content-Type` = "application/json"),
+    "{}",
+    timeout = 73L
+  )
+
+  expect_length(captured, 2L)
+  for (options in captured) {
+    expect_identical(options$timeout, 73L)
+    expect_identical(options$connecttimeout, 73L)
+  }
+})
+
 test_that("SSE collector handles arbitrary line chunk boundaries", {
   times <- as.POSIXct("2020-01-01 00:00:00", tz = "UTC") + c(0, 0.25)
   index <- 0L

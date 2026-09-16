@@ -128,6 +128,52 @@ handle_llm_error <- function(run_id, err, category = "UNKNOWN") {
   )
 }
 
+# Classify normalized caller results without losing provider HTTP evidence.
+classify_llm_result <- function(result) {
+  scalar_integer <- function(value) {
+    value <- suppressWarnings(as.integer(value %||% NA_integer_))
+    if (length(value) == 0L || is.na(value[[1L]])) NA_integer_ else value[[1L]]
+  }
+  scalar_character <- function(value) {
+    if (!is.character(value) || length(value) == 0L || is.na(value[[1L]])) {
+      return(NA_character_)
+    }
+    value[[1L]]
+  }
+
+  public_status <- scalar_integer(result$status)
+  error <- result$error
+  provider_status <- if (is.list(error)) {
+    scalar_integer(error$code)
+  } else {
+    NA_integer_
+  }
+  message <- if (is.list(error)) {
+    scalar_character(error$message)
+  } else {
+    scalar_character(error)
+  }
+
+  provider_http_error <- !is.na(provider_status) &&
+    provider_status >= 400L && provider_status != 599L
+  category <- if (identical(public_status, 599L) && provider_http_error) {
+    "ERROR"
+  } else if (identical(public_status, 599L)) {
+    "TIMEOUT"
+  } else if (!is.na(public_status) && public_status >= 400L) {
+    "ERROR"
+  } else {
+    "SUCCESS"
+  }
+
+  list(
+    category = category,
+    public_status = public_status,
+    provider_status = if (provider_http_error) provider_status else public_status,
+    message = message
+  )
+}
+
 # --- Warning handling ---
 handle_llm_warning <- function(run_id, msg, category = "GENERAL") {
   log_msg <- sprintf("[PsyLingLLM] Run %d WARNING (%s) - %s", run_id, category, msg)
