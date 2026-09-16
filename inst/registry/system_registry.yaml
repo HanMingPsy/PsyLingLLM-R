@@ -1,6 +1,20 @@
 schema_version: 2
 
 providers:
+  anthropic:
+    type: official
+    base_url: https://api.anthropic.com
+    auth:
+      scheme: header
+      env_var: ANTHROPIC_API_KEY
+      header: x-api-key
+    headers:
+      Content-Type: application/json
+      anthropic-version: "2023-06-01"
+    metadata:
+      docs_url: https://platform.claude.com/docs/en/api/overview
+      models_url: https://platform.claude.com/docs/en/models/overview
+      verified_on: "2026-09-16"
   deepseek:
     type: official
     base_url: https://api.deepseek.com
@@ -11,7 +25,33 @@ providers:
       Content-Type: application/json
     metadata:
       docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
-      verified_on: "2026-09-07"
+      models_url: https://api-docs.deepseek.com/api/list-models/
+      verified_on: "2026-09-16"
+  gemini:
+    type: official
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    auth:
+      scheme: bearer
+      env_var: GEMINI_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://ai.google.dev/gemini-api/docs/openai
+      models_url: https://ai.google.dev/gemini-api/docs/models
+      compatibility_status: beta
+      verified_on: "2026-09-16"
+  mistral:
+    type: official
+    base_url: https://api.mistral.ai/v1
+    auth:
+      scheme: bearer
+      env_var: MISTRAL_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://docs.mistral.ai/api
+      models_url: https://docs.mistral.ai/models
+      verified_on: "2026-09-16"
   openai:
     type: official
     base_url: https://api.openai.com/v1
@@ -21,8 +61,147 @@ providers:
     headers:
       Content-Type: application/json
     metadata:
-      docs_url: https://platform.openai.com/docs/api-reference
-      verified_on: "2026-09-07"
+      docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+      models_url: https://developers.openai.com/api/docs/models
+      verified_on: "2026-09-16"
+  qwen:
+    type: official
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    auth:
+      scheme: bearer
+      env_var: QWEN_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+      models_url: https://help.aliyun.com/zh/model-studio/models
+      endpoint_note: Use api_url to select a workspace-specific or non-Beijing endpoint.
+      verified_on: "2026-09-16"
+  xai:
+    type: official
+    base_url: https://api.x.ai/v1
+    auth:
+      scheme: bearer
+      env_var: XAI_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://docs.x.ai/developers/grok-4-6
+      models_url: https://docs.x.ai/developers/models
+      verified_on: "2026-09-16"
+  azure-openai:
+    type: official
+    auth:
+      scheme: header
+      env_var: AZURE_OPENAI_API_KEY
+      header: api-key
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle
+      endpoint_template: https://RESOURCE-NAME.openai.azure.com/openai/v1
+      endpoint_note: Supply the complete deployment request URL with api_url.
+      catalog_mode: deployment_defined
+      verified_on: "2026-09-16"
+  groq:
+    type: official
+    base_url: https://api.groq.com/openai/v1
+    auth:
+      scheme: bearer
+      env_var: GROQ_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://console.groq.com/docs/openai
+      models_url: https://console.groq.com/docs/models
+      verified_on: "2026-09-16"
+  meta-llama:
+    type: official
+    base_url: https://api.llama.com/compat/v1
+    auth:
+      scheme: bearer
+      env_var: LLAMA_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://llama.developer.meta.com/docs
+      models_url: https://api.llama.com/v1/models
+      protocol_mode: openai_compatibility
+      catalog_mode: account_dynamic
+      verified_on: "2026-09-16"
+  moonshot:
+    type: official
+    base_url: https://api.moonshot.cn/v1
+    auth:
+      scheme: bearer
+      env_var: MOONSHOT_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://platform.kimi.com/docs/api/chat
+      models_url: https://platform.kimi.com/docs/models
+      verified_on: "2026-09-16"
+  ollama:
+    type: local
+    base_url: http://127.0.0.1:11434/v1
+    auth:
+      scheme: none
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://docs.ollama.com/api/openai-compatibility
+      models_url: http://127.0.0.1:11434/v1/models
+      catalog_mode: local_dynamic
+      verified_on: "2026-09-16"
+  qianfan:
+    type: official
+    base_url: https://qianfan.baidubce.com/v2
+    auth:
+      scheme: bearer
+      env_var: QIANFAN_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://cloud.baidu.com/doc/qianfan/s/Hmh4suq26
+      models_url: https://qianfan.baidubce.com/v2/models
+      verified_on: "2026-09-16"
+  vllm:
+    type: local
+    base_url: http://127.0.0.1:8000/v1
+    auth:
+      scheme: none
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/
+      models_url: http://127.0.0.1:8000/v1/models
+      catalog_mode: deployment_dynamic
+      auth_note: This template assumes vLLM was started without --api-key.
+      verified_on: "2026-09-16"
+  volcengine-ark:
+    type: official
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    auth:
+      scheme: bearer
+      env_var: ARK_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://www.volcengine.com/docs/82379/1795150
+      endpoint_note: Use api_url for another Ark region or custom endpoint.
+      verified_on: "2026-09-16"
+  zhipu:
+    type: official
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    auth:
+      scheme: bearer
+      env_var: ZHIPU_API_KEY
+    headers:
+      Content-Type: application/json
+    metadata:
+      docs_url: https://docs.bigmodel.cn/cn/guide/develop/http/introduction
+      models_url: https://docs.bigmodel.cn/cn/guide/start/model-overview
+      verified_on: "2026-09-16"
 
 interfaces:
   deepseek-chat-v1:
@@ -178,6 +357,451 @@ interfaces:
       docs_url: https://platform.openai.com/docs/api-reference/responses
       verified_on: "2026-09-07"
 
+  openai-responses-v1:
+    protocol: openai_responses
+    request:
+      builder: openai_responses
+      method: POST
+      encoding: json
+      path: /responses
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_output_tokens:
+          description: Native Responses API output-token limit.
+          docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+        reasoning:
+          description: Native Responses API reasoning configuration.
+          docs_url: https://developers.openai.com/api/docs/guides/reasoning
+        text:
+          description: Native Responses API text-output configuration.
+          docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+        tools:
+          description: Native Responses API tool definitions.
+          docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_responses
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_output_tokens: 1024
+    metadata:
+      legacy_interface: responses
+      docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  openai-responses-nonstream-v1:
+    protocol: openai_responses
+    request:
+      builder: openai_responses
+      method: POST
+      encoding: json
+      path: /responses
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_output_tokens:
+          description: Native Responses API output-token limit.
+          docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+        reasoning:
+          description: Native Responses API reasoning configuration.
+          docs_url: https://developers.openai.com/api/docs/guides/reasoning
+        text:
+          description: Native Responses API text-output configuration.
+          docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+        tools:
+          description: Native Responses API tool definitions.
+          docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+    transport:
+      non_stream: http_json
+    response:
+      parser: openai_responses
+    streaming:
+      supported: false
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_output_tokens: 1024
+    metadata:
+      legacy_interface: responses
+      docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  deepseek-responses-v1:
+    protocol: openai_responses
+    request:
+      builder: openai_responses
+      method: POST
+      encoding: json
+      path: /responses
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_output_tokens:
+          description: Native DeepSeek Responses output-token limit.
+          docs_url: https://api-docs.deepseek.com/guides/responses_api/
+        reasoning:
+          description: Native DeepSeek Responses reasoning configuration.
+          docs_url: https://api-docs.deepseek.com/guides/responses_api/
+        tools:
+          description: Native DeepSeek Responses tool definitions.
+          docs_url: https://api-docs.deepseek.com/guides/responses_api/
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_responses
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_output_tokens: 1024
+    metadata:
+      legacy_interface: responses
+      docs_url: https://api-docs.deepseek.com/guides/responses_api/
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  anthropic-messages-v1:
+    protocol: anthropic_messages
+    request:
+      builder: anthropic_messages
+      method: POST
+      encoding: json
+      path: /v1/messages
+      default_system: You are a helpful assistant.
+      role_mapping:
+        user: user
+        assistant: assistant
+      parameters:
+        max_tokens:
+          description: Required maximum number of output tokens.
+          docs_url: https://platform.claude.com/docs/en/api/messages
+        thinking:
+          description: Native Claude thinking configuration.
+          docs_url: https://platform.claude.com/docs/en/build-with-claude/extended-thinking
+        output_config:
+          description: Native Claude output and effort configuration.
+          docs_url: https://platform.claude.com/docs/en/api/messages
+        tools:
+          description: Native Claude tool definitions.
+          docs_url: https://platform.claude.com/docs/en/api/messages
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: anthropic_messages
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_tokens: 1024
+    metadata:
+      legacy_interface: messages
+      docs_url: https://platform.claude.com/docs/en/api/messages
+      api_version: "2023-06-01"
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  qwen-chat-completions-v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_tokens:
+          description: Native Qwen Chat Completions output-token limit.
+          docs_url: https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope
+        enable_thinking:
+          description: Native Qwen thinking-mode switch where supported.
+          docs_url: https://help.aliyun.com/zh/model-studio/deep-thinking
+        thinking_budget:
+          description: Native Qwen thinking-token budget where supported.
+          docs_url: https://help.aliyun.com/zh/model-studio/deep-thinking
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_tokens: 1024
+    metadata:
+      legacy_interface: chat
+      docs_url: https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  qwen-responses-v1:
+    protocol: openai_responses
+    request:
+      builder: openai_responses
+      method: POST
+      encoding: json
+      path: /responses
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_output_tokens:
+          description: Native Qwen Responses output-token limit.
+          docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+        reasoning:
+          description: Native Qwen Responses reasoning configuration.
+          docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+        tools:
+          description: Native Qwen Responses tool definitions.
+          docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_responses
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_output_tokens: 1024
+    metadata:
+      legacy_interface: responses
+      docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  gemini-openai-chat-v1beta:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_tokens:
+          description: OpenAI-compatible Gemini output-token limit.
+          docs_url: https://ai.google.dev/gemini-api/docs/openai
+        reasoning_effort:
+          description: OpenAI-compatible Gemini thinking-effort control.
+          docs_url: https://ai.google.dev/gemini-api/docs/openai
+        extra_body:
+          description: Gemini-specific extension container for compatibility requests.
+          docs_url: https://ai.google.dev/gemini-api/docs/openai
+        tools:
+          description: OpenAI-compatible function tool definitions.
+          docs_url: https://ai.google.dev/gemini-api/docs/openai
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    defaults:
+      max_tokens: 1024
+    metadata:
+      legacy_interface: chat
+      docs_url: https://ai.google.dev/gemini-api/docs/openai
+      protocol_status: beta
+      verified_on: "2026-09-16"
+
+  mistral-chat-completions-v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_tokens:
+          description: Native Mistral Chat Completions output-token limit.
+          docs_url: https://docs.mistral.ai/api
+        temperature:
+          description: Native Mistral sampling temperature.
+          docs_url: https://docs.mistral.ai/api
+        tools:
+          description: Native Mistral function tool definitions.
+          docs_url: https://docs.mistral.ai/api
+        response_format:
+          description: Native Mistral structured-output configuration.
+          docs_url: https://docs.mistral.ai/api
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    defaults:
+      max_tokens: 1024
+    metadata:
+      legacy_interface: chat
+      docs_url: https://docs.mistral.ai/api
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  xai-responses-v1:
+    protocol: openai_responses
+    request:
+      builder: openai_responses
+      method: POST
+      encoding: json
+      path: /responses
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+      parameters:
+        max_output_tokens:
+          description: Native xAI Responses output-token limit.
+          docs_url: https://docs.x.ai/developers/grok-4-6
+        reasoning_effort:
+          description: Native Grok reasoning-effort control.
+          docs_url: https://docs.x.ai/developers/grok-4-6
+        prompt_cache_key:
+          description: Native xAI prompt-cache routing key.
+          docs_url: https://docs.x.ai/developers/grok-4-6
+        tools:
+          description: Native xAI Responses tool definitions.
+          docs_url: https://docs.x.ai/developers/grok-4-6
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_responses
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    defaults:
+      max_output_tokens: 1024
+    metadata:
+      legacy_interface: responses
+      docs_url: https://docs.x.ai/developers/grok-4-6
+      protocol_status: current
+      verified_on: "2026-09-16"
+
+  openai-compatible-chat-v1:
+    protocol: openai_chat
+    request:
+      builder: openai_chat
+      method: POST
+      encoding: json
+      path: /chat/completions
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_chat
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    metadata:
+      protocol_status: compatibility_profile
+      parameter_policy: provider_native_passthrough
+      verified_on: "2026-09-16"
+
+  openai-compatible-responses-v1:
+    protocol: openai_responses
+    request:
+      builder: openai_responses
+      method: POST
+      encoding: json
+      path: /responses
+      default_system: You are a helpful assistant.
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+    transport:
+      non_stream: http_json
+      stream: sse_json
+    response:
+      parser: openai_responses
+    streaming:
+      supported: true
+      request_parameter: stream
+      request_value: true
+    capabilities:
+      reasoning:
+        response_channel: reasoning
+    metadata:
+      protocol_status: compatibility_profile
+      parameter_policy: provider_native_passthrough
+      verified_on: "2026-09-16"
+
 capabilities:
   reasoning:
     value_type: logical
@@ -191,26 +815,67 @@ capabilities:
 models:
   deepseek-chat:
     provider: deepseek
-    model_id: deepseek-chat
+    model_id: deepseek-flash
     interfaces:
       - deepseek-chat-v1
     default_interface: deepseek-chat-v1
     capabilities:
       reasoning: false
       streaming: true
+    defaults:
+      reasoning_effort: none
     metadata:
       legacy_interfaces: [chat]
+      compatibility_key: true
+      upstream_model_retired: deepseek-chat
+      replacement: deepseek-flash
+      verified_on: "2026-09-16"
   deepseek-reasoner:
     provider: deepseek
-    model_id: deepseek-reasoner
+    model_id: deepseek-flash
     interfaces:
       - deepseek-chat-v1
     default_interface: deepseek-chat-v1
     capabilities:
       reasoning: true
       streaming: true
+    defaults:
+      reasoning_effort: high
     metadata:
       legacy_interfaces: [chat]
+      compatibility_key: true
+      upstream_model_retired: deepseek-reasoner
+      replacement: deepseek-flash
+      verified_on: "2026-09-16"
+  deepseek-flash:
+    provider: deepseek
+    model_id: deepseek-flash
+    interfaces:
+      - deepseek-chat-v1
+      - deepseek-responses-v1
+    default_interface: deepseek-chat-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      release_family: DeepSeek-V4.1-Flash
+      support_status: current
+      docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
+      verified_on: "2026-09-16"
+  deepseek-v4-pro:
+    provider: deepseek
+    model_id: deepseek-v4-pro
+    interfaces:
+      - deepseek-chat-v1
+      - deepseek-responses-v1
+    default_interface: deepseek-chat-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
+      verified_on: "2026-09-16"
   gpt-4o:
     provider: openai
     model_id: gpt-4o
@@ -222,3 +887,525 @@ models:
       streaming: true
     metadata:
       legacy_interfaces: [chat, responses]
+      compatibility_key: true
+      verified_on: "2026-09-16"
+  gpt-6-astra:
+    provider: openai
+    model_id: gpt-6-astra
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-6-astra
+      verified_on: "2026-09-16"
+  gpt-5.6-sol:
+    provider: openai
+    model_id: gpt-5.6-sol
+    aliases: [gpt-5.6]
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.6-sol
+      verified_on: "2026-09-16"
+  gpt-5.6-terra:
+    provider: openai
+    model_id: gpt-5.6-terra
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.6-terra
+      verified_on: "2026-09-16"
+  gpt-5.6-luna:
+    provider: openai
+    model_id: gpt-5.6-luna
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.6-luna
+      verified_on: "2026-09-16"
+  gpt-5.5:
+    provider: openai
+    model_id: gpt-5.5
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.5
+      verified_on: "2026-09-16"
+  gpt-5.5-pro:
+    provider: openai
+    model_id: gpt-5.5-pro
+    interfaces:
+      - openai-responses-nonstream-v1
+    default_interface: openai-responses-nonstream-v1
+    capabilities:
+      reasoning: true
+      streaming: false
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.5-pro
+      verified_on: "2026-09-16"
+  gpt-5.4:
+    provider: openai
+    model_id: gpt-5.4
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.4
+      verified_on: "2026-09-16"
+  gpt-5.4-pro:
+    provider: openai
+    model_id: gpt-5.4-pro
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.4-pro
+      verified_on: "2026-09-16"
+  gpt-5.4-mini:
+    provider: openai
+    model_id: gpt-5.4-mini
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.4-mini
+      verified_on: "2026-09-16"
+  gpt-5.4-nano:
+    provider: openai
+    model_id: gpt-5.4-nano
+    interfaces:
+      - openai-responses-v1
+    default_interface: openai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://developers.openai.com/api/docs/models/gpt-5.4-nano
+      verified_on: "2026-09-16"
+  claude-fable-5.1:
+    provider: anthropic
+    model_id: claude-fable-5-1
+    interfaces:
+      - anthropic-messages-v1
+    default_interface: anthropic-messages-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://platform.claude.com/docs/en/models/overview
+      verified_on: "2026-09-16"
+  claude-opus-5:
+    provider: anthropic
+    model_id: claude-opus-5
+    interfaces:
+      - anthropic-messages-v1
+    default_interface: anthropic-messages-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://platform.claude.com/docs/en/models/overview
+      verified_on: "2026-09-16"
+  claude-sonnet-5:
+    provider: anthropic
+    model_id: claude-sonnet-5
+    interfaces:
+      - anthropic-messages-v1
+    default_interface: anthropic-messages-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://platform.claude.com/docs/en/models/overview
+      verified_on: "2026-09-16"
+  claude-haiku-4.5:
+    provider: anthropic
+    model_id: claude-haiku-4-5-20251001
+    aliases: [claude-haiku-4-5]
+    interfaces:
+      - anthropic-messages-v1
+    default_interface: anthropic-messages-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      pinned_snapshot: true
+      docs_url: https://platform.claude.com/docs/en/models/overview
+      verified_on: "2026-09-16"
+  qwen3.8-max:
+    provider: qwen
+    model_id: qwen3.8-max
+    interfaces:
+      - qwen-chat-completions-v1
+      - qwen-responses-v1
+    default_interface: qwen-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+      verified_on: "2026-09-16"
+  qwen3.8-flash:
+    provider: qwen
+    model_id: qwen3.8-flash
+    interfaces:
+      - qwen-chat-completions-v1
+      - qwen-responses-v1
+    default_interface: qwen-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://help.aliyun.com/zh/model-studio/qwen3-8-flash
+      verified_on: "2026-09-16"
+  qwen3.7-plus:
+    provider: qwen
+    model_id: qwen3.7-plus
+    interfaces:
+      - qwen-chat-completions-v1
+      - qwen-responses-v1
+    default_interface: qwen-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+      verified_on: "2026-09-16"
+  qwen3.7-flash:
+    provider: qwen
+    model_id: qwen3.7-flash
+    interfaces:
+      - qwen-chat-completions-v1
+      - qwen-responses-v1
+    default_interface: qwen-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
+      verified_on: "2026-09-16"
+  gemini-3.8-flash:
+    provider: gemini
+    model_id: gemini-3.8-flash
+    interfaces:
+      - gemini-openai-chat-v1beta
+    default_interface: gemini-openai-chat-v1beta
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      protocol_status: beta
+      docs_url: https://ai.google.dev/gemini-api/docs/models
+      verified_on: "2026-09-16"
+  gemini-3.7-flash:
+    provider: gemini
+    model_id: gemini-3.7-flash
+    interfaces:
+      - gemini-openai-chat-v1beta
+    default_interface: gemini-openai-chat-v1beta
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      protocol_status: beta
+      docs_url: https://ai.google.dev/gemini-api/docs/models
+      verified_on: "2026-09-16"
+  gemini-3.6-flash:
+    provider: gemini
+    model_id: gemini-3.6-flash
+    interfaces:
+      - gemini-openai-chat-v1beta
+    default_interface: gemini-openai-chat-v1beta
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      protocol_status: beta
+      docs_url: https://ai.google.dev/gemini-api/docs/models
+      verified_on: "2026-09-16"
+  gemini-3.5-flash:
+    provider: gemini
+    model_id: gemini-3.5-flash
+    interfaces:
+      - gemini-openai-chat-v1beta
+    default_interface: gemini-openai-chat-v1beta
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      protocol_status: beta
+      docs_url: https://ai.google.dev/gemini-api/docs/models
+      verified_on: "2026-09-16"
+  gemini-3.5-flash-lite:
+    provider: gemini
+    model_id: gemini-3.5-flash-lite
+    interfaces:
+      - gemini-openai-chat-v1beta
+    default_interface: gemini-openai-chat-v1beta
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      protocol_status: beta
+      docs_url: https://ai.google.dev/gemini-api/docs/models
+      verified_on: "2026-09-16"
+  grok-4.6:
+    provider: xai
+    model_id: grok-4.6
+    aliases: [grok-4.6-latest]
+    interfaces:
+      - xai-responses-v1
+    default_interface: xai-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://docs.x.ai/developers/grok-4-6
+      verified_on: "2026-09-16"
+  mistral-medium-3.5:
+    provider: mistral
+    model_id: mistral-medium-latest
+    aliases: [mistral-medium-latest]
+    interfaces:
+      - mistral-chat-completions-v1
+    default_interface: mistral-chat-completions-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      rolling_alias: true
+      docs_url: https://docs.mistral.ai/models
+      verified_on: "2026-09-16"
+  mistral-large-3:
+    provider: mistral
+    model_id: mistral-large-latest
+    aliases: [mistral-large-latest]
+    interfaces:
+      - mistral-chat-completions-v1
+    default_interface: mistral-chat-completions-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      rolling_alias: true
+      docs_url: https://docs.mistral.ai/models/mistral-large-3-25-12
+      verified_on: "2026-09-16"
+  mistral-small-4:
+    provider: mistral
+    model_id: mistral-small-latest
+    aliases: [mistral-small-latest]
+    interfaces:
+      - mistral-chat-completions-v1
+    default_interface: mistral-chat-completions-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      rolling_alias: true
+      docs_url: https://docs.mistral.ai/models
+      verified_on: "2026-09-16"
+  azure-gpt-4.1-nano:
+    provider: azure-openai
+    model_id: gpt-4.1-nano
+    interfaces:
+      - openai-compatible-responses-v1
+    default_interface: openai-compatible-responses-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: deployment_template
+      deployment_requirement: The Azure deployment name must be gpt-4.1-nano.
+      endpoint_requirement: Pass the complete Azure /openai/v1/responses URL with api_url.
+      docs_url: https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle
+      verified_on: "2026-09-16"
+  groq-gpt-oss-120b:
+    provider: groq
+    model_id: openai/gpt-oss-120b
+    interfaces:
+      - openai-compatible-chat-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: production
+      docs_url: https://console.groq.com/docs/models
+      verified_on: "2026-09-16"
+  groq-gpt-oss-20b:
+    provider: groq
+    model_id: openai/gpt-oss-20b
+    interfaces:
+      - openai-compatible-chat-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: production
+      docs_url: https://console.groq.com/docs/models
+      verified_on: "2026-09-16"
+  groq-compound:
+    provider: groq
+    model_id: groq/compound
+    interfaces:
+      - openai-compatible-chat-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: production_system
+      docs_url: https://console.groq.com/docs/models
+      verified_on: "2026-09-16"
+  meta-llama-4-maverick:
+    provider: meta-llama
+    model_id: Llama-4-Maverick-17B-128E-Instruct-FP8
+    interfaces:
+      - openai-compatible-chat-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: account_catalog_check_required
+      catalog_note: Confirm availability through the authenticated Meta models endpoint.
+      docs_url: https://github.com/meta-llama/llama-api-python
+      verified_on: "2026-09-16"
+  kimi-k2.6:
+    provider: moonshot
+    model_id: kimi-k2.6
+    interfaces:
+      - openai-compatible-chat-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://platform.kimi.com/docs/guide/kimi-k2-6-quickstart
+      verified_on: "2026-09-16"
+  ollama-gpt-oss-20b:
+    provider: ollama
+    model_id: gpt-oss:20b
+    interfaces:
+      - openai-compatible-chat-v1
+      - openai-compatible-responses-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: local_template
+      availability_requirement: Run `ollama pull gpt-oss:20b` before use.
+      docs_url: https://docs.ollama.com/api/openai-compatibility
+      verified_on: "2026-09-16"
+  ernie-4.5-turbo-20260402:
+    provider: qianfan
+    model_id: ernie-4.5-turbo-20260402
+    interfaces:
+      - openai-compatible-chat-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://cloud.baidu.com/doc/qianfan/s/Smoghsq3g
+      verified_on: "2026-09-16"
+  vllm-gpt-oss-20b:
+    provider: vllm
+    model_id: openai/gpt-oss-20b
+    interfaces:
+      - openai-compatible-chat-v1
+      - openai-compatible-responses-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: false
+      streaming: true
+    metadata:
+      support_status: local_template
+      availability_requirement: Start vLLM with served model name openai/gpt-oss-20b.
+      docs_url: https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/
+      verified_on: "2026-09-16"
+  doubao-seed-2.0-lite:
+    provider: volcengine-ark
+    model_id: doubao-seed-2-0-lite-260215
+    interfaces:
+      - openai-compatible-responses-v1
+    default_interface: openai-compatible-responses-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://www.volcengine.com/docs/82379/1795150
+      verified_on: "2026-09-16"
+  glm-5.2:
+    provider: zhipu
+    model_id: glm-5.2
+    interfaces:
+      - openai-compatible-chat-v1
+    default_interface: openai-compatible-chat-v1
+    capabilities:
+      reasoning: true
+      streaming: true
+    metadata:
+      support_status: current
+      docs_url: https://docs.bigmodel.cn/cn/guide/models/text/glm-5.2
+      verified_on: "2026-09-16"

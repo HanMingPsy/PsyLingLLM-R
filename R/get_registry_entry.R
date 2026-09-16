@@ -276,8 +276,15 @@ registry_project_resolved_entry <- function(resolved) {
 registry_project_v2_flat <- function(registry) {
   validate_registry_schema(registry)
   projected <- list()
+  model_keys <- names(registry$models)
+  compatibility_keys <- model_keys[vapply(model_keys, function(model_key) {
+    isTRUE(registry$models[[model_key]]$metadata$compatibility_key)
+  }, logical(1))]
+  if (length(compatibility_keys) > 0L) {
+    model_keys <- compatibility_keys
+  }
 
-  for (model_key in names(registry$models)) {
+  for (model_key in model_keys) {
     model <- registry$models[[model_key]]
     labels <- model$metadata$legacy_interfaces %||% model$interfaces
     entries <- list()

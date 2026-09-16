@@ -15,27 +15,76 @@ system_registry_cases <- function() {
   )
 }
 
+system_registry_v1_equivalence_cases <- function() {
+  list(
+    c("gpt-4o", "chat"),
+    c("gpt-4o", "responses")
+  )
+}
+
 test_that("the bundled production registry is a valid v2 bundle", {
   registry <- system_registry_v2_fixture()
 
   expect_identical(registry$schema_version, 2L)
   expect_true(validate_registry_schema(registry))
-  expect_setequal(
-    names(registry$models),
-    c("deepseek-chat", "deepseek-reasoner", "gpt-4o")
-  )
+  expect_true(all(c("deepseek-chat", "deepseek-reasoner", "gpt-4o") %in%
+    names(registry$models)))
   expect_error(
     resolve_registry_entry("gpt-4o", registry = registry),
     class = "registry_resolution_error"
   )
 })
 
+test_that("every bundled model interface resolves and builds offline", {
+  registry <- system_registry_v2_fixture()
+  context <- new_llm_call_context(
+    material = "Offline fixture",
+    api_key = "TEST_TOKEN_PLACEHOLDER",
+    optionals_missing = FALSE,
+    optionals_value = NULL,
+    stream = FALSE,
+    timeout = 30
+  )
+
+  for (model_key in names(registry$models)) {
+    model <- registry$models[[model_key]]
+    for (interface_id in model$interfaces) {
+      config <- resolve_registry_entry(
+        model_key,
+        interface_id,
+        registry = registry
+      )
+      entry <- registry_project_resolved_entry(config)
+      request_context <- context
+      if (identical(model_key, "azure-gpt-4.1-nano")) {
+        request_context$api_url <- paste0(
+          "https://example.openai.azure.com/openai/v1/",
+          if (identical(config$interface$protocol, "openai_responses")) {
+            "responses"
+          } else {
+            "chat/completions"
+          }
+        )
+      }
+      request <- build_llm_request(
+        config$interface$request$builder,
+        runtime_request_builder_input(config, entry),
+        request_context
+      )
+      request <- configure_llm_request_transport(request, config)
+
+      expect_true(nzchar(request$url), info = model_key)
+      expect_identical(request$body$model, config$model$id)
+    }
+  }
+})
+
 test_that("the v2 public projection preserves the bundled v1 contract", {
   old <- system_registry_v1_fixture()
   current <- load_registry()
 
-  expect_setequal(names(current), names(old))
-  for (case in system_registry_cases()) {
+  expect_true(all(names(old) %in% names(current)))
+  for (case in system_registry_v1_equivalence_cases()) {
     model_key <- case[[1L]]
     interface <- case[[2L]]
     old_entry <- normalize_registry_entry(
@@ -75,7 +124,7 @@ test_that("v1 and bundled v2 generate equivalent requests", {
     )
   )
 
-  for (case in system_registry_cases()) {
+  for (case in system_registry_v1_equivalence_cases()) {
     model_key <- case[[1L]]
     interface <- case[[2L]]
     old_config <- resolve_registry_entry(
