@@ -79,6 +79,53 @@ test_that("every bundled model interface resolves and builds offline", {
   }
 })
 
+test_that("xAI Responses uses the native nested reasoning wire shape", {
+  registry <- system_registry_v2_fixture()
+  config <- resolve_registry_entry("grok-4.6", registry = registry)
+  request <- build_llm_request(
+    config$interface$request$builder,
+    config,
+    new_llm_call_context(
+      material = "Offline fixture",
+      api_key = "TEST_TOKEN_PLACEHOLDER",
+      optionals_missing = FALSE,
+      optionals_value = list(reasoning = list(effort = "high")),
+      stream = FALSE,
+      timeout = 30
+    )
+  )
+
+  expect_true("reasoning" %in% names(
+    config$interface$request$parameters
+  ))
+  expect_false("reasoning_effort" %in% names(
+    config$interface$request$parameters
+  ))
+  expect_identical(request$body$reasoning, list(effort = "high"))
+  expect_false("reasoning_effort" %in% names(request$body))
+})
+
+test_that("unverified Meta compatibility is explicit in registry metadata", {
+  registry <- system_registry_v2_fixture()
+  config <- resolve_registry_entry(
+    "meta-llama-4-maverick",
+    registry = registry
+  )
+
+  expect_identical(
+    config$provider$metadata$protocol_status,
+    "unverified"
+  )
+  expect_identical(
+    config$model$metadata$support_status,
+    "experimental_unverified"
+  )
+  expect_match(
+    config$provider$metadata$compatibility_note,
+    "native /v1 API"
+  )
+})
+
 test_that("the v2 public projection preserves the bundled v1 contract", {
   old <- system_registry_v1_fixture()
   current <- load_registry()

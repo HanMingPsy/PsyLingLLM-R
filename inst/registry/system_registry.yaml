@@ -127,6 +127,8 @@ providers:
       docs_url: https://llama.developer.meta.com/docs
       models_url: https://api.llama.com/v1/models
       protocol_mode: openai_compatibility
+      protocol_status: unverified
+      compatibility_note: Confirm the /compat/v1 response contract before production use; the documented native /v1 API uses a different response shape.
       catalog_mode: account_dynamic
       verified_on: "2026-09-16"
   moonshot:
@@ -715,9 +717,9 @@ interfaces:
         max_output_tokens:
           description: Native xAI Responses output-token limit.
           docs_url: https://docs.x.ai/developers/grok-4-6
-        reasoning_effort:
-          description: Native Grok reasoning-effort control.
-          docs_url: https://docs.x.ai/developers/grok-4-6
+        reasoning:
+          description: "Native xAI Responses reasoning configuration, for example {effort: high}."
+          docs_url: https://docs.x.ai/developers/model-capabilities/text/reasoning
         prompt_cache_key:
           description: Native xAI prompt-cache routing key.
           docs_url: https://docs.x.ai/developers/grok-4-6
@@ -1323,8 +1325,9 @@ models:
       reasoning: false
       streaming: true
     metadata:
-      support_status: account_catalog_check_required
+      support_status: experimental_unverified
       catalog_note: Confirm availability through the authenticated Meta models endpoint.
+      compatibility_note: The configured /compat/v1 OpenAI response contract requires fixture or live verification before production use.
       docs_url: https://github.com/meta-llama/llama-api-python
       verified_on: "2026-09-16"
   kimi-k2.6:
