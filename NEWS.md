@@ -7,6 +7,9 @@
   experiment-facing behavior.
 - Added reusable protocol support for OpenAI-compatible Chat Completions,
   OpenAI Responses, DeepSeek-compatible chat, and Anthropic Messages.
+- Added explicit support levels and opt-in production Registry smoke tests.
+  OpenAI Responses, DeepSeek Chat/Responses, and Qwen Chat/Responses passed
+  live non-stream and stream verification for the documented model entries.
 - Preserved Registry v1 user files and the existing public registry return
   structures through compatibility projections.
 - Added network-free contract tests for request construction, streaming,

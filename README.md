@@ -15,7 +15,7 @@ The 0.4 release separates model resolution, request construction, transport, and
     Custom Endpoint Support: Handles non-standard API structures from local deployments and proxy services
     
     **Pre-Configured Provider Templates**<br>
-    Major Provider Support:  Ready to use and pre-optimized templates for major providers
+    Provider Catalog: Reviewed Registry templates for major providers; the support matrix below distinguishes live-verified integrations from offline contracts and deployment templates
     Standardized Interfaces: Unified access patterns across different API specifications
     Rapid Deployment: Quick-start configurations requiring minimal customization
 
@@ -25,6 +25,42 @@ The 0.4 release separates model resolution, request construction, transport, and
 
     See Part II for the registry system.
 ***
+
+## PsyLingLLM 0.4 support matrix
+
+Registry presence does not by itself mean that an integration has been tested
+against a live service. PsyLingLLM 0.4 uses the following support levels:
+
+- **Live verified**: the bundled production Registry completed real non-stream
+  and stream calls, returned a non-empty normalized answer, and preserved token
+  usage without exposing credentials.
+- **Offline verified**: schema, resolution, request generation, mock transport,
+  response parsing, and result normalization are covered without a provider
+  account.
+- **Deployment template**: correctness also depends on the user's deployment,
+  endpoint, served model name, or installed local model.
+- **Experimental**: the upstream compatibility contract or account catalog has
+  not yet been verified and must not be treated as production support.
+
+| Provider or deployment | Bundled protocol | 0.4 status | Verification scope |
+|---|---|---|---|
+| OpenAI | Responses | **Live verified** | `gpt-5.6-luna`; non-stream and stream |
+| DeepSeek | Chat Completions, Responses | **Live verified** | `deepseek-flash`; non-stream and stream |
+| Qwen | Chat Completions, Responses | **Live verified** | `qwen3.8-flash`; workspace endpoint override, non-stream and stream, plus `trial_experiment()` |
+| Anthropic | Messages | **Offline verified** | Native request/parser contract; the adapter also passed live tests through a Qwen Anthropic-compatible endpoint, but the bundled Anthropic provider was not tested with an Anthropic account |
+| Gemini | OpenAI-compatible Chat | **Offline verified (beta)** | Basic answer and streaming contract; thought-summary extraction is not claimed |
+| Mistral | Chat Completions | **Offline verified** | Rolling model aliases require upstream availability checks |
+| xAI | Responses | **Offline verified** | Native nested `reasoning` request shape covered; no xAI credential used |
+| Groq, Kimi, GLM, Qianfan | OpenAI-compatible Chat | **Offline verified** | Provider-native parameters pass through unchanged; no live credential used |
+| Volcengine Ark | Responses | **Offline verified** | Official request and typed response contract; no live credential used |
+| Azure OpenAI | Responses | **Deployment template** | Requires a complete deployment URL and matching deployment name |
+| Ollama, vLLM | OpenAI-compatible Chat/Responses | **Deployment template** | Depends on local server version, model installation, chat template, and served model name |
+| Meta Llama API | `/compat/v1` Chat compatibility | **Experimental** | Account catalog and compatibility response shape remain unverified; the documented native `/v1` response is not OpenAI-shaped |
+
+The live verification date for the maintained 0.4 production paths is
+2026-09-17. Other models that reuse a verified interface still require an
+upstream availability check; protocol verification does not guarantee that
+every account can access every model ID.
 
 ## 📖 Background
 

@@ -44,8 +44,8 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 8 release validation complete — final CRAN submission
-awaiting explicit approval**.
+Current phase: **Phase 8 release validation complete after production Registry
+live verification — final CRAN submission still requires explicit approval**.
 
 Phase 1 delivered:
 
@@ -155,8 +155,8 @@ for every bundled interface. The complete offline suite passes, and the built
 source tarball passes `R CMD check --no-manual` with `Status: OK` under the
 Windows `C` locale. Network access and real credentials were not used.
 
-Real-provider smoke tests remain deferred until the user explicitly supplies
-credentials and approves their use. Phase 7 was reviewed and committed before
+Real-provider smoke tests were initially deferred until the user supplied
+credentials and approved their use. Phase 7 was reviewed and committed before
 Phase 8 release metadata and documentation work began.
 
 Phase 8 local release preparation has now:
@@ -200,15 +200,43 @@ Phase 8 local release preparation has now:
 12. Prepared `cran-comments.md` to summarize the release checks and explain the
     expected new-submission and domain-spelling NOTE. The file is excluded from
     the CRAN source tarball.
+13. Audited the expanded provider catalog against current upstream
+    documentation and official SDK contracts. Corrected the xAI Responses
+    reasoning request metadata to use nested `reasoning.effort`, and marked the
+    undocumented Meta `/compat/v1` response contract as experimental and
+    unverified rather than claiming production support.
+14. Added an opt-in production Registry live-test layer that suppresses user
+    Registry overrides. With explicit user approval and environment-provided
+    credentials, OpenAI Responses (`gpt-5.6-luna`), DeepSeek Chat and Responses
+    (`deepseek-flash`), and Qwen Chat and Responses (`qwen3.8-flash`) passed
+    non-stream and stream tests on 2026-09-17. Qwen also passed a complete
+    bundled-Registry `trial_experiment()` data path.
+15. Re-ran the separate live adapter suite. The Anthropic Messages adapter
+    passed through a Qwen Anthropic-compatible endpoint; provider error
+    evidence, secret redaction, trial data, and multi-turn conversation data
+    also passed. This does not claim that the bundled Anthropic provider has
+    been tested against an official Anthropic account.
+16. Added a user-facing 0.4 support matrix that distinguishes live-verified
+    integrations, offline protocol contracts, deployment templates, and
+    experimental entries. Registry presence alone is not documented as proof
+    of live provider support.
+17. Re-ran the complete default offline suite, rebuilt and inspected the source
+    tarball, and passed the final local `R CMD check --as-cran --no-manual`
+    with `Status: OK`. The tarball contains the production Registry and opt-in
+    live-test source but excludes credentials, development plans, check output,
+    temporary directories, and local API results.
 
 The full local `--as-cran` run reached all package checks successfully, but PDF
 manual generation was blocked by the host MiKTeX installation lacking
 `stringenc.sty`; Rd validation and the HTML manual passed. This is an external
 toolchain limitation, not evidence of an Rd defect. The final tarball has now
 passed R-devel/Win-builder and practical Windows, macOS, and Linux checks.
-Phase 8 release validation is complete. Formal CRAN submission remains a
-separate external action requiring explicit user approval. Real-provider smoke
-tests remain separately opt-in and require user-provided credentials.
+The post-live-test Phase 8 release regression is complete. The final offline
+suite, source build, tarball inspection, and CRAN-style check all passed after
+the Registry, tests, README, NEWS, and this guide were updated. Formal CRAN
+submission remains a separate external action requiring explicit user
+approval. Real-provider smoke tests remain separately opt-in and require
+user-provided credentials.
 
 ## CRAN Submission Standard
 
@@ -672,9 +700,13 @@ Probe logic must not assume every endpoint uses OpenAI JSON, `stream`, SSE `data
 
 Current credential policy:
 
-- During the current development stages, do not request, use, store, or transmit any real API key.
+- Normal development, examples, package checks, and default tests do not
+  request, use, store, or transmit any real API key.
 - Complete schema, compatibility, resolver, request-builder, transport, parser, caller, and experiment-compatibility tests with fixtures, injected mocks, or a local mock server.
-- Real-provider smoke testing is deferred until the user explicitly provides credentials and approves that specific test run.
+- Real-provider smoke testing requires credentials supplied outside source
+  control and explicit approval for the specific run. The maintained 0.4
+  production paths were approved and tested on 2026-09-17; future reruns remain
+  opt-in.
 - Absence of credentials does not block Phases 1 through 4 or network-free protocol contract tests.
 - Never copy a credential into source code, YAML, test fixtures, command history, snapshots, logs, Git diffs, or persisted debug output.
 
@@ -746,6 +778,10 @@ Run focused tests first, then the full test suite and `R CMD check` when practic
 - A provider using an existing protocol can be added without changing `llm_caller()`.
 - A new protocol can be added through reusable runtime components without provider branches in orchestration.
 - OpenAI-compatible, DeepSeek, and Anthropic-style scenarios have network-free contract tests. Add a local-runtime scenario only when PsyLingLLM claims that protocol as supported in 0.4.0.
+- The README support matrix accurately separates live-verified integrations,
+  offline contracts, deployment templates, and experimental entries.
+- Opt-in production Registry tests cover the maintained live-verified 0.4
+  paths without altering user Registry files or persisting credentials.
 - Existing bundled models continue working.
 - Existing experiments, exported names, function signatures, and documented return contracts remain compatible.
 - All existing `llm_caller()` formals retain their order, defaults, and
