@@ -260,6 +260,7 @@ interfaces:
       legacy_streaming_enabled: true
       docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
       verified_on: "2026-09-07"
+      live_verified_on: "2026-09-17"
 
   openai-chat-completions-v1:
     protocol: openai_chat
@@ -403,6 +404,7 @@ interfaces:
       docs_url: https://developers.openai.com/api/reference/resources/responses/methods/create
       protocol_status: current
       verified_on: "2026-09-16"
+      live_verified_on: "2026-09-17"
 
   openai-responses-nonstream-v1:
     protocol: openai_responses
@@ -487,6 +489,7 @@ interfaces:
       docs_url: https://api-docs.deepseek.com/guides/responses_api/
       protocol_status: current
       verified_on: "2026-09-16"
+      live_verified_on: "2026-09-17"
 
   anthropic-messages-v1:
     protocol: anthropic_messages
@@ -574,6 +577,7 @@ interfaces:
       docs_url: https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope
       protocol_status: current
       verified_on: "2026-09-16"
+      live_verified_on: "2026-09-17"
 
   qwen-responses-v1:
     protocol: openai_responses
@@ -616,6 +620,7 @@ interfaces:
       docs_url: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses
       protocol_status: current
       verified_on: "2026-09-16"
+      live_verified_on: "2026-09-17"
 
   gemini-openai-chat-v1beta:
     protocol: openai_chat
@@ -864,6 +869,7 @@ models:
       support_status: current
       docs_url: https://api-docs.deepseek.com/api/create-chat-completion/
       verified_on: "2026-09-16"
+      live_verified_on: "2026-09-17"
   deepseek-v4-pro:
     provider: deepseek
     model_id: deepseek-v4-pro
@@ -944,6 +950,7 @@ models:
       support_status: current
       docs_url: https://developers.openai.com/api/docs/models/gpt-5.6-luna
       verified_on: "2026-09-16"
+      live_verified_on: "2026-09-17"
   gpt-5.5:
     provider: openai
     model_id: gpt-5.5
@@ -1104,6 +1111,7 @@ models:
       support_status: current
       docs_url: https://help.aliyun.com/zh/model-studio/qwen3-8-flash
       verified_on: "2026-09-16"
+      live_verified_on: "2026-09-17"
   qwen3.7-plus:
     provider: qwen
     model_id: qwen3.7-plus

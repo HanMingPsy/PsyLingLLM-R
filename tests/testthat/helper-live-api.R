@@ -195,6 +195,22 @@ live_api_use_registry <- function() {
   invisible(registry_path)
 }
 
+live_api_use_system_registry <- function() {
+  local_envir <- parent.frame()
+  directory <- withr::local_tempdir(.local_envir = local_envir)
+  missing_user_registry <- file.path(directory, "missing-user-registry.yaml")
+  testthat::local_mocked_bindings(
+    get_registry_path = function() missing_user_registry,
+    .package = "PsyLingLLM",
+    .env = local_envir
+  )
+  invisible(missing_user_registry)
+}
+
+live_api_endpoint <- function(base_url, path) {
+  paste0(sub("/+$", "", base_url), "/", sub("^/+", "", path))
+}
+
 live_api_use_openai_proxy <- function() {
   proxy <- Sys.getenv("OPENAI_HTTPS_PROXY")
   if (nzchar(proxy)) {

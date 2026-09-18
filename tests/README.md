@@ -43,3 +43,10 @@ Live tests use temporary Registry v2 and output paths. They assert protocol
 connectivity, streaming, error evidence, secret redaction, trial data, and
 multi-turn conversation history without modifying the bundled or user
 registry.
+
+The `test-live-system-registry.R` layer additionally suppresses the user
+registry and exercises models and interfaces from the bundled production
+Registry. These tests cover OpenAI Responses, DeepSeek Chat, Qwen Chat,
+DeepSeek Responses, Qwen Responses, streaming, and one experiment-data path.
+They use the same explicit opt-in and credential requirements as the
+fixture-based live tests.
