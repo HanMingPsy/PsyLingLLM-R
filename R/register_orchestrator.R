@@ -166,13 +166,23 @@ llm_register <- function(url,
 ) {
   provider <- normalize_provider_label(provider)
 
+  # Keep reusable templates secret-free even when callers supplied a literal
+  # credential instead of ${API_KEY}. The effective request below restores the
+  # real key only for transport.
+  headers_template <- template_registration_credential(headers, api_key)
+  body_template <- template_registration_credential(body, api_key)
+
   # ---- Pass 1: ORIGINAL INPUTS (as user provided) ----
-  input_raw_p1 <- list(url = url, headers = headers, body = body)
+  input_raw_p1 <- list(
+    url = url,
+    headers = headers_template,
+    body = body_template
+  )
 
   # calls use substituted "effective" inputs
   mapping <- list(API_KEY = api_key, CONTENT = content_value)
-  headers_eff_p1 <- sub_placeholders(headers, mapping)
-  body_eff_p1    <- sub_placeholders(body,    mapping)
+  headers_eff_p1 <- sub_placeholders(headers_template, mapping)
+  body_eff_p1    <- sub_placeholders(body_template, mapping)
 
   # Probe with Pass-1 effective
   res1 <- probe_llm_streaming(url = url, headers = headers_eff_p1, body = body_eff_p1, stream_param = stream_param, timeout = timeout)
@@ -189,9 +199,11 @@ llm_register <- function(url,
 
   # Input echo
   L <- c(L, "\n[Input]")
-  hdr_lines <- if (length(headers_eff_p1)) paste(sprintf("\"%s\" = \"%s\"", names(headers_eff_p1), headers_eff_p1), collapse = ",\n                ") else ""
+  headers_report <- redact_llm_diagnostics(headers_eff_p1)
+  body_report <- redact_llm_diagnostics(body_eff_p1)
+  hdr_lines <- if (length(headers_report)) paste(sprintf("\"%s\" = \"%s\"", names(headers_report), headers_report), collapse = ",\n                ") else ""
   L <- c(L, if (nzchar(hdr_lines)) sprintf("headers <- list(%s)", hdr_lines) else "headers <- list()")
-  body_p1_dump <- capture.output(dput(body_eff_p1))
+  body_p1_dump <- capture.output(dput(body_report))
   L <- c(L, paste("\nbody <-", paste(body_p1_dump, collapse = "\n        ")))
 
   # Non-streaming (Pass 1)
@@ -239,7 +251,11 @@ llm_register <- function(url,
   # --- Pass 2: standardized self-test (ports retrievability only)
 
   # pick model from the effective body
-  std <- build_standardized_input(headers, body, optional_keys = optional_defaults)
+  std <- build_standardized_input(
+    headers_template,
+    body_template,
+    optional_keys = optional_defaults
+  )
   # templates for record (as "raw" of pass2)
   headers_p2_tmpl <- std$headers_p2 %||% std$headers
   body_p2_tmpl    <- std$body_p2    %||% std$body
@@ -251,7 +267,7 @@ llm_register <- function(url,
     role_mapping = role_mapping,
     defaults = optional_defaults,
     include_system = FALSE,                 # per our latest rule
-    pass1_body_for_roles = body
+    pass1_body_for_roles = body_template
   )
 
   res2 <- probe_llm_streaming(url, eff2$headers, eff2$body, stream_param = stream_param, timeout = timeout)
@@ -298,12 +314,15 @@ llm_register <- function(url,
 
   # Generate the structured report (uses the helper you defined)
   L <- c(L, render_pass2_path_consistency_report(pass1_paths, pass2_paths))
+  L <- redact_llm_diagnostics(
+    template_registration_credential(L, api_key)
+  )
 
   # Final print
   cat_slowly(L, delay = 0.025, final_delay = 2)
 
   # Decide model id (prefer Pass-1 body$model; else best-guess)
-  model_eff <- body$model %||% "unnamed-model"
+  model_eff <- body_template$model %||% "unnamed-model"
 
   # error detection and early return
   e1 <- e2 <- NULL
@@ -325,12 +344,23 @@ llm_register <- function(url,
       )),
       collapse = " \n "
     )
-    warning(sprintf("[llm_register] Probe error(s):\n    %s", msg), call. = FALSE)
+    warning(
+      sprintf(
+        "[llm_register] Probe error(s):\n    %s",
+        redact_diagnostic_text(
+          template_registration_credential(msg, api_key)
+        )
+      ),
+      call. = FALSE
+    )
     return()
   }
 
   # ---- Record method / role_mapping exactly as provided by the caller (no inference here) ----
-  role_mapping_auto <- tryCatch(infer_role_mapping_from_body(body), error = function(e) NULL)
+  role_mapping_auto <- tryCatch(
+    infer_role_mapping_from_body(body_template),
+    error = function(e) NULL
+  )
   role_mapping_final <- role_mapping %||% role_mapping_auto %||%
     tryCatch(std$diagnostics$role_mapping_inferred, error = function(e) NULL)
 
@@ -339,9 +369,15 @@ llm_register <- function(url,
     report = L,  # your assembled report lines (character vector)
 
     pass1 = list(
-      details = res1,
-      input_raw = list(url = url, headers = headers, body = body),  # EXACT originals
-      input_effective = list(url = url, headers = headers_eff_p1, body = body_eff_p1),
+      details = redact_llm_diagnostics(
+        template_registration_credential(res1, api_key)
+      ),
+      input_raw = input_raw_p1,
+      input_effective = redact_llm_diagnostics(list(
+        url = url,
+        headers = headers_eff_p1,
+        body = body_eff_p1
+      )),
       ports = list(
         respond_path        = ns_answer_path,       # from your scoring/selection
         thinking_path       = ns_think_path,        # may be NULL
@@ -352,10 +388,20 @@ llm_register <- function(url,
     ),
     pass2 = list(
       # Pass-2 processed template we standardized (with ${PARAMETER}: {})
-      input_raw = list(url = url, headers = headers, body = std$body_p2),
+      input_raw = list(
+        url = url,
+        headers = template_registration_credential(headers_p2_tmpl, api_key),
+        body = template_registration_credential(body_p2_tmpl, api_key)
+      ),
       # Effective inputs actually used for Pass-2 probe (placeholders substituted, defaults merged)
-      input_effective = list(url = url, headers = headers_p2_tmpl, body = body_p2_tmpl),
-      details = res2
+      input_effective = redact_llm_diagnostics(list(
+        url = url,
+        headers = eff2$headers,
+        body = eff2$body
+      )),
+      details = redact_llm_diagnostics(
+        template_registration_credential(res2, api_key)
+      )
     )
   )
 
@@ -370,7 +416,7 @@ llm_register <- function(url,
       provider             = provider,                 # e.g., "official","chutes.ai","local"
       generation_interface = generation_interface,
       url                  = url,                      # persisted as default_url only when provider == "official"
-      headers_input        = headers,                  # EXACT user headers (placeholders intact)
+      headers_input        = headers_template,
       role_mapping_input   = role_mapping_final,            # NULL -> stored as ~ (no inference)
       stream_param         = stream_param,
       optional_defaults    = optional_defaults
@@ -410,9 +456,21 @@ llm_register <- function(url,
   invisible(list(
     report = L,
     pass1 = list(
-      details = res1,
-      ns = list(best = ns_best, candidates = ns_cand),
-      st = list(best = st_best, candidates = st_cand),
+      details = redact_llm_diagnostics(
+        template_registration_credential(res1, api_key)
+      ),
+      ns = redact_llm_diagnostics(
+        template_registration_credential(
+          list(best = ns_best, candidates = ns_cand),
+          api_key
+        )
+      ),
+      st = redact_llm_diagnostics(
+        template_registration_credential(
+          list(best = st_best, candidates = st_cand),
+          api_key
+        )
+      ),
       ports = list(
         respond_path = ns_answer_path,
         thinking_path = ns_think_path,
@@ -421,7 +479,16 @@ llm_register <- function(url,
       ),
       detected_system = std$diagnostics$default_system %||% NULL
     ),
-    pass2 = if (exists("res2")) list(details = res2, warnings = warnings) else NULL
+    pass2 = if (exists("res2")) {
+      list(
+        details = redact_llm_diagnostics(
+          template_registration_credential(res2, api_key)
+        ),
+        warnings = NULL
+      )
+    } else {
+      NULL
+    }
   ))
 
 }

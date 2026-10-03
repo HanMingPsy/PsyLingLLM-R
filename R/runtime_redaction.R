@@ -75,6 +75,31 @@ redact_diagnostic_text <- function(value) {
        "[REDACTED]", value, perl = TRUE)
 }
 
+# Replace a known registration credential with the reusable Registry
+# placeholder. This operates on a copy: callers still substitute the real key
+# into the request that is sent to the provider.
+template_registration_credential <- function(value, api_key) {
+  valid_key <- is.character(api_key) && length(api_key) == 1L &&
+    !is.na(api_key) && nzchar(api_key)
+  if (!valid_key || is.null(value)) {
+    return(value)
+  }
+
+  if (is.list(value)) {
+    result <- value
+    for (index in seq_along(value)) {
+      result[[index]] <- template_registration_credential(value[[index]], api_key)
+    }
+    return(result)
+  }
+
+  if (is.character(value)) {
+    return(gsub(api_key, "${API_KEY}", value, fixed = TRUE))
+  }
+
+  value
+}
+
 diagnostic_request_payload <- function(payload) {
   parsed <- if (is.character(payload) && length(payload) == 1L) {
     tryCatch(

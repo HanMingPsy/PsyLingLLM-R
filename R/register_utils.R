@@ -416,7 +416,7 @@ register_endpoint_offline <- function(model,
   }
 
   if (do_register) {
-    registry_path <- "~/.psylingllm/user_registry.yaml"
+    registry_path <- get_registry_path()
     register_endpoint_to_user_registry(entry, registry_path)
     message(sprintf("[PsyLingLLM]  Registered '%s' in %s", model, registry_path))
   } else {
