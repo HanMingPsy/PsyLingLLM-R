@@ -145,3 +145,133 @@ test_that("planner preparation rejects unsafe or ambiguous inputs", {
     class = "experiment_spec_error"
   )
 })
+
+test_that("processed planner responses reach reviewed Experiment Spec plans", {
+  acknowledgement_call <- prepare_experiment_planner_call(
+    "deepseek-chat",
+    "chat"
+  )
+  acknowledgement_response <- process_experiment_planner_response(
+    acknowledgement_call,
+    list(
+      status = 200L,
+      response_status = "OK",
+      answer = planner_acknowledgement_json(),
+      usage = list(id = "planner-onboarding-id")
+    )
+  )
+  expect_true(acknowledgement_response$valid)
+  expect_identical(
+    acknowledgement_response$acknowledgement,
+    planner_acknowledgement_json()
+  )
+  expect_identical(
+    acknowledgement_response$request_id,
+    "planner-onboarding-id"
+  )
+
+  source_materials <- c(
+    "The teacher praised the student.",
+    "The sandwich frightened the doctor."
+  )
+  spec_call <- prepare_experiment_planner_call(
+    "deepseek-chat",
+    "chat",
+    turn = "spec",
+    requirements = "Use one condition field named Condition.",
+    source_materials = source_materials,
+    acknowledgement = planner_acknowledgement_json()
+  )
+  spec_json <- paste(
+    readLines(
+      test_path("fixtures", "experiment-spec", "valid-trial-v1.json"),
+      warn = FALSE,
+      encoding = "UTF-8"
+    ),
+    collapse = "\n"
+  )
+  spec_response <- process_experiment_planner_response(
+    spec_call,
+    list(
+      status = 200L,
+      response_status = "OK",
+      answer = spec_json,
+      usage = list(id = "planner-spec-id")
+    ),
+    source_materials = source_materials,
+    required_condition_names = "Condition"
+  )
+
+  expect_true(spec_response$valid)
+  expect_s3_class(spec_response$plan, "psylingllm_experiment_plan")
+  expect_s3_class(spec_response$review, "psylingllm_experiment_review")
+  expect_identical(spec_response$plan$data$Material, source_materials)
+  expect_identical(spec_response$review$preview$projected_runs, 2L)
+  expect_identical(spec_response$request_id, "planner-spec-id")
+})
+
+test_that("processed planner responses reject API and fidelity failures", {
+  call <- prepare_experiment_planner_call(
+    "deepseek-chat",
+    "chat",
+    turn = "spec",
+    requirements = "Create one trial.",
+    source_materials = "Exact material.",
+    acknowledgement = planner_acknowledgement_json()
+  )
+  api_failure <- process_experiment_planner_response(
+    call,
+    list(
+      status = 599L,
+      response_status = "ERROR",
+      answer = NULL,
+      error = list(message = "Provider rejected the request."),
+      usage = list(id = "failed-request-id")
+    ),
+    source_materials = "Exact material."
+  )
+  expect_false(api_failure$valid)
+  expect_identical(api_failure$errors[[1L]]$code, "planner_api_failure")
+  expect_null(api_failure$spec)
+
+  invalid_json <- process_experiment_planner_response(
+    call,
+    list(
+      status = 200L,
+      response_status = "OK",
+      answer = "```json\n{}\n```",
+      usage = list(id = "invalid-json-id")
+    ),
+    source_materials = "Exact material."
+  )
+  expect_false(invalid_json$valid)
+  expect_identical(invalid_json$errors[[1L]]$code, "invalid_json")
+  expect_match(
+    experiment_planner_validation_feedback(invalid_json),
+    "Return one corrected Experiment Spec v1 JSON object only.",
+    fixed = TRUE
+  )
+
+  fixture_path <- test_path(
+    "fixtures", "experiment-spec", "valid-trial-v1.json"
+  )
+  changed_material <- process_experiment_planner_response(
+    call,
+    list(
+      status = 200L,
+      response_status = "OK",
+      answer = paste(readLines(fixture_path, warn = FALSE), collapse = "\n"),
+      usage = list()
+    ),
+    source_materials = c(
+      "The teacher praised the student.",
+      "The doctor was frightened by a sandwich."
+    ),
+    required_condition_names = "Condition"
+  )
+  expect_false(changed_material$valid)
+  expect_identical(
+    changed_material$errors[[1L]]$code,
+    "material_fidelity_failure"
+  )
+})
