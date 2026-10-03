@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://psylingllm.org/schema/experiment-spec-v1.schema.json",
+  "title": "PsyLingLLM Experiment Spec v1",
+  "description": "A reviewed ordinary-trial experiment plan for PsyLingLLM.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_type",
+    "task",
+    "materials",
+    "runtime"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [1]
+    },
+    "experiment_type": {
+      "type": "string",
+      "enum": ["trial"]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trial_prompt"],
+      "properties": {
+        "trial_prompt": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "materials": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item", "material"],
+        "properties": {
+          "item": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "material": {
+            "type": "string",
+            "minLength": 1
+          },
+          "conditions": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {"type": "string"},
+                {"type": "number"},
+                {"type": "boolean"}
+              ]
+            }
+          },
+          "trial_prompt": {
+            "type": ["string", "null"]
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_key",
+        "generation_interface",
+        "system_content",
+        "repeats",
+        "random",
+        "stream",
+        "timeout",
+        "parameter_policy",
+        "parameters"
+      ],
+      "properties": {
+        "model_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation_interface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_content": {
+          "type": ["string", "null"]
+        },
+        "repeats": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "random": {
+          "type": "boolean"
+        },
+        "stream": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "parameter_policy": {
+          "type": "string",
+          "enum": ["explicit", "none"]
+        },
+        "parameters": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

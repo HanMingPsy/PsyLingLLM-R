@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "experiment_type": "trial",
+  "task": {
+    "trial_prompt": "Answer Y or N."
+  },
+  "materials": [
+    {
+      "item": 1,
+      "material": "A test material.",
+      "conditions": {"Condition": "Control"},
+      "response": "Y"
+    }
+  ],
+  "runtime": {
+    "model_key": "deepseek-flash",
+    "generation_interface": "chat",
+    "system_content": "Answer using only Y or N.",
+    "repeats": 1,
+    "random": false,
+    "stream": false,
+    "timeout": 120,
+    "parameter_policy": "explicit",
+    "parameters": {
+      "max_tokens": 512,
+      "api_key": "forbidden"
+    }
+  }
+}

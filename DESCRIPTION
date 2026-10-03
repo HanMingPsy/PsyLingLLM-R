@@ -32,6 +32,7 @@ Imports:
     utils,
     stringi
 Suggests:
+    jsonvalidate,
     testthat (>= 3.0.0),
     withr
 License: MIT + file LICENSE
