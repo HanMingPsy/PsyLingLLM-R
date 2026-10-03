@@ -111,6 +111,7 @@ validate_experiment_spec <- function(spec) {
   } else {
     item_values <- integer(length(materials))
     expected_condition_names <- NULL
+    expected_condition_types <- NULL
     for (index in seq_along(materials)) {
       row <- materials[[index]]
       path <- sprintf("$.materials[%d]", index)
@@ -142,6 +143,7 @@ validate_experiment_spec <- function(spec) {
       conditions <- row$conditions
       if (is.null(conditions)) {
         condition_names <- character()
+        condition_types <- character()
       } else if (!named_object(conditions)) {
         add_error(
           "invalid_conditions",
@@ -149,6 +151,7 @@ validate_experiment_spec <- function(spec) {
           "conditions must be an object with unique field names."
         )
         condition_names <- character()
+        condition_types <- character()
       } else {
         scalar_condition <- vapply(
           conditions,
@@ -171,14 +174,37 @@ validate_experiment_spec <- function(spec) {
           )
         }
         condition_names <- sort(names(conditions))
+        condition_types <- vapply(
+          conditions[condition_names],
+          function(value) {
+            if (is.character(value)) {
+              return("string")
+            }
+            if (is.logical(value)) {
+              return("boolean")
+            }
+            if (is.numeric(value)) {
+              return("number")
+            }
+            "invalid"
+          },
+          character(1)
+        )
       }
       if (is.null(expected_condition_names)) {
         expected_condition_names <- condition_names
+        expected_condition_types <- condition_types
       } else if (!identical(condition_names, expected_condition_names)) {
         add_error(
           "inconsistent_condition_fields",
           paste0(path, ".conditions"),
           "Every material row must use the same condition fields."
+        )
+      } else if (!identical(condition_types, expected_condition_types)) {
+        add_error(
+          "inconsistent_condition_types",
+          paste0(path, ".conditions"),
+          "Every condition field must use one consistent scalar type."
         )
       }
     }
