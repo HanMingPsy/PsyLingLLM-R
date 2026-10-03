@@ -45,7 +45,69 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 ## Current Migration Phase
 
 Current phase: **Phase 8 release validation complete after production Registry
-live verification — final CRAN submission still requires explicit approval**.
+live verification; a post-0.4 internal implementation track for versioned
+natural-language experiment specifications is now active. Formal CRAN
+submission still requires explicit approval.**
+
+### Current implementation track: Experiment Spec v1 foundation
+
+The immediate implementation target is a stable, internal-only foundation for
+turning natural-language experiment requirements into a reviewed PsyLingLLM
+trial plan. This work extends the package beside the existing experiment API;
+it must not alter existing experiment execution semantics.
+
+The verified test-only prototype is backed up by these commits:
+
+- `7908f23 fix(registry): harden registration credential handling`
+- `d7bcd26 feat(runtime): classify normalized response status`
+- `0a034e1 docs(package): rebuild experiment workflow guide`
+- `33852bb test(experiment): prototype natural language planning workflow`
+
+Production implementation order:
+
+1. Add one versioned JSON Schema Draft-07 asset for the `trial` experiment
+   plan. Draft-07 is the initial production dialect because the CRAN
+   `jsonvalidate` package and its AJV engine document support for Drafts 04,
+   06, and 07. Do not claim Draft 2020-12 runtime validation until the selected
+   R validator supports and tests it.
+2. Add internal schema loading, JSON parsing, structural validation, and
+   PsyLingLLM semantic validation. Keep actionable R validation errors even
+   when JSON Schema validation is also available.
+3. Add deterministic material normalization, source-fidelity review, execution
+   preview, and explicit approval objects.
+4. Add an allowlisted compiler that can produce only the existing
+   `trial_experiment()` call contract. It must return an R call specification;
+   it must never parse or evaluate model-generated R code.
+5. Add result validation and a secret-free execution receipt containing schema
+   versions, model/interface identity, planned/completed runs, status summaries,
+   and request IDs.
+6. Only after the offline foundation is complete, add Registry-selected
+   structured-output adapters for provider-native JSON object, JSON Schema, or
+   tool-input modes. Provider wire shapes must not be hard-coded in the
+   experiment planner or `llm_caller()`.
+
+Initial scope and gates:
+
+- Experiment Spec v1 supports ordinary `trial` experiments only.
+- Factorial, conversation, adaptive-feedback, and multi-model schemas remain
+  out of production scope until the trial path is stable.
+- New functions remain internal during the foundation phase. Do not export
+  them or modify generated `NAMESPACE`/`.Rd` files.
+- Do not modify `llm_caller()` or existing experiment functions for this
+  foundation.
+- Do not modify production Registry YAML in the schema/validator commit.
+- Keep API keys, API URLs, output paths, results, and arbitrary function names
+  outside the model-generated plan.
+- Treat JSON Schema as structural validation, not scientific or semantic
+  validation. Material fidelity, Registry resolution, run limits, protected
+  request fields, and approval remain explicit R checks.
+- Add `jsonvalidate` to `Suggests` initially and use it conditionally in tests
+  to check that JSON Schema and R validators agree. Do not add V8 to the core
+  runtime dependency chain during the foundation phase.
+- Default tests remain network-free. The existing natural-language live test
+  stays explicit opt-in, secret-safe, short, and skipped on CRAN.
+- Every implementation step must pass focused tests and the complete offline
+  suite before the next layer begins.
 
 Phase 1 delivered:
 
