@@ -275,3 +275,171 @@ test_that("processed planner responses reject API and fidelity failures", {
     "material_fidelity_failure"
   )
 })
+
+test_that("two-turn planner produces a review without exposing credentials", {
+  spec_json <- paste(
+    readLines(
+      test_path("fixtures", "experiment-spec", "valid-trial-v1.json"),
+      warn = FALSE,
+      encoding = "UTF-8"
+    ),
+    collapse = "\n"
+  )
+  calls <- list()
+  executor <- function(...) {
+    arguments <- list(...)
+    calls[[length(calls) + 1L]] <<- arguments
+    answer <- if (length(calls) == 1L) {
+      planner_acknowledgement_json()
+    } else {
+      spec_json
+    }
+    list(
+      status = 200L,
+      response_status = "OK",
+      answer = answer,
+      usage = list(id = paste0("request-", length(calls)))
+    )
+  }
+  secret <- "test-secret-must-not-escape"
+  source_materials <- c(
+    "The teacher praised the student.",
+    "The sandwich frightened the doctor."
+  )
+
+  session <- run_experiment_planner(
+    model_key = "deepseek-chat",
+    generation_interface = "chat",
+    requirements = "Use one condition field named Condition.",
+    source_materials = source_materials,
+    api_key = secret,
+    parameters = list(max_tokens = 2048L),
+    required_condition_names = "Condition",
+    executor = executor
+  )
+
+  expect_true(session$valid)
+  expect_identical(session$stage, "review")
+  expect_identical(session$attempts, 1L)
+  expect_identical(session$request_ids, c("request-1", "request-2"))
+  expect_s3_class(session$review, "psylingllm_experiment_review")
+  expect_identical(session$plan$data$Material, source_materials)
+  expect_length(calls, 2L)
+  expect_true(all(vapply(calls, function(call) call$api_key == secret, logical(1))))
+  session_json <- jsonlite::toJSON(session, auto_unbox = TRUE, null = "null")
+  expect_false(grepl(secret, session_json, fixed = TRUE))
+})
+
+test_that("two-turn planner repairs one invalid plan and then stops", {
+  valid_json <- paste(
+    readLines(
+      test_path("fixtures", "experiment-spec", "valid-trial-v1.json"),
+      warn = FALSE,
+      encoding = "UTF-8"
+    ),
+    collapse = "\n"
+  )
+  answers <- list(
+    planner_acknowledgement_json(),
+    "not json",
+    valid_json
+  )
+  calls <- list()
+  executor <- function(...) {
+    calls[[length(calls) + 1L]] <<- list(...)
+    list(
+      status = 200L,
+      response_status = "OK",
+      answer = answers[[length(calls)]],
+      usage = list(id = paste0("repair-", length(calls)))
+    )
+  }
+  source_materials <- c(
+    "The teacher praised the student.",
+    "The sandwich frightened the doctor."
+  )
+
+  session <- run_experiment_planner(
+    model_key = "deepseek-chat",
+    generation_interface = "chat",
+    requirements = "Use one condition field named Condition.",
+    source_materials = source_materials,
+    api_key = "local-test-key",
+    required_condition_names = "Condition",
+    executor = executor
+  )
+
+  expect_true(session$valid)
+  expect_identical(session$attempts, 2L)
+  expect_length(calls, 3L)
+  expect_length(calls[[3L]]$assistant_content, 4L)
+  expect_match(
+    calls[[3L]]$material,
+    "previous JSON failed deterministic PsyLingLLM validation",
+    fixed = TRUE
+  )
+})
+
+test_that("planner does not retry provider failures", {
+  calls <- 0L
+  executor <- function(...) {
+    calls <<- calls + 1L
+    if (calls == 1L) {
+      return(list(
+        status = 200L,
+        response_status = "OK",
+        answer = planner_acknowledgement_json(),
+        usage = list(id = "onboarding-id")
+      ))
+    }
+    list(
+      status = 599L,
+      response_status = "ERROR",
+      answer = NULL,
+      error = list(message = "Provider failure."),
+      usage = list(id = "failed-id")
+    )
+  }
+
+  session <- run_experiment_planner(
+    model_key = "deepseek-chat",
+    generation_interface = "chat",
+    requirements = "Create one trial.",
+    source_materials = "Exact material.",
+    api_key = "local-test-key",
+    executor = executor
+  )
+
+  expect_false(session$valid)
+  expect_identical(session$stage, "planning")
+  expect_identical(session$attempts, 1L)
+  expect_identical(calls, 2L)
+  expect_identical(session$errors[[1L]]$code, "planner_api_failure")
+})
+
+test_that("planner does not try to repair an empty response", {
+  calls <- 0L
+  executor <- function(...) {
+    calls <<- calls + 1L
+    list(
+      status = 200L,
+      response_status = "OK",
+      answer = if (calls == 1L) planner_acknowledgement_json() else "",
+      usage = list(id = paste0("empty-", calls))
+    )
+  }
+
+  session <- run_experiment_planner(
+    model_key = "deepseek-chat",
+    generation_interface = "chat",
+    requirements = "Create one trial.",
+    source_materials = "Exact material.",
+    api_key = "local-test-key",
+    executor = executor
+  )
+
+  expect_false(session$valid)
+  expect_identical(session$attempts, 1L)
+  expect_identical(calls, 2L)
+  expect_identical(session$errors[[1L]]$code, "empty_planner_response")
+})
