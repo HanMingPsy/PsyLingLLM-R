@@ -98,6 +98,28 @@ test_that("R semantic validator does not coerce schema versions", {
   expect_false(validate_experiment_spec(spec)$valid)
 })
 
+test_that("trial plans require effective prompts and safe condition fields", {
+  text <- paste(
+    readLines(experiment_spec_fixture("valid-trial-v1.json"), warn = FALSE),
+    collapse = "\n"
+  )
+  spec <- parse_experiment_spec(text)
+  spec$task$trial_prompt <- NULL
+  spec$materials[[1L]]$conditions$Response <- "reserved"
+  validation <- validate_experiment_spec(spec)
+  codes <- vapply(validation$errors, `[[`, character(1), "code")
+
+  expect_false(validation$valid)
+  expect_contains(codes, "missing_effective_trial_prompt")
+  expect_contains(codes, "reserved_condition_field")
+
+  spec$task <- "invalid"
+  expect_s3_class(
+    validate_experiment_spec(spec),
+    "psylingllm_experiment_spec_validation"
+  )
+})
+
 test_that("parameter policy none accepts an explicit empty JSON object", {
   text <- paste(
     readLines(experiment_spec_fixture("valid-trial-v1.json"), warn = FALSE),

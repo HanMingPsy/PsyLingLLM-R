@@ -100,6 +100,12 @@ validate_experiment_spec <- function(spec) {
       "trial_prompt must be null or one non-empty string."
     )
   }
+  global_trial_prompt <- if (is.list(spec$task) &&
+                             "trial_prompt" %in% names(spec$task)) {
+    spec$task$trial_prompt
+  } else {
+    NULL
+  }
 
   materials <- spec$materials
   if (!is.list(materials) || length(materials) == 0L) {
@@ -140,6 +146,18 @@ validate_experiment_spec <- function(spec) {
           "trial_prompt must be null or one non-empty string."
         )
       }
+      row_trial_prompt <- if ("trial_prompt" %in% names(row)) {
+        row$trial_prompt
+      } else {
+        NULL
+      }
+      if (is.null(global_trial_prompt) && is.null(row_trial_prompt)) {
+        add_error(
+          "missing_effective_trial_prompt",
+          paste0(path, ".trial_prompt"),
+          "A global or row-level trial_prompt is required for every material."
+        )
+      }
       conditions <- row$conditions
       if (is.null(conditions)) {
         condition_names <- character()
@@ -153,6 +171,23 @@ validate_experiment_spec <- function(spec) {
         condition_names <- character()
         condition_types <- character()
       } else {
+        reserved_condition_names <- c(
+          "run", "item", "material", "trialprompt", "response", "think",
+          "modelname", "totalresponsetime", "firsttokenlatency",
+          "prompttokens", "completiontokens", "trialstatus",
+          "responsestatus", "streaming", "timestamp", "requestid",
+          "api_key", "api_url", "output_path", "authorization", "headers"
+        )
+        reserved <- names(conditions)[
+          tolower(names(conditions)) %in% reserved_condition_names
+        ]
+        if (length(reserved)) {
+          add_error(
+            "reserved_condition_field",
+            paste0(path, ".conditions"),
+            paste("Reserved condition field(s):", paste(reserved, collapse = ", "))
+          )
+        }
         scalar_condition <- vapply(
           conditions,
           function(value) {
