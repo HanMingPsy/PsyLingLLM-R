@@ -48,7 +48,9 @@ conversation_experiment_with_feedback(
 \item{assistant_content}{Optional static few-shot seed: character vector or a list of message objects
 (`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.}
 
-\item{optionals}{Optional named list. NULL → use registry typed defaults; list → send only user keys; missing → use defaults.}
+\item{optionals}{Optional named list. If omitted, Registry defaults are used;
+explicit \code{NULL} suppresses them; a named list sends only the supplied
+provider-native parameters.}
 
 \item{role_mapping}{Optional mapping for local labels; not forced into `llm_caller()` unless supplied.}
 
@@ -79,7 +81,9 @@ conversation_experiment_with_feedback(
 \item{return_raw}{Logical(1). Include raw request/response.}
 }
 \value{
-Tibble with PsyLingLLM schema per executed turn.
+Tibble with PsyLingLLM schema per executed turn. The additional
+  \code{ResponseStatus} field distinguishes empty final answers from usable
+  responses without changing \code{TrialStatus} compatibility.
 }
 \description{
 Multi-turn conversations identified by `ConversationId` and ordered by `Turn`.

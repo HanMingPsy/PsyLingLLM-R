@@ -22,6 +22,7 @@ normalize_llm_result <- function(config,
   } else {
     599L
   }
+  response_status <- classify_normalized_response(parsed_response)
   raw_request <- if (isTRUE(return_raw)) {
     redact_llm_diagnostics(list(
       url = request$url,
@@ -45,6 +46,7 @@ normalize_llm_result <- function(config,
       usage = usage,
       answer = parsed_response$answer,
       thinking = parsed_response$reasoning,
+      response_status = response_status,
       first_token_latency = transport_response$timing$first_token_latency,
       raw = if (isTRUE(return_raw)) {
         redact_llm_diagnostics(list(
@@ -67,6 +69,7 @@ normalize_llm_result <- function(config,
     usage = usage,
     answer = parsed_response$answer,
     thinking = parsed_response$reasoning,
+    response_status = response_status,
     raw = if (isTRUE(return_raw)) {
       redact_llm_diagnostics(list(
         request = raw_request,
@@ -81,6 +84,24 @@ normalize_llm_result <- function(config,
     },
     error = redact_llm_diagnostics(parsed_response$error)
   )
+}
+
+classify_normalized_response <- function(parsed_response) {
+  if (!is.null(parsed_response$error)) {
+    error_code <- suppressWarnings(
+      as.integer(parsed_response$error$code %||% NA_integer_)
+    )
+    if (length(error_code) && !is.na(error_code[[1L]]) &&
+        error_code[[1L]] == 599L) {
+      return("TIMEOUT")
+    }
+    return("ERROR")
+  }
+
+  answer <- parsed_response$answer
+  has_answer <- is.character(answer) && length(answer) > 0L &&
+    any(!is.na(answer) & nzchar(trimws(answer)))
+  if (has_answer) "OK" else "EMPTY_RESPONSE"
 }
 
 llm_result_abort <- function(message, reason = "invalid_result") {

@@ -25,7 +25,9 @@
 #' @param system_content Optional character(1) or NULL. If NULL, uses registry `default_system` when available.
 #' @param assistant_content Optional static few-shot seed: character vector or a list of message objects
 #'   (`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.
-#' @param optionals Optional named list. NULL → use registry typed defaults; list → send only user keys; missing → use defaults.
+#' @param optionals Optional named list. If omitted, Registry defaults are used;
+#'   explicit \code{NULL} suppresses them; a named list sends only the supplied
+#'   provider-native parameters.
 #' @param role_mapping Optional mapping for local labels; not forced into `llm_caller()` unless supplied.
 #' @param history_mode "all" or "last". Default "all".
 #' @param max_history_turns Integer(1) or Inf. Only for "all". Each turn contributes 2 messages.
@@ -42,7 +44,9 @@
 #' @param return_raw Logical(1). Include raw request/response.
 #' @importFrom stats setNames
 #'
-#' @return Tibble with PsyLingLLM schema per executed turn.
+#' @return Tibble with PsyLingLLM schema per executed turn. The additional
+#'   \code{ResponseStatus} field distinguishes empty final answers from usable
+#'   responses without changing \code{TrialStatus} compatibility.
 #' @export
 conversation_experiment_with_feedback <- function(
     model_key,
@@ -160,6 +164,7 @@ conversation_experiment_with_feedback <- function(
   data$PromptTokens <- NA_integer_
   data$CompletionTokens <- NA_integer_
   data$TrialStatus <- NA_character_
+  data$ResponseStatus <- NA_character_
   data$Streaming <- NA
   data$Timestamp <- NA_character_
   data$RequestID <- NA_character_
@@ -284,6 +289,7 @@ conversation_experiment_with_feedback <- function(
       data$PromptTokens[i] <- NA_integer_
       data$CompletionTokens[i] <- NA_integer_
       data$TrialStatus[i] <- "TIMEOUT"
+      data$ResponseStatus[i] <- "TIMEOUT"
       data$Streaming[i] <- llm_resp$streaming %||% isTRUE(stream)
       data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       data$RequestID[i] <- NA_character_
@@ -313,6 +319,7 @@ conversation_experiment_with_feedback <- function(
       data$PromptTokens[i] <- NA_integer_
       data$CompletionTokens[i] <- NA_integer_
       data$TrialStatus[i] <- "ERROR"
+      data$ResponseStatus[i] <- "ERROR"
       data$Streaming[i] <- llm_resp$streaming %||% isTRUE(stream)
       data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       data$RequestID[i] <- NA_character_
@@ -352,6 +359,7 @@ conversation_experiment_with_feedback <- function(
     data$CompletionTokens[i] <- safe_int(ctoks)
 
     data$TrialStatus[i] <- llm_resp$TrialStatus %||% "SUCCESS"
+    data$ResponseStatus[i] <- result_status$response_status
     data$Streaming[i] <- llm_resp$streaming %||% isTRUE(stream)
     data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     data$RequestID[i] <- safe_chr(llm_resp$usage$id)
@@ -410,7 +418,7 @@ conversation_experiment_with_feedback <- function(
 
           wipe <- c("Response","Think","AssistantContext","HistoryMode","HistoryUsedMsgs",
                     "TotalResponseTime","FirstTokenLatency","PromptTokens","CompletionTokens",
-                    "TrialStatus","Streaming","Timestamp","RequestID",
+                    "TrialStatus","ResponseStatus","Streaming","Timestamp","RequestID",
                     "FeedbackDecision","FeedbackMeta","RequestMessages")
           new_row[wipe] <- NA
 

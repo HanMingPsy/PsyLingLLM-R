@@ -31,6 +31,9 @@
 #' @section Diagnostics:
 #' \describe{
 #'   \item{TrialStatus}{Character. Either "SUCCESS" or "ERROR".}
+#'   \item{ResponseStatus}{Character. Response-quality classification:
+#'   "OK", "EMPTY_RESPONSE", "TIMEOUT", or "ERROR". This does not replace
+#'   the backward-compatible transport-oriented \code{TrialStatus}.}
 #'   \item{Streaming}{Logical. Whether SSE streaming was used.}
 #'   \item{Timestamp}{Character. Completion time of the run (ISO 8601).}
 #'   \item{RequestID}{Character or NA. Provider request identifier if returned.}

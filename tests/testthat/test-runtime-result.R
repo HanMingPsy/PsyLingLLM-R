@@ -67,7 +67,7 @@ test_that("result normalizer preserves the non-stream public contract", {
     names(result),
     c(
       "status", "interface", "model_key", "streaming", "usage",
-      "answer", "thinking", "raw", "error"
+      "answer", "thinking", "response_status", "raw", "error"
     )
   )
   expect_identical(
@@ -76,6 +76,7 @@ test_that("result normalizer preserves the non-stream public contract", {
   )
   expect_identical(result$raw$request$body$model, "fixture-model")
   expect_identical(result$raw$response$non_stream$parsed, body)
+  expect_identical(result$response_status, "OK")
 })
 
 test_that("result normalizer preserves the stream public contract", {
@@ -105,12 +106,13 @@ test_that("result normalizer preserves the stream public contract", {
     names(result),
     c(
       "status", "interface", "model_key", "streaming", "usage",
-      "answer", "thinking", "first_token_latency", "raw", "error"
+      "answer", "thinking", "response_status", "first_token_latency", "raw", "error"
     )
   )
   expect_true(result$streaming)
   expect_identical(result$first_token_latency, 0.25)
   expect_identical(result$raw$response$stream$raw_json, events)
+  expect_identical(result$response_status, "OK")
 })
 
 test_that("result normalizer preserves legacy return_raw semantics", {
@@ -216,4 +218,26 @@ test_that("transport status 599 remains a timeout-compatible result", {
 
   expect_identical(result$status, 599L)
   expect_identical(result$error$code, 599L)
+  expect_identical(result$response_status, "TIMEOUT")
+})
+
+test_that("successful responses without a final answer are classified", {
+  transport <- normalize_llm_transport_response(
+    list(status = 200L, text = "{}", parsed = list(), error = NULL),
+    "http_json",
+    "{}"
+  )
+  parsed <- make_parsed_result()
+  parsed$answer <- "  "
+
+  result <- normalize_llm_result(
+    make_result_config(),
+    make_result_entry(),
+    make_result_request(),
+    transport,
+    parsed
+  )
+
+  expect_identical(result$status, 200L)
+  expect_identical(result$response_status, "EMPTY_RESPONSE")
 })

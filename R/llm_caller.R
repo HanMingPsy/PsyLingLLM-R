@@ -67,8 +67,10 @@
 #'   value in \code{...} wins with a warning.
 #'
 #' @return A list with fields: \code{status}, \code{interface}, \code{model_key},
-#'   \code{streaming}, \code{usage}, \code{answer}, \code{thinking}, and
-#'   optionally \code{raw} or \code{error}. Transport and provider failures
+#'   \code{streaming}, \code{usage}, \code{answer}, \code{thinking},
+#'   \code{response_status}, and optionally \code{raw} or \code{error}.
+#'   \code{response_status} is one of \code{"OK"}, \code{"EMPTY_RESPONSE"},
+#'   \code{"TIMEOUT"}, or \code{"ERROR"}. Transport and provider failures
 #'   retain the compatibility status \code{599}; the original HTTP status and
 #'   provider evidence remain available in \code{error}.
 #'

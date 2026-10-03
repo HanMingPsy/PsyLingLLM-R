@@ -59,8 +59,9 @@ registry \code{default_system} is used when available.}
 message objects (\code{list(role = ..., content = ...)}). These appear before
 rolling history and are preserved as-is.}
 
-\item{optionals}{Optional named list. If not supplied, defaults are used (tri-state);
-if \code{NULL}, no defaults are injected; if a list, only user keys are sent.}
+\item{optionals}{Optional named list. The default \code{NULL} suppresses
+Registry defaults; a named list sends only the supplied provider-native
+parameters.}
 
 \item{role_mapping}{Optional mapping of roles (\code{system}/\code{user}/\code{assistant}).
 If absent, registry mapping applies.}
@@ -87,8 +88,9 @@ otherwise forces streaming/non-streaming.}
 A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:
   \code{Response}, \code{Think}, \code{ModelName}, \code{TotalResponseTime},
   \code{FirstTokenLatency}, \code{PromptTokens}, \code{CompletionTokens},
-  \code{TrialStatus}, \code{Streaming}, \code{Timestamp}, \code{RequestID},
-  plus \code{Stimulus} and \code{ConditionLabel}.
+  \code{TrialStatus}, \code{ResponseStatus}, \code{Streaming},
+  \code{Timestamp}, \code{RequestID}, plus \code{Stimulus} and
+  \code{ConditionLabel}.
 }
 \description{
 Builds a factorial trial list (carrier sentences × factor levels × optional CW),

@@ -165,9 +165,21 @@ classify_llm_result <- function(result) {
   } else {
     "SUCCESS"
   }
+  response_status <- scalar_character(result$response_status)
+  if (is.na(response_status)) {
+    if (!identical(category, "SUCCESS")) {
+      response_status <- category
+    } else {
+      answer <- result$answer %||% result$response
+      has_answer <- is.character(answer) && length(answer) > 0L &&
+        any(!is.na(answer) & nzchar(trimws(answer)))
+      response_status <- if (has_answer) "OK" else "EMPTY_RESPONSE"
+    }
+  }
 
   list(
     category = category,
+    response_status = response_status,
     public_status = public_status,
     provider_status = if (provider_http_error) provider_status else public_status,
     message = message

@@ -45,7 +45,9 @@ conversation_experiment(
 \item{assistant_content}{Optional static few-shot seed: character vector or a list of message objects
 (`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.}
 
-\item{optionals}{Optional named list. NULL → use registry typed defaults; list → send only user keys; missing → use defaults.}
+\item{optionals}{Optional named list. If omitted, Registry defaults are used;
+explicit \code{NULL} suppresses them; a named list sends only the supplied
+provider-native parameters.}
 
 \item{role_mapping}{Optional mapping of roles. If absent, we only use registry mapping for **local labeling**,
 and we do **not** pass a role map to \code{llm_caller()} (no forcing).}
@@ -73,8 +75,8 @@ and we do **not** pass a role map to \code{llm_caller()} (no forcing).}
 \value{
 A data.frame/tibble with PsyLingLLM schema columns per turn:
   Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if present),
-  PromptTokens, CompletionTokens, TrialStatus, Streaming, Timestamp, RequestID,
-  plus HistoryMode and HistoryUsedMsgs.
+  PromptTokens, CompletionTokens, TrialStatus, ResponseStatus, Streaming,
+  Timestamp, RequestID, plus HistoryMode and HistoryUsedMsgs.
 }
 \description{
 Executes multi-turn conversations where each conversation is identified by

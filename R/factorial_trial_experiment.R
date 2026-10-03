@@ -53,8 +53,9 @@
 #' @param assistant_content Optional static few-shot seed: a character vector or a list of
 #'   message objects (\code{list(role = ..., content = ...)}). These appear before
 #'   rolling history and are preserved as-is.
-#' @param optionals Optional named list. If not supplied, defaults are used (tri-state);
-#'   if \code{NULL}, no defaults are injected; if a list, only user keys are sent.
+#' @param optionals Optional named list. The default \code{NULL} suppresses
+#'   Registry defaults; a named list sends only the supplied provider-native
+#'   parameters.
 #' @param role_mapping Optional mapping of roles (\code{system}/\code{user}/\code{assistant}).
 #'   If absent, registry mapping applies.
 #' @param stream Logical(1) or \code{NULL}. If \code{NULL}, uses the registry default;
@@ -71,8 +72,9 @@
 #' @return A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:
 #'   \code{Response}, \code{Think}, \code{ModelName}, \code{TotalResponseTime},
 #'   \code{FirstTokenLatency}, \code{PromptTokens}, \code{CompletionTokens},
-#'   \code{TrialStatus}, \code{Streaming}, \code{Timestamp}, \code{RequestID},
-#'   plus \code{Stimulus} and \code{ConditionLabel}.
+#'   \code{TrialStatus}, \code{ResponseStatus}, \code{Streaming},
+#'   \code{Timestamp}, \code{RequestID}, plus \code{Stimulus} and
+#'   \code{ConditionLabel}.
 #'
 #' @export
 factorial_trial_experiment <- function(
@@ -173,6 +175,7 @@ factorial_trial_experiment <- function(
   trials$PromptTokens <- NA_integer_
   trials$CompletionTokens <- NA_integer_
   trials$TrialStatus <- NA_character_
+  trials$ResponseStatus <- NA_character_
   trials$Streaming <- NA
   trials$Timestamp <- NA_character_
   trials$RequestID <- NA_character_
@@ -233,6 +236,7 @@ factorial_trial_experiment <- function(
       trials$PromptTokens[i] <- NA_integer_
       trials$CompletionTokens[i] <- NA_integer_
       trials$TrialStatus[i] <- "TIMEOUT"
+      trials$ResponseStatus[i] <- "TIMEOUT"
       trials$Streaming[i] <- parsed_resp$streaming %||% isTRUE(stream)
       trials$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       trials$RequestID[i] <- NA_character_
@@ -255,6 +259,7 @@ factorial_trial_experiment <- function(
       trials$PromptTokens[i] <- NA_integer_
       trials$CompletionTokens[i] <- NA_integer_
       trials$TrialStatus[i] <- "ERROR"
+      trials$ResponseStatus[i] <- "ERROR"
       trials$Streaming[i] <- parsed_resp$streaming %||% isTRUE(stream)
       trials$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       trials$RequestID[i] <- NA_character_
@@ -284,6 +289,7 @@ factorial_trial_experiment <- function(
     trials$CompletionTokens[i] <- safe_int(ctoks)
 
     trials$TrialStatus[i] <- parsed_resp$TrialStatus %||% "SUCCESS"
+    trials$ResponseStatus[i] <- result_status$response_status
     trials$Streaming[i] <- parsed_resp$streaming %||% isTRUE(stream)
     trials$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     trials$RequestID[i] <- safe_chr(parsed_resp$usage$id)

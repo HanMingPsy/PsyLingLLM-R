@@ -44,7 +44,7 @@ test_that("trial experiments preserve success and timeout result fields", {
         ))
       }
 
-      list(
+      if (call_index == 3L) return(list(
         status = 599L,
         answer = "",
         thinking = NULL,
@@ -61,6 +61,16 @@ test_that("trial experiments preserve success and timeout result fields", {
           headers = c(`x-request-id` = "request-rate-limit"),
           request_id = "request-rate-limit"
         )
+      ))
+
+      list(
+        status = 200L,
+        answer = "  ",
+        thinking = "Reasoning without a final answer",
+        first_token_latency = NA_real_,
+        usage = list(prompt = 5L, completion = 8L, id = "request-empty"),
+        streaming = FALSE,
+        error = NULL
       )
     },
     .package = "PsyLingLLM"
@@ -69,7 +79,7 @@ test_that("trial experiments preserve success and timeout result fields", {
   result <- trial_experiment(
     model_key = "fixture-model",
     api_key = "not-a-real-key",
-    data = data.frame(Material = c("First", "Second", "Third")),
+    data = data.frame(Material = c("First", "Second", "Third", "Fourth")),
     output_path = output_directory,
     delay = 0
   )
@@ -83,16 +93,25 @@ test_that("trial experiments preserve success and timeout result fields", {
     "PromptTokens",
     "CompletionTokens",
     "TrialStatus",
+    "ResponseStatus",
     "Streaming",
     "Timestamp",
     "RequestID"
   )
 
   expect_true(all(expected_result_fields %in% names(result)))
-  expect_identical(result$TrialStatus, c("SUCCESS", "TIMEOUT", "ERROR"))
+  expect_identical(
+    result$TrialStatus,
+    c("SUCCESS", "TIMEOUT", "ERROR", "SUCCESS")
+  )
+  expect_identical(
+    result$ResponseStatus,
+    c("OK", "TIMEOUT", "ERROR", "EMPTY_RESPONSE")
+  )
   expect_identical(result$Response[[1]], "Fixture answer")
   expect_true(is.na(result$Response[[2]]))
   expect_true(is.na(result$Response[[3]]))
+  expect_identical(result$Response[[4]], "  ")
   expect_identical(result$Think[[1]], "Fixture reasoning")
   expect_true(is.na(result$Think[[2]]))
   expect_true(is.na(result$Think[[3]]))
@@ -101,7 +120,7 @@ test_that("trial experiments preserve success and timeout result fields", {
   expect_identical(result$RequestID[[1]], "request-success")
   expect_true(is.na(result$RequestID[[2]]))
   expect_true(is.na(result$RequestID[[3]]))
-  expect_identical(result$Streaming, c(FALSE, FALSE, FALSE))
+  expect_identical(result$Streaming, c(FALSE, FALSE, FALSE, FALSE))
 })
 
 test_that("normalized failures distinguish timeouts from provider errors", {
@@ -125,4 +144,6 @@ test_that("normalized failures distinguish timeouts from provider errors", {
   expect_identical(provider$message, "Invalid key")
   expect_identical(legacy_http$category, "ERROR")
   expect_identical(legacy_http$provider_status, 500L)
+  expect_identical(timeout$response_status, "TIMEOUT")
+  expect_identical(provider$response_status, "ERROR")
 })

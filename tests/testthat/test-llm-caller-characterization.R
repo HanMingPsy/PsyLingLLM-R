@@ -174,6 +174,7 @@ test_that("non-stream calls preserve message order and normalized results", {
       "usage",
       "answer",
       "thinking",
+      "response_status",
       "raw",
       "error"
     )
@@ -334,6 +335,7 @@ test_that("streaming responses retain delta and latency behavior", {
       "usage",
       "answer",
       "thinking",
+      "response_status",
       "first_token_latency",
       "raw",
       "error"

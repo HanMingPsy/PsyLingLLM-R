@@ -43,7 +43,9 @@ trial_experiment(
 \item{assistant_content}{Optional static few-shot seed: character vector or a list of message objects
 (`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.}
 
-\item{optionals}{Optional named list. If NULL, use registry typed defaults; user keys are not merged with defaults.}
+\item{optionals}{Optional named list. The default \code{NULL} suppresses
+Registry defaults; a named list sends only the supplied provider-native
+parameters.}
 
 \item{role_mapping}{Optional list. Override registry role names (effective only when the template uses \code{\${ROLE}}).}
 
@@ -66,7 +68,8 @@ trial_experiment(
 \value{
 A data.frame/tibble with PsyLingLLM schema columns:
   Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if stream),
-  PromptTokens, CompletionTokens, TrialStatus, Streaming, Timestamp, RequestID.
+  PromptTokens, CompletionTokens, TrialStatus, ResponseStatus, Streaming,
+  Timestamp, RequestID.
 }
 \description{
 Executes repeated trials using a registry-defined LLM interface. All request

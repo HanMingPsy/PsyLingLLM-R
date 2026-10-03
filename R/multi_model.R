@@ -188,7 +188,8 @@ multi_model_experiment <- function(
           Response = character(), Think = character(), ModelName = character(),
           TotalResponseTime = numeric(), FirstTokenLatency = numeric(),
           PromptTokens = integer(), CompletionTokens = integer(),
-          TrialStatus = character(), Streaming = logical(),
+          TrialStatus = character(), ResponseStatus = character(),
+          Streaming = logical(),
           Timestamp = character(), RequestID = character(),
           stringsAsFactors = FALSE
         )
@@ -207,7 +208,8 @@ multi_model_experiment <- function(
       Response = character(), Think = character(), ModelName = character(),
       TotalResponseTime = numeric(), FirstTokenLatency = numeric(),
       PromptTokens = integer(), CompletionTokens = integer(),
-      TrialStatus = character(), Streaming = logical(),
+      TrialStatus = character(), ResponseStatus = character(),
+      Streaming = logical(),
       Timestamp = character(), RequestID = character(),
       ModelKey = character(),
       stringsAsFactors = FALSE
