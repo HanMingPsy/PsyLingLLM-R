@@ -44,17 +44,17 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 8 release validation complete after production Registry
-live verification; a post-0.4 internal implementation track for versioned
-natural-language experiment specifications is now active. Formal CRAN
-submission still requires explicit approval.**
+Current phase: **Phase 8 release validation remains complete. The internal
+Experiment Spec v1 trial workflow is implemented and live-verified with
+DeepSeek; public API design and formal CRAN submission remain separate approval
+boundaries.**
 
 ### Current implementation track: Experiment Spec v1 foundation
 
-The immediate implementation target is a stable, internal-only foundation for
+The current implementation provides a stable, internal-only workflow for
 turning natural-language experiment requirements into a reviewed PsyLingLLM
-trial plan. This work extends the package beside the existing experiment API;
-it must not alter existing experiment execution semantics.
+trial plan. It extends the package beside the existing experiment API and does
+not alter existing experiment execution semantics.
 
 The verified test-only prototype is backed up by these commits:
 
@@ -63,7 +63,7 @@ The verified test-only prototype is backed up by these commits:
 - `0a034e1 docs(package): rebuild experiment workflow guide`
 - `33852bb test(experiment): prototype natural language planning workflow`
 
-The first production foundation steps are now delivered:
+The production foundation is delivered through these atomic commits:
 
 - `636a88d feat(experiment): add trial spec schema foundation`
   adds the packaged Draft-07 schema, internal schema loading, strict JSON
@@ -72,13 +72,57 @@ The first production foundation steps are now delivered:
   adds deterministic trial-data normalization, condition-type stability,
   source-material fidelity review, Registry model/interface resolution,
   execution preview, plan-integrity checks, and explicit approval objects.
+- `0da261a feat(experiment): compile approved trial plans`
+  adds an allowlisted compiler for the existing `trial_experiment()` contract;
+  it never evaluates model-generated R code and keeps runtime secrets outside
+  the compiled plan.
+- `9146ccc feat(experiment): validate trial results and receipts`
+  adds experiment-result validation and secret-free execution receipts.
+- `7c52832 feat(runtime): add registry structured output adapters`
+  adds protocol-scoped OpenAI Chat and Responses JSON object/JSON Schema wire
+  adapters without adding provider branches to `llm_caller()`.
+- `a9293b7 feat(registry): declare verified JSON output modes`
+  enables JSON object output for the verified DeepSeek Chat, OpenAI Chat,
+  OpenAI Responses, and Qwen Chat production interfaces while leaving the
+  historical GPT-4o Responses compatibility route unchanged.
+- `b1a7af9 feat(experiment): prepare registry-driven planner calls`
+  adds the two-turn toolbox/schema prompt contract and credential-free planner
+  call specifications selected through Registry components.
+- `8afec67 feat(experiment): validate planner responses locally`
+  adds strict JSON parsing, semantic validation, source fidelity review, and
+  minimal repair feedback without retaining raw provider responses.
+- `aa170fe feat(experiment): orchestrate reviewed planner sessions`
+  adds an internal two-turn planner with dependency-injected offline tests,
+  one bounded validation repair, transient credential injection, and no
+  automatic approval or experiment execution.
+- `4acbdde test(experiment): verify production planner live path`
+  replaces the manual live prototype path with the production planner,
+  explicit approval, compiled trial execution, result validation, and receipt
+  validation.
 
-The next implementation boundary is the allowlisted compiler in step 4. It
-must produce a reviewable `trial_experiment()` call specification only; it must
-not execute the call or introduce credential handling. Execution-time secrets
-belong to a separately tested and approved boundary.
+On 2026-10-03, the production workflow passed an explicit opt-in live DeepSeek
+test using the bundled Registry: onboarding, Experiment Spec generation,
+deterministic review, explicit test-harness approval, two `trial_experiment()`
+runs, result validation, and secret-free receipt creation all succeeded. This
+does not claim that the planner workflow has been live-tested with OpenAI,
+Qwen, Anthropic, or every Registry entry. Default and CRAN tests remain offline.
 
-Production implementation order:
+The next implementation boundary requires explicit review before code changes:
+
+1. Decide whether Experiment Spec v1 remains an internal post-0.4 prototype or
+   becomes a supported public feature in a later release.
+2. If public, review the smallest user-facing API names and separate planning,
+   human approval, compilation, and execution rather than exporting all
+   internal helpers.
+3. Add roxygen2 documentation and README guidance only after that public
+   contract is approved; never manually edit `NAMESPACE` or `.Rd` files.
+4. Keep factorial, conversation, adaptive-feedback, and multi-model schemas
+   out of scope until the ordinary-trial public workflow is stable.
+5. Before any release containing this track, repeat the complete offline suite,
+   source-tarball CRAN checks, tarball inspection, and relevant multi-platform
+   checks. Live tests remain a separate explicit opt-in gate.
+
+Delivered implementation order:
 
 1. Add one versioned JSON Schema Draft-07 asset for the `trial` experiment
    plan. Draft-07 is the initial production dialect because the CRAN
