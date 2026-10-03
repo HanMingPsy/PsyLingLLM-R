@@ -1,0 +1,5 @@
+Item,Material,TrialPrompt
+1,The key near the cabinet(s) {VERB} on the table.,Rate the grammatical acceptability of the sentence from 1 (completely unacceptable) to 7 (completely acceptable). Reply with one integer only.
+2,The label beside the folder(s) {VERB} difficult to read.,Rate the grammatical acceptability of the sentence from 1 (completely unacceptable) to 7 (completely acceptable). Reply with one integer only.
+3,The report from the analyst(s) {VERB} ready for review.,Rate the grammatical acceptability of the sentence from 1 (completely unacceptable) to 7 (completely acceptable). Reply with one integer only.
+4,The letter to the teacher(s) {VERB} in the envelope.,Rate the grammatical acceptability of the sentence from 1 (completely unacceptable) to 7 (completely acceptable). Reply with one integer only.

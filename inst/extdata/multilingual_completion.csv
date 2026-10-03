@@ -1,0 +1,12 @@
+Item,ConditionLanguage,Material,TrialPrompt
+1,English,The cat sat on the ____.,Complete the blank in the sentence. Return the full completed sentence only.
+2,Chinese (Simplified),这只猫咪坐在____上。,Complete the blank in the sentence. Return the full completed sentence only.
+3,French,Le chat était assis sur le ____.,Complete the blank in the sentence. Return the full completed sentence only.
+4,Spanish,El gato estaba sentado en el ____.,Complete the blank in the sentence. Return the full completed sentence only.
+5,German,Die Katze saß auf dem ____.,Complete the blank in the sentence. Return the full completed sentence only.
+6,Italian,Il gatto era seduto sul ____.,Complete the blank in the sentence. Return the full completed sentence only.
+7,Japanese,ネコが____の上に座っていました。,Complete the blank in the sentence. Return the full completed sentence only.
+8,Korean,고양이가 ____ 위에 앉아 있었습니다.,Complete the blank in the sentence. Return the full completed sentence only.
+9,Portuguese,O gato estava sentado no ____.,Complete the blank in the sentence. Return the full completed sentence only.
+10,Swedish,Katten satt på ____.,Complete the blank in the sentence. Return the full completed sentence only.
+11,Russian,Кот сидел на ____.,Complete the blank in the sentence. Return the full completed sentence only.

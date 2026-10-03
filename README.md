@@ -1,1149 +1,1564 @@
 # PsyLingLLM
 
-PsyLingLLM is an experimental toolkit for studying **human-like language processing** with Large Language Models (LLMs) in **R**.
-It provides functions to **design, execute, and analyze** psycholinguistic, psychological, and educational experiments using LLMs.
+PsyLingLLM is an R package for controlled psychological, psycholinguistic,
+cognitive, and educational experiments with large language models (LLMs). It
+helps researchers present the same materials across models and providers while
+collecting responses, reasoning fields, timing, token usage, request IDs, trial
+status, and logs in a consistent data structure.
 
-***
-- v0.4 Update: **Registry v2 Runtime Architecture**<br>
-The 0.4 release separates model resolution, request construction, transport, and response parsing while preserving the existing experiment APIs and Registry v1 user files.<br>
+Version 0.4 introduces a Registry v2 runtime architecture. Model resolution,
+request construction, HTTP transport, streaming, response parsing, and result
+normalization are now separate responsibilities. Existing experiment functions
+and Registry v1 user files remain supported.
 
-    **YAML-Based Configuration Registry**<br>
-    Structured Experiment Definitions: All model API parameters and interface specifications stored in standardized YAML format
-    Version-Controlled Setups: Enable exact experiment replication through committed registry files
-    Cross-Platform Compatibility: Consistent behavior across different computing environments
-    Flexible Field Mapping: Adapts to proprietary response formats without manual configuration
-    Custom Endpoint Support: Handles non-standard API structures from local deployments and proxy services
-    
-    **Pre-Configured Provider Templates**<br>
-    Provider Catalog: Reviewed Registry templates for major providers; the support matrix below distinguishes live-verified integrations from offline contracts and deployment templates
-    Standardized Interfaces: Unified access patterns across different API specifications
-    Rapid Deployment: Quick-start configurations requiring minimal customization
+## Background
 
-    **Automatic Registration System**<br>
-    Automated Registration Pipeline: A streamlined workflow systematically analyzes API endpoints, standardizes request templates, and generates optimized configuration files through intelligent path detection and structural inference.<br>
-    Interactive Preview Interface: Prior to finalization, researchers can comprehensively review all details through a structured preview that highlights potential inconsistencies or missing elements.<br>
+LLMs are increasingly used as experimental participants, stimulus generators,
+and computational comparison systems in psycholinguistics, psychology,
+cognitive science, and education. A controlled study needs more than a single
+prompt: researchers must preserve materials, instructions, model settings,
+trial order, conversation history, timing, responses, reasoning fields, usage,
+errors, and provider metadata.
 
-    See Part II for the registry system.
-***
+PsyLingLLM provides one experiment layer for those tasks. The same material
+table can be presented to different models while the Registry translates the
+provider-specific API contract. This separation lets experiment scripts remain
+stable when a model moves to another endpoint or when a provider adds a new
+protocol version.
 
-## PsyLingLLM 0.4 support matrix
+PsyLingLLM supports:
 
-Registry presence does not by itself mean that an integration has been tested
-against a live service. PsyLingLLM 0.4 uses the following support levels:
+- single-trial and repeated-trial experiments;
+- factorial designs generated from controlled carrier materials;
+- multi-turn conversation and memory experiments;
+- adaptive experiments driven by a user feedback function;
+- comparisons across models and providers;
+- CSV and Excel material workflows with preserved condition columns;
+- streaming latency, response time, token, reasoning, status, and request-ID
+  collection;
+- Registry-based official, proxy, cloud-deployment, and local-runtime setups.
 
-- **Live verified**: the bundled production Registry completed real non-stream
-  and stream calls, returned a non-empty normalized answer, and preserved token
-  usage without exposing credentials.
-- **Offline verified**: schema, resolution, request generation, mock transport,
-  response parsing, and result normalization are covered without a provider
-  account.
-- **Deployment template**: correctness also depends on the user's deployment,
-  endpoint, served model name, or installed local model.
-- **Experimental**: the upstream compatibility contract or account catalog has
-  not yet been verified and must not be treated as production support.
+The package standardizes execution and measurement. It does not make hosted
+models deterministic, and it does not turn a small demonstration into evidence
+of human-like cognition. Reproducible research still requires adequate
+materials, repetitions, controls, model-version records, and statistical
+analysis.
+
+## Design principle: user registration comes first
+
+PsyLingLLM is designed around user-managed model registration.
+
+- The bundled system registry supplies basic presets and protocol examples.
+- The user registry is the main extension point for new models, changed APIs,
+  proxy services, and local deployments.
+- A user entry with the same model key takes precedence over the bundled entry.
+- PsyLingLLM does not automatically rewrite or migrate user registry files.
+- If a bundled preset becomes outdated, users can replace it locally without
+  waiting for a package release.
+
+The effective precedence is:
+
+```text
+Runtime arguments > User registry > System registry > Package defaults
+```
+
+A model appearing in the bundled registry does not guarantee that the upstream
+model is available to every account. The system registry is a starting point;
+the user registry remains authoritative for an individual experiment.
+
+## Installation
+
+Install the development version from GitHub:
+
+```r
+install.packages("remotes")
+remotes::install_github("HanMingPsy/PsyLingLLM-R")
+
+library(PsyLingLLM)
+packageVersion("PsyLingLLM")
+```
+
+PsyLingLLM requires R 4.0 or later.
+
+## Contents
+
+### Overview and experiment system
+
+1. [Background](#background)
+2. [Authentication and quick start](#authentication-and-quick-start)
+3. [Experimental workflow](#experimental-workflow)
+4. [Single-trial and repeated experiments](#single-trial-and-repeated-experiments)
+5. [Factorial designs](#factorial-designs)
+6. [Conversation experiments](#conversation-experiments)
+7. [Adaptive feedback](#adaptive-feedback)
+8. [Multi-model experiments](#multi-model-experiments)
+9. [Input, output, and file management](#input-output-and-file-management)
+10. [Function guide](#function-guide)
+
+### Registry topics
+
+11. [Registry resolution](#registry-resolution)
+12. [Models, providers, interfaces, and capabilities](#models-providers-interfaces-and-capabilities)
+13. [Provider-native parameters](#provider-native-parameters)
+14. [Registering a model](#registering-a-model)
+15. [Validating a registration](#validating-a-registration)
+16. [Bundled support levels](#bundled-support-levels)
+17. [Runtime architecture](#runtime-architecture)
+18. [Errors, privacy, and reproducibility](#errors-privacy-and-reproducibility)
+19. [Research design and interpretation](#research-design-and-interpretation)
+20. [Troubleshooting](#troubleshooting)
+21. [Testing and CRAN](#testing-and-cran)
+22. [Contributing and support](#contributing-and-support)
+23. [License](#license)
+
+## Experiment system
+
+### Authentication and quick start
+
+An experiment needs three pieces of provider information:
+
+1. an API key or another authentication credential;
+2. a Registry model key, which resolves to the provider-facing model ID;
+3. an endpoint, either supplied by the Registry or explicitly overridden with
+   `api_url` for a proxy, workspace, cloud deployment, or local server.
+
+For a bundled official preset, users normally provide only the Registry model
+key and API key. Model IDs and account availability remain provider-specific;
+check the upstream account catalog if a preset returns a model-not-found error.
+
+Do not put API keys in an experiment table, Registry YAML file, README, or
+version-controlled script. For non-interactive work, environment variables are
+a simple option. Add values to a user-level `.Renviron` file and restart R:
+
+```text
+DEEPSEEK_API_KEY=your_key_here
+OPENAI_API_KEY=your_key_here
+```
+
+For desktop use, the optional `keyring` package can read credentials from the
+operating system credential store:
+
+```r
+# Environment variable
+deepseek_key <- Sys.getenv("DEEPSEEK_API_KEY")
+
+# Optional alternative; PsyLingLLM does not manage the keyring itself
+# deepseek_key <- keyring::key_get("PsyLingLLM", "deepseek")
+```
+
+Load a reproducible material file bundled with the package and run a small
+experiment:
+
+```r
+library(PsyLingLLM)
+
+garden_path_file <- system.file(
+  "extdata",
+  "garden_path_sentences.csv",
+  package = "PsyLingLLM"
+)
+
+garden_path <- readr::read_csv(
+  garden_path_file,
+  show_col_types = FALSE
+)
+
+yn_system_prompt <- paste(
+  "You are a participant in a psychology experiment.",
+  "Your task is to answer the following questions with ONLY a single character: Y for Yes or N for No.",
+  "Do not provide any other text, explanation, or punctuation.",
+  sep = "\n"
+)
+
+result <- trial_experiment(
+  model_key = "deepseek-flash",
+  api_key = deepseek_key,
+  data = garden_path[1:2, ],
+  system_content = yn_system_prompt,
+  optionals = list(
+    max_tokens = 64L,
+    thinking = list(type = "disabled")
+  ),
+  stream = FALSE,
+  random = FALSE,
+  delay = 0
+)
+
+result[c(
+  "Item", "Condition", "Response", "TrialStatus",
+  "PromptTokens", "CompletionTokens"
+)]
+```
+
+The bundled DeepSeek preset provides its official endpoint. Supply `api_url`
+when a workspace, proxy, local server, or private deployment uses a different
+request URL.
+
+### Experimental workflow
+
+A typical PsyLingLLM study follows this sequence:
+
+```text
+Material table
+  -> experiment design and trial ordering
+  -> Registry model/interface resolution
+  -> provider-native request construction
+  -> HTTP or streaming transport
+  -> response and reasoning parsing
+  -> standardized experiment rows and log files
+  -> descriptive or inferential analysis
+```
+
+Keep the experimental manipulation in the material table or factorial design,
+and keep provider details in the Registry or runtime arguments. This makes it
+possible to rerun the same design with another provider without rewriting the
+experiment logic.
+
+Before a large or costly run:
+
+1. inspect the material rows and condition counts;
+2. resolve the selected Registry entry;
+3. run one short non-streaming request;
+4. run one short streaming request when latency is measured;
+5. run one complete trial through the experiment function;
+6. inspect response format, reasoning, usage, status, and saved paths;
+7. only then start the full experiment.
+
+### Single-trial and repeated experiments
+
+`trial_experiment()` executes each row in a material table. `Material` is the
+required content column. An optional row-level `TrialPrompt` takes precedence
+over the global `trial_prompt` argument.
+
+#### Multilingual sentence-completion example
+
+The first experiment from the earlier PsyLingLLM README is retained as a
+multilingual UTF-8 demonstration. The materials are now stored in a package
+file instead of being duplicated inside the analysis script:
+
+| Item | Language | Material |
+|---:|---|---|
+| 1 | English | The cat sat on the ____. |
+| 2 | Chinese (Simplified) | 这只猫咪坐在____上。 |
+| 3 | French | Le chat était assis sur le ____. |
+| 4 | Spanish | El gato estaba sentado en el ____. |
+| 5 | German | Die Katze saß auf dem ____. |
+| 6 | Italian | Il gatto era seduto sul ____. |
+| 7 | Japanese | ネコが____の上に座っていました。 |
+| 8 | Korean | 고양이가 ____ 위에 앉아 있었습니다. |
+| 9 | Portuguese | O gato estava sentado no ____. |
+| 10 | Swedish | Katten satt på ____. |
+| 11 | Russian | Кот сидел на ____. |
+
+```r
+multilingual_file <- system.file(
+  "extdata",
+  "multilingual_completion.csv",
+  package = "PsyLingLLM"
+)
+
+multilingual_data <- readr::read_csv(
+  multilingual_file,
+  show_col_types = FALSE
+)
+
+multilingual_result <- trial_experiment(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = multilingual_data,
+  system_content = paste(
+    "You are participating in a multilingual sentence-completion experiment.",
+    "Follow the requested output format exactly."
+  ),
+  optionals = list(
+    max_tokens = 128L,
+    thinking = list(type = "disabled")
+  ),
+  stream = FALSE,
+  repeats = 1,
+  random = FALSE,
+  delay = 0
+)
+
+multilingual_result[c(
+  "Item", "ConditionLanguage", "Material",
+  "Response", "TrialStatus"
+)]
+```
+
+For an initial endpoint check, use `data = multilingual_data[1:2, ]` before
+running all languages. The example verifies that multilingual text survives the
+material, request, response, and result-file path. It is not by itself a fair
+cross-language benchmark: comparable scoring requires language-specific target
+definitions, tokenization records, sufficient items, and human-validated
+coding rules.
+
+#### Garden Path judgment task
+
+The bundled demonstration presents four Garden Path sentences and two clear
+controls. It illustrates how to combine categorical judgments with streaming
+latency and token measurements. The small material set is a software example,
+not a validated experimental norm.
+
+| Item | Condition | Material | Target |
+|---:|---|---|---|
+| 1 | GardenPath | The old man the boats. | No |
+| 2 | GardenPath | The horse raced past the barn fell. | No |
+| 3 | GardenPath | Fat people eat accumulates. | No |
+| 4 | GardenPath | The man whistling tunes pianos. | No |
+| 5 | Control | Birds are singing in the garden. | Yes |
+| 6 | Control | The children played football after school. | Yes |
+
+The system message constrains the observable answer to one character. When the
+selected interface exposes a separate reasoning channel, `Think` can still be
+recorded independently from `Response`.
+
+```r
+garden_path_result <- trial_experiment(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = garden_path,
+  system_content = yn_system_prompt,
+  optionals = list(
+    max_tokens = 1024L,
+    thinking = list(type = "enabled"),
+    reasoning_effort = "high"
+  ),
+  stream = TRUE,
+  repeats = 1,
+  random = FALSE,
+  delay = 0
+)
+
+garden_path_result$Response <- toupper(
+  trimws(garden_path_result$Response)
+)
+
+stopifnot(
+  all(garden_path_result$TrialStatus == "SUCCESS"),
+  all(garden_path_result$Response %in% c("Y", "N"))
+)
+```
+
+`repeats` duplicates the complete material table before execution. Set a random
+seed when randomized trial order must be reproducible:
+
+```r
+set.seed(2026)
+```
+
+The provider-native `thinking` object enables DeepSeek thinking mode;
+`reasoning_effort` controls its effort. These fields are sent without renaming.
+They are protocol-specific, so consult the provider documentation before using
+them with another interface.
+
+Summarize response latency, token use, and the probability of a `Y` judgment:
+
+```r
+library(dplyr)
+
+summary_result <- garden_path_result %>%
+  group_by(Condition) %>%
+  summarise(
+    n = n(),
+    mean_FTL = mean(FirstTokenLatency, na.rm = TRUE),
+    mean_RT = mean(TotalResponseTime, na.rm = TRUE),
+    mean_tokens = mean(CompletionTokens, na.rm = TRUE),
+    Y_prob = mean(Response == "Y", na.rm = TRUE),
+    .groups = "drop"
+  )
+
+print(summary_result)
+```
+
+A live run with `deepseek-flash` on September 20, 2026 produced the following
+result. Timing and model output can vary across runs and provider revisions.
+
+| Condition | n | mean_FTL | mean_RT | mean_tokens | Y_prob |
+|---|---:|---:|---:|---:|---:|
+| Control | 2 | 0.234 | 1.024 | 37.50 | 1.00 |
+| GardenPath | 4 | 0.208 | 2.280 | 252.75 | 0.00 |
+
+All six trials completed successfully, returned exactly one `Y` or `N`, and
+included a non-empty reasoning field, token usage, and request ID. No trial
+reached the configured 1,024-token completion limit.
+
+The optional `ggplot2` package can visualize the four descriptive measures:
+
+```r
+library(ggplot2)
+
+plot_bar <- function(data, y_var, y_label, title) {
+  ggplot(data, aes(x = Condition, y = .data[[y_var]], fill = Condition)) +
+    geom_col(width = 0.6, color = "black") +
+    labs(title = title, x = "Condition", y = y_label) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5, face = "bold")
+    )
+}
+
+plot_bar(
+  summary_result,
+  "mean_RT",
+  "Mean total response time (s)",
+  "Mean total response time by condition"
+)
+
+plot_bar(
+  summary_result,
+  "mean_FTL",
+  "Mean first-token latency (s)",
+  "Mean first-token latency by condition"
+)
+
+plot_bar(
+  summary_result,
+  "mean_tokens",
+  "Mean completion tokens",
+  "Mean completion tokens by condition"
+)
+
+ggplot(summary_result, aes(x = Condition, y = Y_prob, group = 1)) +
+  geom_line(color = "#2c7fb8", linewidth = 1.2) +
+  geom_point(size = 3, color = "#2c7fb8") +
+  scale_y_continuous(
+    limits = c(0, 1),
+    labels = function(x) paste0(round(100 * x), "%")
+  ) +
+  labs(
+    title = "Probability of responding Y by condition",
+    x = "Condition",
+    y = "Probability of Y"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+```
+
+The following figures were generated from the live result shown above:
+
+![Mean total response time for Control and GardenPath items](inst/figures/garden-path-response-time.png)
+
+![Mean first-token latency for Control and GardenPath items](inst/figures/garden-path-first-token-latency.png)
+
+![Mean completion tokens for Control and GardenPath items](inst/figures/garden-path-completion-tokens.png)
+
+![Probability of a Y response for Control and GardenPath items](inst/figures/garden-path-y-probability.png)
+
+In this run, Garden Path items required more total time and more completion
+tokens than Control items, while first-token latency was similar and slightly
+lower for Garden Path items. The model rejected every Garden Path item and
+accepted both Control items. These values demonstrate the experimental and
+measurement workflow; six trials are not enough to establish a psycholinguistic
+effect or a human-like processing pattern. A confirmatory study should use more
+items, repetitions, models, and an appropriate statistical analysis.
+
+Related psycholinguistic work includes Ferreira and Henderson (1991) on
+recovery from garden-path misanalysis and Christianson et al. (2001) on the
+persistence of thematic interpretations. These references motivate the
+paradigm; they do not validate the six-item demonstration or the model result.
+
+#### Progress, results, and log files
+
+During execution, the console displays the current trial, total number of
+trials, completion percentage, estimated time remaining, and model key. A
+typical progress line has this form:
+
+```text
+[====================--------------------] 50% Trial 3/6 - ETA: 00:05 - deepseek-flash
+```
+
+When `output_path = NULL`, experiment functions create timestamped results and
+logs under `~/.psylingllm/results`. For example:
+
+```text
+deepseek-flash_20260920_132306.csv
+deepseek-flash_20260920_132306.log
+```
+
+`output_path` can be a full CSV/XLSX filename or a directory. A directory gets
+an automatically generated filename. `overwrite = FALSE` protects an existing
+explicit output file. Tests and package examples should instead use
+`tempdir()` so they do not write persistent user files.
+
+#### `trial_experiment()` arguments
+
+| Argument | Purpose and behavior |
+|---|---|
+| `model_key` | Registry key for the model or deployment |
+| `generation_interface` | Friendly interface label or exact versioned interface ID; defaults to `"chat"` |
+| `api_key` | Runtime credential; never store it in materials or Registry YAML |
+| `api_url` | Optional complete endpoint override for a proxy, workspace, deployment, or local server |
+| `data` | Data frame or tibble containing `Material`; use a list-generation helper to load CSV/XLSX first |
+| `trial_prompt` | Global task instruction; a non-empty row-level `TrialPrompt` takes precedence |
+| `system_content` | Global system instruction, subject to the selected protocol's role support |
+| `assistant_content` | Static few-shot or seed assistant messages placed before trial history |
+| `optionals` | Named list of provider-native request parameters; names and nested values are sent without cross-provider translation |
+| `role_mapping` | Optional override for Registry role labels |
+| `stream` | `FALSE` by default for `trial_experiment()`; `TRUE` enables streaming when the interface supports it |
+| `timeout` | Per-request limit in seconds; default 120 |
+| `repeats` | Number of copies of the complete material table |
+| `random` | Whether to shuffle the expanded trial order |
+| `delay` | Pause in seconds after each request |
+| `output_path` | Result filename or directory; `NULL` uses the timestamped user results directory |
+| `overwrite` | Whether an existing explicit result file may be replaced |
+| `return_raw` | Requests raw runtime diagnostics from `llm_caller()`; experiment tables keep the standardized row schema, so use a direct caller request when the raw object itself must be inspected |
+
+`trial_experiment()` and `factorial_trial_experiment()` default `optionals` to
+`NULL`, so they do not inject Registry optional defaults. The conversation
+functions preserve the full three-state contract: omitting `optionals` uses
+Registry defaults, explicit `NULL` suppresses them, and a named list sends only
+the supplied values. Direct `llm_caller()` behavior is described later.
+
+#### Sentence-completion task
+
+The sentence-completion materials are also available as CSV and XLSX files:
+
+```r
+completion_file <- system.file(
+  "extdata",
+  "Sentence_Completion.csv",
+  package = "PsyLingLLM"
+)
+
+completion_data <- readr::read_csv(
+  completion_file,
+  show_col_types = FALSE
+)
+
+completion_result <- trial_experiment(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = completion_data,
+  trial_prompt = "Complete the blank with one word only.",
+  optionals = list(max_tokens = 32L),
+  stream = FALSE,
+  random = FALSE,
+  delay = 0
+)
+```
+
+The completion file contains one row per stimulus. Repetition and randomization
+are added by the experiment function, while all source columns remain attached
+to the resulting rows. For a controlled completion study, define in advance
+whether scoring uses the full returned sentence, the completed word, a semantic
+category, or human coding; do not infer the scoring rule after observing model
+responses.
+
+#### One direct request
+
+Use `llm_caller()` when a trial table is unnecessary:
+
+```r
+response <- llm_caller(
+  model_key = "gpt-5.6-luna",
+  api_key = Sys.getenv("OPENAI_API_KEY"),
+  material = "Reply with the word OK only.",
+  optionals = list(
+    max_output_tokens = 64L,
+    reasoning = list(effort = "low")
+  ),
+  stream = FALSE
+)
+
+response$answer
+response$thinking
+response$usage
+```
+
+The normalized caller result contains:
+
+| Field | Meaning |
+|---|---|
+| `status` | Public runtime status; compatibility failures use `599` |
+| `answer` | Final semantic answer text |
+| `thinking` | Separate reasoning content when declared and returned |
+| `usage` | Prompt/completion usage and request ID when supplied by the provider |
+| `streaming` | Effective transport mode |
+| `first_token_latency` | Time to the first streamed content token when available |
+| `error` | Structured provider or transport evidence on failure |
+| `raw` | Redacted request/response diagnostics only when `return_raw = TRUE` |
+
+Use `llm_caller()` for endpoint smoke tests, adapter diagnostics, and one-off
+requests. Use an experiment function when rows, repetitions, randomization,
+logs, and standardized result files are part of the research workflow.
+
+### Factorial designs
+
+`factorial_trial_experiment()` expands carrier materials across all combinations
+of user-defined factors, realizes each condition with a fill function, and then
+runs the resulting trial table through the same standardized runtime. This is
+useful when the experimental manipulation should vary while the surrounding
+lexical material stays controlled.
+
+The bundled factorial demonstration is a 2 x 2 agreement-attraction design:
+
+- `AttractorNumber`: singular or plural.
+- `Agreement`: match or mismatch with the singular head noun.
+
+The carrier sentences use `noun(s)` and `{VERB}` placeholders. The custom
+`fill_method` realizes each condition before the API call.
+
+With four carrier items, two attractor-number levels, two agreement levels,
+one repetition, and no critical-word table, the design contains
+`4 x 2 x 2 x 1 = 16` trials.
+
+```r
+factorial_file <- system.file(
+  "extdata",
+  "factorial_design.csv",
+  package = "PsyLingLLM"
+)
+
+factorial_data <- readr::read_csv(
+  factorial_file,
+  show_col_types = FALSE
+)
+
+fill_agreement <- function(condition, material, word) {
+  stimulus <- sub(
+    "\\(s\\)",
+    if (condition$AttractorNumber == "plural") "s" else "",
+    material
+  )
+  verb <- if (condition$Agreement == "match") "is" else "are"
+  sub("{VERB}", verb, stimulus, fixed = TRUE)
+}
+
+factorial_preview <- generate_llm_factorial_experiment_list(
+  data = factorial_data,
+  factors = list(
+    AttractorNumber = c("singular", "plural"),
+    Agreement = c("match", "mismatch")
+  ),
+  repeats = 1,
+  random = FALSE
+)
+
+stopifnot(nrow(factorial_preview) == 16L)
+
+factorial_result <- factorial_trial_experiment(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = factorial_data,
+  factors = list(
+    AttractorNumber = c("singular", "plural"),
+    Agreement = c("match", "mismatch")
+  ),
+  fill_method = fill_agreement,
+  optionals = list(max_tokens = 32L),
+  stream = FALSE,
+  random = TRUE,
+  delay = 0
+)
+
+factorial_result[c(
+  "Item", "AttractorNumber", "Agreement", "Stimulus",
+  "ConditionLabel", "Response"
+)]
+```
+
+Before making any API request, inspect the expanded design with
+`generate_llm_factorial_experiment_list()` if required. When `fill_method` is
+omitted, the built-in filler supports `{CW}`, `[CW]`, `__CW__`, and `____`
+critical-word placeholders.
+
+Factorial output retains the factor columns and adds `Stimulus` and
+`ConditionLabel`, so the result can be grouped without reconstructing the
+experimental design:
+
+```r
+factorial_summary <- factorial_result %>%
+  group_by(AttractorNumber, Agreement) %>%
+  summarise(
+    mean_rating = mean(as.numeric(Response), na.rm = TRUE),
+    mean_RT = mean(TotalResponseTime, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+Before interpreting the means, inspect response-format violations and missing
+trials. For confirmatory work, analyze item and model variability rather than
+treating the expanded rows as independent observations without qualification.
+
+### Conversation experiments
+
+`conversation_experiment()` groups rows by `ConversationId`, sorts them by
+`Turn`, and carries structured user/assistant history forward. The bundled
+example measures free recall and source memory after an encoding turn.
+
+Unlike independent trials, later turns can depend on earlier model responses.
+This supports research on memory, priming, adaptation, consistency, and
+sequential dependence. It also changes the unit of randomization: preserve turn
+order inside each conversation, and treat a complete `ConversationId` sequence
+as the coherent experimental unit.
+
+The bundled data contain two three-turn conversations:
+
+| ConversationId | Turn | Condition | Task |
+|---|---:|---|---|
+| `memory-1` | 1 | `encoding` | Remember *lantern* and reply `READY` |
+| `memory-1` | 2 | `free_recall` | Recall the target word |
+| `memory-1` | 3 | `source_memory` | Judge whether it was described as living |
+| `memory-2` | 1 | `encoding` | Remember *meadow* and reply `READY` |
+| `memory-2` | 2 | `free_recall` | Recall the target word |
+| `memory-2` | 3 | `source_memory` | Judge whether it was described as a place |
+
+```r
+conversation_file <- system.file(
+  "extdata",
+  "conversation_experiment.csv",
+  package = "PsyLingLLM"
+)
+
+conversation_data <- readr::read_csv(
+  conversation_file,
+  show_col_types = FALSE
+)
+
+conversation_result <- conversation_experiment(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = conversation_data,
+  system_content = paste(
+    "You are participating in a memory experiment.",
+    "Follow the requested response format exactly."
+  ),
+  optionals = list(max_tokens = 64L),
+  history_mode = "all",
+  max_history_turns = 2,
+  stream = FALSE,
+  random = FALSE,
+  delay = 0
+)
+```
+
+History options:
+
+- `history_mode = "all"` retains earlier turns, optionally limited by
+  `max_history_turns`.
+- `history_mode = "last"` retains only the most recently completed turn.
+
+Every completed turn contributes one user message and one assistant message.
+Static few-shot messages can be supplied through `assistant_content` as
+character values or structured message objects.
+
+Conversation output keeps the ordinary response, reasoning, timing, token,
+status, and request-ID fields and adds the request messages and history used for
+each turn. This makes it possible to audit the exact context that produced a
+response. Because context grows across turns, token use and latency are not
+directly comparable to isolated trials unless the analysis controls for prompt
+length and history policy.
+
+Inspect recall and source judgments without discarding failed turns:
+
+```r
+conversation_result %>%
+  select(
+    ConversationId, Turn, Condition, Target,
+    Response, PromptTokens, CompletionTokens, TrialStatus
+  )
+```
+
+`repeats` repeats complete conversations rather than independently duplicating
+and mixing turns. When `random = TRUE`, verify the generated conversation order
+before a costly run.
+
+### Adaptive feedback
+
+`conversation_experiment_with_feedback()` calls a user-defined function after
+each successful response. The callback receives the response, current row, and
+a context list. It can select the next prompt and attach decision metadata.
+
+The bundled demonstration adjusts prime-number difficulty after each answer:
+
+| ConversationId | StartNumber | Initial question |
+|---|---:|---|
+| `prime-1` | 17 | Is 17 a prime number? |
+| `prime-2` | 21 | Is 21 a prime number? |
+
+```r
+adaptive_file <- system.file(
+  "extdata",
+  "adaptive_feedback.csv",
+  package = "PsyLingLLM"
+)
+
+adaptive_data <- readr::read_csv(
+  adaptive_file,
+  show_col_types = FALSE
+)
+
+is_prime <- function(x) {
+  if (x < 2L) return(FALSE)
+  if (x < 4L) return(TRUE)
+  if (x %% 2L == 0L) return(FALSE)
+  upper <- floor(sqrt(x))
+  if (upper < 3L) return(TRUE)
+  !any(x %% seq.int(3L, upper, by = 2L) == 0L)
+}
+
+prime_feedback <- function(response, row, context) {
+  number <- as.integer(sub(
+    ".*?(\\d+).*",
+    "\\1",
+    row$TrialPrompt[[1]]
+  ))
+  says_yes <- grepl("^\\s*yes\\b", response, ignore.case = TRUE)
+  correct <- identical(says_yes, is_prime(number))
+  next_number <- if (correct) number + 4L else max(2L, number - 2L)
+
+  list(
+    name = if (correct) "correct" else "incorrect",
+    next_prompt = paste(
+      "Is", next_number, "a prime number? Answer YES or NO."
+    ),
+    meta = list(
+      number = number,
+      correct = correct,
+      next_number = next_number
+    )
+  )
+}
+
+adaptive_result <- conversation_experiment_with_feedback(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = adaptive_data,
+  feedback_fn = prime_feedback,
+  apply_mode = "insert_dynamic",
+  max_turns = 5,
+  optionals = list(max_tokens = 16L),
+  stream = FALSE,
+  random = FALSE,
+  delay = 0
+)
+```
+
+With `apply_mode = "replace_next"`, feedback replaces the next planned prompt
+without inserting a row. With `apply_mode = "insert_dynamic"`, a new turn may
+be appended until `max_turns` is reached.
+
+The callback contract is deliberately small:
+
+- `response` is the normalized answer from the completed turn;
+- `row` is the current experiment row;
+- `context` contains the evolving conversation state;
+- `next_prompt` and optional `next_material` determine the next turn;
+- `name` labels the feedback decision;
+- `meta` records analysis variables such as correctness and next difficulty.
+
+Return `NULL` when no adaptation should be applied. Keep `max_turns` finite for
+dynamic insertion, validate callback outputs, and make the rule deterministic
+or record its random seed. Provider errors and timeouts must not be scored as
+participant answers; inspect `TrialStatus` before using the response in a
+feedback decision.
+
+### Multi-model experiments
+
+`multi_model_experiment()` runs the same trial table through multiple Registry
+models. The required model-table column is `model_key`. Optional columns
+include `generation_interface`, `api_key`, `api_url`, `stream`,
+`system_content`, `assistant_content`, `optionals`, `role_mapping`, and
+`output_path`.
+
+Use this layer when the scientific comparison requires identical materials,
+trial-generation rules, and result columns across models. Provider-native
+parameters can differ by row; they are not forced into a universal parameter
+vocabulary.
+
+```r
+models <- data.frame(
+  model_key = c("deepseek-flash", "gpt-5.6-luna"),
+  generation_interface = c("chat", "responses"),
+  api_key = c(
+    Sys.getenv("DEEPSEEK_API_KEY"),
+    Sys.getenv("OPENAI_API_KEY")
+  ),
+  stringsAsFactors = FALSE
+)
+
+models$optionals <- list(
+  list(max_tokens = 64L),
+  list(
+    max_output_tokens = 64L,
+    reasoning = list(effort = "low")
+  )
+)
+
+comparison <- multi_model_experiment(
+  models = models,
+  data = garden_path[1:2, ],
+  random = FALSE,
+  delay = 0,
+  output_dir = tempdir(),
+  combined_output_path = file.path(
+    tempdir(),
+    "combined-results.csv"
+  )
+)
+```
+
+The combined result includes `ModelKey`. A failure for one model does not stop
+the remaining model rows from being attempted. Never save real credentials in
+a CSV or XLSX model table intended for sharing.
+
+The in-memory model table used above is equivalent to:
+
+| model_key | generation_interface | optionals concept |
+|---|---|---|
+| `deepseek-flash` | `chat` | `max_tokens` |
+| `gpt-5.6-luna` | `responses` | `max_output_tokens`, nested `reasoning` |
+
+The names differ because each row follows its provider's wire contract. A
+cross-model study should record those differences rather than silently mapping
+one setting to another.
+
+`output_dir` stores per-model experiment files. `combined_output_path` writes a
+single row-bound CSV with `ModelKey` for comparison. A simple descriptive
+summary is:
+
+```r
+model_summary <- comparison %>%
+  group_by(ModelKey, Condition) %>%
+  summarise(
+    successful_trials = sum(TrialStatus == "SUCCESS"),
+    mean_RT = mean(TotalResponseTime, na.rm = TRUE),
+    mean_tokens = mean(CompletionTokens, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+Do not compare latency across providers without recording region, endpoint,
+transport mode, rate limiting, and execution time. Those deployment variables
+can dominate model-computation differences.
+
+### Input, output, and file management
+
+Experiment data can be supplied as a data frame. The list-generation helpers
+also accept CSV and XLS/XLSX paths:
+
+```r
+trials <- generate_llm_experiment_list(
+  data = garden_path_file,
+  repeats = 2,
+  random = TRUE
+)
+```
+
+Supported material sources:
+
+| Source | Reader | Notes |
+|---|---|---|
+| R data frame | used directly | Best for programmatically generated or preprocessed materials |
+| CSV | `readr::read_csv()` | Character columns are checked and converted toward UTF-8 when needed |
+| XLS/XLSX | `readxl::read_excel()` | Useful when a collaborator maintains materials in Excel |
+
+`Material` is required. `Item` is generated when absent. A row-level
+`TrialPrompt` is retained; otherwise the global `trial_prompt` is added. Columns
+whose names begin with `Condition` or `condition` are placed near the core
+identifiers, and all remaining custom columns are preserved. This allows target
+answers, list assignments, lexical measures, and preregistered exclusions to
+travel with every result row.
+
+For reproducible randomization, set and record the seed before generating the
+trial list:
+
+```r
+set.seed(2026)
+
+trials <- generate_llm_experiment_list(
+  data = garden_path_file,
+  repeats = 2,
+  random = TRUE,
+  save_path = file.path(tempdir(), "garden-path-trials.csv")
+)
+```
+
+Core output fields include:
+
+| Field | Meaning |
+|---|---|
+| `Run`, `Item` | Execution and material identifiers |
+| `TrialPrompt`, `Material` | Prompt and stimulus used for the trial |
+| `Response` | Normalized final answer |
+| `Think` | Separate reasoning field when declared and returned |
+| `ModelName` | Registry model key |
+| `TotalResponseTime` | Complete request duration in seconds |
+| `FirstTokenLatency` | Time to first streamed token when available |
+| `PromptTokens`, `CompletionTokens` | Provider-reported usage when available |
+| `TrialStatus` | `SUCCESS`, `ERROR`, or `TIMEOUT` |
+| `Streaming` | Whether streaming transport was used |
+| `Timestamp`, `RequestID` | Completion time and provider request identifier |
+
+Original experimental-condition columns remain in the result. Conversation
+functions additionally record request messages and conversation history.
+
+Status should be part of every analysis filter:
+
+```r
+table(garden_path_result$TrialStatus, useNA = "ifany")
+
+analysis_data <- garden_path_result %>%
+  filter(TrialStatus == "SUCCESS", Response %in% c("Y", "N"))
+```
+
+Do not silently convert `ERROR`, `TIMEOUT`, blank answers, or response-format
+violations into substantive judgments. Report exclusions and retry rules before
+comparing conditions.
+
+Save an already constructed result table explicitly with:
+
+```r
+save_experiment_results(
+  garden_path_result,
+  output_path = file.path(tempdir(), "garden-path-results.xlsx"),
+  model = "deepseek-flash",
+  overwrite = TRUE
+)
+```
+
+CSV output uses an Excel-compatible UTF-8 encoding. XLS/XLSX output uses
+`writexl`. Columns containing only missing or empty values may be removed from
+the saved file; keep the in-memory object when the full schema is needed for
+programmatic checks.
+
+### Function guide
+
+The main user-facing workflow functions are:
+
+| Function | Use |
+|---|---|
+| `trial_experiment()` | Independent or repeated row-wise trials |
+| `factorial_trial_experiment()` | Cross factors, realize carrier materials, and run the expanded design |
+| `conversation_experiment()` | Ordered multi-turn conversations with retained history |
+| `conversation_experiment_with_feedback()` | Adaptive conversations controlled by a callback |
+| `multi_model_experiment()` | Run one trial design across Registry model rows |
+| `llm_caller()` | Make one normalized request without an experiment table |
+| `generate_llm_experiment_list()` | Inspect, repeat, randomize, and optionally save an ordinary trial list |
+| `generate_llm_factorial_experiment_list()` | Inspect and save a factorial expansion before API calls |
+| `save_experiment_results()` | Save a result data frame as CSV or Excel |
+| `load_registry()` | Inspect the effective flat compatibility view |
+| `get_registry_entry()` | Resolve one public model/interface entry |
+| `get_model_config()` | Obtain compatibility configuration used by existing callers |
+| `get_registry_path()` | Locate the user Registry file |
+| `llm_register()` | Probe a live endpoint and prepare a registration candidate |
+| `validate_registry_schema()` | Validate Registry v1/v2 structure before runtime |
+
+Run `?function_name` in R for the formal argument reference. Registration also
+exports lower-level diagnostic helpers for advanced maintainers; ordinary
+experiments should use the high-level functions above.
+
+## Registry and API adaptation
+
+### Registry resolution
+
+The default user registry path is:
+
+```r
+get_registry_path()
+# ~/.psylingllm/model_registry.yaml
+```
+
+Inspect the effective public registry view and one resolved interface:
+
+```r
+registry <- load_registry()
+names(registry)
+
+entry <- get_registry_entry(
+  model_key = "deepseek-flash",
+  generation_interface = "chat"
+)
+
+entry$provider
+entry$input$default_url
+entry$input$optional_defaults
+entry$streaming
+
+config <- get_model_config(
+  model_key = "deepseek-flash",
+  generation_interface = "chat"
+)
+```
+
+`load_registry()` continues to expose a flat Registry v1-compatible public
+view. Internally, runtime resolution uses a validated canonical configuration.
+Invalid YAML, unsupported schema versions, unknown adapters, and broken
+cross-references fail before an API request is sent.
+
+Registry v1 user files remain readable and are never rewritten automatically.
+A native Registry v2 user file is also accepted, but it must currently be a
+self-contained bundle whose provider, interface, capability, and model
+references all resolve inside that document. Partial v2 overlays that refer to
+system-only interfaces are not supported.
+
+User/system precedence is applied to complete model entries. If a user file
+defines the same model key as the system registry, the user entry replaces the
+system entry; their interface definitions are not recursively combined.
+
+### Models, providers, interfaces, and capabilities
+
+Registry v2 separates four concepts:
+
+- **Model**: Registry key, provider-facing model ID, aliases, interfaces,
+  default interface, capabilities, and model defaults.
+- **Provider**: service identity, endpoint, authentication scheme, headers,
+  and deployment metadata.
+- **Interface**: reusable protocol definition with a request builder,
+  transport, parser, streaming rules, and optional parameter help.
+- **Capability**: research-relevant behavior such as reasoning or streaming.
+
+A new model that uses an existing protocol should normally need only Registry
+configuration. It should not require a model-name branch in `llm_caller()`.
+
+Models can expose multiple interfaces. Select a friendly compatibility label
+or the exact versioned interface ID:
+
+```r
+responses_result <- llm_caller(
+  model_key = "deepseek-flash",
+  generation_interface = "deepseek-responses-v1",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  material = "Reply with OK only.",
+  optionals = list(max_output_tokens = 64L),
+  stream = FALSE
+)
+```
+
+### Provider-native parameters
+
+PsyLingLLM does not define a universal cross-provider parameter vocabulary.
+Use the exact wire names and nested values documented for the selected provider
+and interface. These names are not automatically translated:
+
+```text
+max_tokens
+max_completion_tokens
+max_output_tokens
+```
+
+Unknown provider parameters produce a warning but are still transmitted. This
+allows newly introduced upstream parameters to work before Registry help text
+is updated. The provider remains authoritative for invalid names and values.
+
+Direct `llm_caller()` calls preserve a three-state `optionals` contract:
+
+| Call form | Behavior |
+|---|---|
+| Omit `optionals` | Use Registry defaults when present |
+| `optionals = NULL` | Send no Registry optional defaults |
+| `optionals = list(...)` | Send only the supplied values |
+
+`llm_caller()` also accepts provider parameters through trailing `...`:
+
+```r
+response <- llm_caller(
+  model_key = "gpt-5.6-luna",
+  api_key = Sys.getenv("OPENAI_API_KEY"),
+  material = "Give one word describing calm water.",
+  optionals = NULL,
+  max_output_tokens = 64L,
+  reasoning = list(effort = "low")
+)
+```
+
+If both forms contain the same name, the value in `...` wins and a warning is
+emitted. Experiment functions do not expose trailing `...`; supply their
+provider-native values through `optionals`.
+
+Protocol-owned fields such as `model`, `messages`, `input`, `instructions`,
+and `system` cannot be replaced through optional parameters. `api_url`,
+`stream`, `timeout`, and `return_raw` remain runtime controls.
+
+### Registering a model
+
+There are two practical registration routes in 0.4:
+
+1. Use `llm_register()` as an advanced discovery assistant.
+2. Maintain a Registry v1-compatible user entry directly.
+
+The second route is often preferable when the provider publishes a stable,
+OpenAI-compatible response contract.
+
+#### Automatic registration assistant
+
+`llm_register()` performs live requests. It probes non-streaming and streaming
+responses, ranks candidate answer/reasoning paths, constructs a standardized
+request template, and performs a second retrievability check.
+
+```r
+registration <- llm_register(
+  url = "https://api.deepseek.com/chat/completions",
+  provider = "official",
+  headers = list(
+    "Content-Type" = "application/json",
+    "Authorization" = "Bearer ${API_KEY}"
+  ),
+  body = list(
+    model = "deepseek-flash",
+    messages = list(
+      list(role = "user", content = "${CONTENT}")
+    ),
+    stream = TRUE
+  ),
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  content_value = "Reply with OK only.",
+  generation_interface = "chat",
+  optional_defaults = list(max_tokens = 64L),
+  stream_param = "stream",
+  auto_register = FALSE
+)
+```
+
+In an interactive session, `auto_register = FALSE` displays a preview and asks
+whether it should be saved. `auto_register = TRUE` writes the inferred entry to
+the user registry without that confirmation. Inspect the preview before using
+automatic persistence.
+
+Automatic path ranking is evidence, not proof of semantic correctness. Treat
+registration diagnostics as sensitive request metadata, never publish an
+unreviewed report, and test the resulting entry before using it in an
+experiment. The Registry must retain `${API_KEY}` as a placeholder rather than
+the real credential.
+
+#### Manual Registry v1-compatible entry
+
+For a single custom or proxy endpoint, create or edit the file returned by
+`get_registry_path()`. A minimal OpenAI-compatible example is:
+
+```yaml
+my-model@custom:
+  chat:
+    provider: custom
+    reasoning: false
+    input:
+      headers:
+        Content-Type: application/json
+        Authorization: Bearer ${API_KEY}
+      body:
+        model: provider-model-id
+        messages:
+          - role: ${ROLE}
+            content: ${CONTENT}
+        ${PARAMETER}: ${VALUE}
+      optional_defaults:
+        max_tokens:
+          value: 128
+          type: numeric
+      role_mapping:
+        system: system
+        user: user
+        assistant: assistant
+    output:
+      respond_path: 'list("choices..message.content")'
+      id_path: 'list("id")'
+      token_usage_path:
+        prompt: 'list("usage","prompt_tokens")'
+        completion: 'list("usage","completion_tokens")'
+    streaming:
+      enabled: true
+      delta_path: 'list("choices..delta.content")'
+      param_name: stream
+```
+
+Do not copy response paths from this example unless the real provider response
+has the same structure. Do not put credentials in YAML.
+
+Non-official registrations use keys such as `my-model@custom`,
+`my-model@proxy`, or `my-model@local`. Supply the actual endpoint at runtime:
+
+```r
+custom_result <- llm_caller(
+  model_key = "my-model@custom",
+  generation_interface = "chat",
+  api_url = "https://provider.example/v1/chat/completions",
+  api_key = Sys.getenv("CUSTOM_API_KEY"),
+  material = "Reply with OK only.",
+  optionals = list(max_tokens = 32L),
+  stream = FALSE
+)
+```
+
+To replace an outdated bundled preset, define the same model key in the user
+registry. Because precedence applies to the complete model entry, include every
+interface that the experiment needs.
+
+### Validating a registration
+
+Validate in increasing order of cost:
+
+1. Confirm that the YAML parses and the model resolves.
+2. Inspect URL, headers, defaults, streaming settings, and output selectors.
+3. Make one short non-streaming request.
+4. Make one short streaming request when supported.
+5. Run a one-row experiment through the complete data path.
+6. Start the full experiment only after these checks succeed.
+
+```r
+custom_entry <- get_registry_entry(
+  "my-model@custom",
+  generation_interface = "chat"
+)
+
+custom_entry$input$headers
+custom_entry$output
+custom_entry$streaming
+
+smoke_data <- garden_path[1, , drop = FALSE]
+
+smoke_result <- trial_experiment(
+  model_key = "my-model@custom",
+  generation_interface = "chat",
+  api_url = "https://provider.example/v1/chat/completions",
+  api_key = Sys.getenv("CUSTOM_API_KEY"),
+  data = smoke_data,
+  optionals = list(max_tokens = 32L),
+  stream = FALSE,
+  random = FALSE,
+  delay = 0,
+  output_path = tempdir()
+)
+
+stopifnot(smoke_result$TrialStatus[[1]] == "SUCCESS")
+```
+
+Repeat the smoke test after changing a model ID, endpoint, API version,
+authentication rule, request parameter, streaming format, or response path.
+
+### Bundled support levels
+
+The system registry is a starter catalog and protocol reference. It does not
+replace the user registry.
+
+| Level | Meaning |
+|---|---|
+| **Live verified** | The maintained entry completed real non-stream and stream tests on the recorded date |
+| **Offline verified** | Schema, resolution, request generation, mock transport, parsing, and normalization are covered without a provider account |
+| **Deployment template** | Correctness depends on the user's endpoint, deployment, installed model, or server configuration |
+| **Experimental** | The upstream compatibility contract or account catalog remains unverified |
 
 | Provider or deployment | Bundled protocol | 0.4 status | Verification scope |
 |---|---|---|---|
 | OpenAI | Responses | **Live verified** | `gpt-5.6-luna`; non-stream and stream |
 | DeepSeek | Chat Completions, Responses | **Live verified** | `deepseek-flash`; non-stream and stream |
 | Qwen | Chat Completions, Responses | **Live verified** | `qwen3.8-flash`; workspace endpoint override, non-stream and stream, plus `trial_experiment()` |
-| Anthropic | Messages | **Offline verified** | Native request/parser contract; the adapter also passed live tests through a Qwen Anthropic-compatible endpoint, but the bundled Anthropic provider was not tested with an Anthropic account |
+| Anthropic | Messages | **Offline verified** | Native request/parser contract; live compatibility also passed through a Qwen Anthropic-compatible endpoint, not an official Anthropic account |
 | Gemini | OpenAI-compatible Chat | **Offline verified (beta)** | Basic answer and streaming contract; thought-summary extraction is not claimed |
-| Mistral | Chat Completions | **Offline verified** | Rolling model aliases require upstream availability checks |
-| xAI | Responses | **Offline verified** | Native nested `reasoning` request shape covered; no xAI credential used |
+| Mistral | Chat Completions | **Offline verified** | Rolling model aliases still require an account availability check |
+| xAI | Responses | **Offline verified** | Native nested `reasoning` request shape; no xAI credential used |
 | Groq, Kimi, GLM, Qianfan | OpenAI-compatible Chat | **Offline verified** | Provider-native parameters pass through unchanged; no live credential used |
-| Volcengine Ark | Responses | **Offline verified** | Official request and typed response contract; no live credential used |
+| Volcengine Ark | Responses | **Offline verified** | Request and typed response contract; no live credential used |
 | Azure OpenAI | Responses | **Deployment template** | Requires a complete deployment URL and matching deployment name |
-| Ollama, vLLM | OpenAI-compatible Chat/Responses | **Deployment template** | Depends on local server version, model installation, chat template, and served model name |
-| Meta Llama API | `/compat/v1` Chat compatibility | **Experimental** | Account catalog and compatibility response shape remain unverified; the documented native `/v1` response is not OpenAI-shaped |
+| Ollama, vLLM | OpenAI-compatible Chat/Responses | **Deployment template** | Depends on server version, installed model, chat template, and served model name |
+| Meta Llama API | `/compat/v1` Chat compatibility | **Experimental** | Account catalog and compatibility response shape remain unverified |
 
-The live verification date for the maintained 0.4 production paths is
-2026-09-17. Other models that reuse a verified interface still require an
-upstream availability check; protocol verification does not guarantee that
-every account can access every model ID.
+The live verification date for the maintained production paths above is
+2026-09-17. Check the upstream account catalog and maintain a user entry when a
+model name, endpoint, authentication rule, or protocol changes.
 
-## 📖 Background
+### Runtime architecture
 
-LLMs are increasingly used to study **human language processing**, **cognitive science**, and **education**.  
-Yet, designing controlled experiments with LLMs often involves substantial work: creating structured prompts, randomizing trials, and collecting results consistently.
+Registry v2 keeps experiment code independent from provider wire formats:
 
-**PsyLingLLM** simplifies this process by providing an **R package** that seamlessly integrates:
-
-- Flexible experiment designs: `factorial`, `repeated trials`, and `conversation-based` paradigms
-- Automated API interactions with multiple LLM providers
-- Structured data logging, including `responses`, `reasoning traces`, and `timing`
-- Support for adaptive trials and feedback-driven experiments
-
-This enables researchers to focus on theory and analysis rather than experiment logistics.
-
-***
-
-## 📥 Installation
-
-To install PsyLingLLM directly from the GitHub repository, execute the following commands in your R environment:
-
-```r
-# Install devtools if not already available
-install.packages("devtools")
-
-# Install PsyLingLLM from the GitHub repository
-devtools::install_github("HanMingPsy/PsyLingLLM-R")
-```
-Verification:
-
-After installation, verify successful installation by loading the package and checking its version:
-
-```r
-library(PsyLingLLM)
-packageVersion("PsyLingLLM")
+```text
+trial_experiment() / conversation_experiment() / other experiment functions
+                              |
+                              v
+                        llm_caller()
+                     orchestration only
+                              |
+             +----------------+----------------+
+             |                |                |
+             v                v                v
+      Registry resolver  Request builder   Result normalizer
+             |                |                ^
+             |                v                |
+             +----------> Transport ----------+
+                              |
+                    stream/non-stream decoder
+                              |
+                              v
+                       Response parser
 ```
 
-***
-# 📚 Features
+Responsibilities are deliberately separated:
 
-- ✅ **Registry-first Reproducibility**
-      All experiment configurations — from model endpoints to parameter defaults — are stored in versioned YAML registries.
-      This guarantees full transparency and reproducibility across updates, labs, or computing environments.
-      Automatic endpoint detection and schema inference remove the need for manual API setup, letting you focus entirely on your experimental design.
+- the **Registry resolver** selects model, provider, interface, capabilities,
+  endpoint, authentication metadata, and defaults;
+- the **request builder** converts messages and provider-native parameters into
+  the selected protocol body;
+- the **transport** performs authenticated HTTP, timeout, and streaming I/O;
+- the **response parser** extracts semantic answer, reasoning, usage, request
+  ID, and provider errors from protocol-specific events or JSON;
+- the **result normalizer** preserves the experiment-facing result contract;
+- `llm_caller()` coordinates those components without model-name branches.
 
-- ✅ **Precise Experimental Control**
-      PsyLingLLM treats LLMs like participants in a behavioral experiment.
-      It supports single-trial presentation, randomization, controlled repetition — ensuring every response is collected under precisely defined conditions.
-      This makes model evaluation quantitative, time-sensitive, and reproducible.
+A new model that shares an existing protocol should therefore require a
+Registry model entry, not a new runtime branch. A genuinely new protocol needs
+one reusable component set plus deterministic fixtures and transport tests.
 
-- ✅ **Factorial & Condition-based Design**  
-      Design complex experiments without manual table manipulation.
-      Built-in factorial expansion automatically generates all combinations of independent variables (e.g., Congruity × Language), while condition metadata keeps your datasets organized.
-      Ideal for psycholinguistic, reasoning, or cognitive modeling studies that test interaction effects between multiple experimental factors.
+Key package files follow the same boundary:
 
-- ✅ **Conversation & Adaptive Paradigms**  
-      Move beyond single prompts to multi-turn dialogue experiments with persistent context and rolling message history.
-      Implement adaptive or feedback-driven tasks, where the model’s next input depends on its previous response — enabling simulations of tutoring, learning, and cooperative reasoning.
-      
-- ✅ **Cross-model & Multilingual Benchmarking**  
-      Run the same experiment across different LLMs and languages under identical protocols.
-      Full UTF-8 and Excel/CSV compatibility ensures smooth multilingual data handling,
-      Structured logging and schema-standardized outputs allow direct cross-model comparison — turning raw model runs into analyzable experimental data.
-
-***
-
-# 📑 Table of Contents
-
-## Part I
-- [1. Single-Trial Experiment](#1-single-trial-experiment)
-- [2. Repeated Trials with Conditions](#2-garden-path-sentences-judgment-task)
-- [3. Factorial Designs](#4-factorial-designs)
-- [4. Conversation-based Experiments](#5-conversation-style-experiment)
-- [5. Dynamic Feedback & Adaptive Difficulty](#6-conversation-experiment-with-feedback)
-- [6. Multi-Model Comparisons](#7-multi-model-experiment)
-- [7. Data Handling (CSV/XLSX, UTF-8 Safe)](#7-data-handling-csvxlsx-utf-8-safe)
-## Part II
-- [8. Registry System Overview](#1-single-trial-experiment)
-- [9. Endpoint Registration & Auto-Discovery](#1-single-trial-experiment)
-- [10. Provider-Agnostic Interface](#1-single-trial-experiment)
-- [10. Configuration Management](#1-single-trial-experiment)
-
-
-***
-
-
-# Part I: Experiment System
-
-
-
-## 🚀 Quick Start
-### 🔑 Authentication and Model Setup
-
-To run any experiment, you need to prepare the following three items **from your LLM provider**:
-
-1. **API Key** – your personal access token.  
-2. **Model Name** – the identifier of the model you want to call.  
-3. **API URL** – the HTTP endpoint for requests.
-
-### How to find them?
-- **API Key**: Available in your provider's user dashboard under API Keys or Access Tokens
-  e.g., `DeepSeek: https://api-docs.deepseek.com/`<br>
-  `ChatGPT: https://platform.openai.com/api-keys`<br>
-  `HuggingFace: https://huggingface.co/settings/tokens`
-- **Model Name**: Check your provider's documentation for available models, names are case-sensitive.
-    e.g., `DeepSeek: deepseek-chat, deepseek-coder`
-    `OpenAI: gpt-5, gpt-4o, gpt-4o-mini`
-- **API URL**: check the developer documentation of your provider.<br>
-      Custom endpoints: Your provider's API endpoint URL (e.g., `https://api.deepseek.com/chat/completions` for DeepSeek chat interfaces)<br>
-      Self-hosted models: Local server address (e.g., `http://localhost:8080/v1/chat/completions`)<br>
- **Note**: Registered official providers are automatically configured—no URL specification required.
-
-⚠️ **Important**: Never expose API keys in publicly accessible code. Store credentials in environment variables instead of saving them in scripts. For example:
-
-```r
-        # Use variables
-        deepseek_api_key <- "sk-**********"
-        api_key = deepseek_api_key
-```
-Or 
-```r
-        # Use environment variables
-        Sys.setenv(deepseek_api_key = "sk-**********")
-        api_key = Sys.getenv("deepseek_api_key")
+```text
+R/registry_loader.R          Registry source loading and precedence
+R/registry_resolver.R        Canonical model/interface resolution
+R/runtime_request_builder.R  Provider request construction
+R/runtime_transport.R        HTTP and streaming transport
+R/runtime_response_parser.R  Typed response parsing
+R/runtime_result.R           Standard result normalization
+R/llm_caller.R               Public orchestration entry point
+inst/registry/               Bundled Registry v2 configuration
+inst/extdata/                Reproducible example materials
 ```
 
-***
+The exact internal filenames may evolve, but the responsibility boundaries and
+public experiment contract are the stable design. User YAML can select only
+registered component IDs; it cannot name and execute arbitrary R functions.
 
-## 1. Single-Trial Experiment
-`trial_experiment()` represents the most fundamental paradigm for testing LLM behavior, analogous to presenting one stimulus to a human participant in psychological research. 
+### Errors, privacy, and reproducibility
 
+#### Provider and transport errors
 
-```r
-   library(PsyLingLLM)
-   # Test material
-   df <- data.frame(
-     Material = c(
-       "The cat sat on the ____.",           # English
-       "这只猫咪坐在____上。",                # Chinese (Simplified)
-       "Le chat était assis sur le ____.",   # French
-       "El gato estaba sentado en el ____.", # Spanish
-       "Die Katze saß auf dem ____.",        # German
-       "Il gatto era seduto sul ____.",      # Italian
-       "ネコが____の上に座っていました。",     # Japanese
-       "고양이가 ____ 위에 앉아 있었습니다.",  # Korean
-       "O gato estava sentado no ____.",     # Portuguese
-       "Katten satt på ____.",               # Swedish
-       "Кот сидел на ____."                  # Russian
-     )
-   )
-   
-   # Run test
-   result <- trial_experiment(
-     data = df,
-     api_key = "your_api_key_here",
-     model_key   = "your_model_here",
-     api_url = "https://your_api_url_here",
-     trial_prompt = "Please complete the blank in the sentence."
-   )
-   
-   print(result$Response)
-```
-***
-
-### 🖥️ Console Output & File Management
-
-During `PsyLingLLM` experiment execution, the console output provides runtime feedback including:
-
-
-<img width="1725" height="45" alt="image" src="https://github.com/user-attachments/assets/6b05da8f-2152-472e-95f3-52efef72a170" />
-
-
-
-- `[██████░░░] 73%` → Progress bar showing the completion of all trials.
-- `Trial 8/11` → Indicates the current trial number out of total trials.
-- `ETA: 01:14` → Estimated time remaining (s).
-- `- deepseek-reasoner` → The model used for this experiment.
-
-Upon experiment completion, the console will display execution results and output file paths:
-
-
-`[PsyLingLLM] Results saved: C:\Users\Documents\.psylingllm\results\deepseek-reasoner_20251101_224010.csv`
-
-
-**Output File Management**
-When no custom output_path is specified, results are automatically saved to the default directory: ~/.psylingllm. The system generates timestamped files:
-deepseek-reasoner_20251101_221529.csv → Structured experimental data and model responses
-deepseek-reasoner_20251101_221529.log → Detailed execution logs and diagnostic information
-
-
-Default file Naming Convention:
-`{model-name}_{YYYYMMDD}_{HHMMSS}.{extension}` ensures unique identification across multiple experimental runs.
-
-
-### 📝 Result Data Structure
-
-After running a trial experiment with `PsyLingLLM`, the results are returned as a `data.frame` or saved to `CSV/XLSX` like this:
-
-| Run | Item | TrialPrompt | Material | Response | Think |
-|-----|------|--------------|-----------|-----------|----------------|
-| 1 | 1 | Please complete the blank in the sentence. | The cat sat on the ____. | The cat sat on the **mat**. | "This is a very common English sentence, often used as an example. The most typical completion is 'mat'..." |
-| 2 | 2 | Please complete the blank in the sentence. | 这只猫咪坐在____上。 | 这只猫咪坐在沙发上。 | "Common things a cat might sit on include a chair, a mat, a bed, a sofa... I'll go with '沙发'." |
-| 3 | 3 | Please complete the blank in the sentence. | Le chat était assis sur le ____. | Le chat était assis sur le **tapis**. | "The sentence is in French... 'tapis' is masculine and means 'mat' — a common choice." |
-| 4 | 4 | Please complete the blank in the sentence. | El gato estaba sentado en el ____. | El gato estaba sentado en el **tejado**. | "'En el' requires a masculine noun... 'tejado' (roof) makes sense here." |
-| 5 | 5 | Please complete the blank in the sentence. | Die Katze saß auf dem ____. | Die Katze saß auf dem **Dach**. | "'Auf dem Dach' means 'on the roof' — a standard example in German." |
-| 6 | 6 | Please complete the blank in the sentence. | Il gatto era seduto sul ____. | Il gatto era seduto sul divano. | "'Sul' is used with masculine nouns... 'divano' (sofa) is natural and common." |
-| 7 | 7 | Please complete the blank in the sentence. | ネコが____の上に座っていました。 | ネコがいすの上に座っていました。 | "The sentence means 'The cat was sitting on top of ___'... I'll use 'いす' (chair)." |
-| 8 | 8 | Please complete the blank in the sentence. | 고양이가 ____ 위에 앉아 있었습니다. | 고양이가 의자 위에 앉아 있었습니다. | "Common options include '의자', '탁자', '바닥'... I'll choose '의자' (chair)." |
-| 9 | 9 | Please complete the blank in the sentence. | O gato estava sentado no ____. | O gato estava sentado no **chão**. | "'No' combines 'em + o', so the noun must be masculine... 'chão' fits perfectly." |
-| 10 | 10 | Please complete the blank in the sentence. | Katten satt på ____. | Katten satt på mattan. | "In Swedish, 'på' means 'on'... 'mattan' (the mat) is the definite form." |
-| 11 | 11 | Please complete the blank in the sentence. | Кот сидел на ____. | Кот сидел на столе. | "'На' takes the prepositional case... 'стол' becomes 'на столе' (on the table)." |
-
-
-and includes comprehensive diagnostic metadata and trial execution states:
-
-
-| ModelName | TotalResponseTime | PromptTokens | CompletionTokens | TrialStatus | Streaming | Timestamp | RequestID |
-|------------|------------------:|--------------:|-----------------:|-------------|------------|------------------|--------------------|
-| deepseek-reasoner | 8.530571222 | 25 | 206 | SUCCESS | FALSE | 2025/11/1 22:15 | b6d5b351|
-| deepseek-reasoner | 14.36554313 | 24 | 376 | SUCCESS | FALSE | 2025/11/1 22:15 | d8bfa8c1|
-| deepseek-reasoner | 26.26069283 | 27 | 689 | SUCCESS | FALSE | 2025/11/1 22:16 | 2cbb1e4c|
-| deepseek-reasoner | 49.05775499 | 28 | 1346 | SUCCESS | FALSE | 2025/11/1 22:17 | 68062a0d|
-| deepseek-reasoner | 19.82083488 | 27 | 548 | SUCCESS | FALSE | 2025/11/1 22:17 | 7a9d3aa3|
-| deepseek-reasoner | 29.26222396 | 27 | 794 | SUCCESS | FALSE | 2025/11/1 22:17 | 273a27f2|
-| deepseek-reasoner | 36.12755489 | 29 | 977 | SUCCESS | FALSE | 2025/11/1 22:18 | 5041a156|
-| deepseek-reasoner | 16.51271296 | 30 | 436 | SUCCESS | FALSE | 2025/11/1 22:18 | a71ca7e3|
-| deepseek-reasoner | 42.01539993 | 27 | 1074 | SUCCESS | FALSE | 2025/11/1 22:19 | 9acc1843|
-| deepseek-reasoner | 33.07628107 | 25 | 900 | SUCCESS | FALSE | 2025/11/1 22:20 | da315652|
-| deepseek-reasoner | 17.22883201 | 25 | 465 | SUCCESS | FALSE | 2025/11/1 22:20 | 1c5f8f25|
-
-**Column Explanations:**
-
-**Run** → Global sequential index for each trial.  
-**Item** → Identifier of the presented stimulus or sentence item.  
-**TrialPrompt** → The instruction or task prompt shown to the model.  
-**Material** → The sentence, phrase, or experimental context the model responds to.  
-**Response** → The final completion or answer produced by the model.  
-**Think** → A short excerpt of the model’s reasoning trace (if available), useful for psycholinguistic or cognitive analysis.  
-
-**ModelName** → The name or identifier of the large language model used (e.g., `deepseek-reasoner`).  
-**TotalResponseTime** → Total time in seconds taken by the model to generate a full response.  
-**PromptTokens** → Number of tokens in the input prompt.  
-**CompletionTokens** → Number of tokens produced in the model’s output.  
-**TrialStatus** → Execution result of the trial.  
-**Streaming** → Indicates whether the response was generated using streaming mode.  
-**Timestamp** → timestamp of when the trial was completed.  
-**RequestID** → Unique identifier assigned to the request for reproducibility and traceability.  
-
-Learn more in the schema section.
-
-
-***
-
-
-## ⚙️Full Function Arguments: `trial_experiment()`
-#### Core Experiment Parameters
-- **`model_key`** → Registry identifier
-   >Specifies the pre-configured model entry from the registry (e.g., `deepseek-chat` or `deepseek-chat@proxy`).
-   >
-- **`generation_interface `** → API interface type
-   >Defines the interaction protocol; defaults to "chat/completion" for conversational interfaces.
-   >
-- **`api_key`** → Authentication credentials
-   >Provider-specific API key for service access.
-   >
-- **`api_url`** → Endpoint override
-   >Optional custom API URL; required for non-official providers.
-   >
-- **`data`** → The experiment materials. Can be a `data.frame` or a CSV/XLSX file.  
-   >The experimental materials to be used for generating the LLM trial table. Can be a `data.frame`, or a path to a `.csv`, `.xls`, or `.xlsx` file.
-   >
-   >**Supported Input Formats**
-   >
-   > `PsyLingLLM` will automatically detect whether your data input is:
-   >
-   >`CSV file (.csv)`
-   >Read using readr::read_csv() (UTF-8 safe).
-   >
-   >PsyLingLLM will automatically checks for non-UTF-8 encodings.
-   >If non-UTF-8 characters (e.g., smart quotes, special symbols) are detected, they are automatically converted via stringi::stri_enc_toutf8().
-   >A warning is issued when conversion occurs.
-   >If encoding issues persist, it is recommended to save the file as Excel (.xlsx) instead.
-   >
-   >`Excel file (.xls, .xlsx)`
-   >Read with readxl::read_excel()
-  >
-  >`R data.frame`
-  >If a data frame is already loaded or generated in R, it will be used directly.
-  >
-  >`R data.frame`
-  >Directly passed in if already loaded or generated in R.Useful when you pre-process or dynamically create stimuli.
-  >
-  >**Required Column**<br>
-  >`Material` the experimental stimulus (sentence, word, text).<br>
-  >This column is automatically recognized if your input has no headers:
-  >If the first column of your CSV/data.frame has no name, it will be treated as Material.<br>
-  >
-  >**Automatically Added Columns**<br>
-  >If these columns are missing from your input data, the system will automatically generate them:<br>
-  >`Item` Sequential item number assigned to each row<br>
-  >`Run` Trial index after repetitions and randomization<br>
-  >`TrialPrompt` Prompt applied to trials<br>
-  >
-  >**Optional Columns**<br>
-  > `Condition`: Experimental factors (e.g., Congruity, Difficulty)<br>
-  >  Columns matching `Condition` or `condition` patterns receive priority placement. You need to name columns starting with (e.g., `condition1`, `Condition_congruity`)<br>
-  >  `Custom Columns`: Add any additional columns to your dataset - all custom columns are preserved through the experimental pipeline.(e.g., correctresponse)<br>
-  >  Columns organized as: Core → Conditions → Content → Custom
-  >
-  >  Link:Learn more in Data Handling section
-#### Experiment Control Parameters
-- **`repeats`** → The repeats parameter controls how many times the entire experiment dataset (all rows in data) should be duplicated. Optional (default = 1).
-   >How it works
-   ```r
-         df <- df[rep(seq_len(nrow(df)), repeats), , drop = FALSE]
-   ```
-   >This means that every trial in your dataset will be repeated repeats times.
-   >
-   >For example:
-   >
-   >Suppose you have 10 rows of stimuli:
-   ```r
-         df <- data.frame(
-           Item = 1:10,
-           Material = paste("Sentence", 1:10)
-         )
-   ```
-   >If you set repeats = 3, each row will be copied 3 times:
-   >
-   > | Run | Item | Material    |
-   > |-----|------|-------------|
-   > | 1 | 1    | Sentence 1  |
-   > | 2 | 2    | Sentence 2  |
-   > | … | …    | …           |
-   > | 10 | 10   | Sentence 10 |
-   > | 11 | 1    | Sentence 1  |
-   > | 12 | 2    | Sentence 2  |
-   > | … | …    | …           |
-   > | 20 | 10   | Sentence 10 |
-   > | 21 | 1    | Sentence 1  |
-   > | 22 | 2    | Sentence 2  |
-   > | … | …    | …           |
-   > | 30 | 10   | Sentence 10 |
-   >
-- **`random`** → Logical flag to control the order of trials.
-   >`TRUE` → trials are shuffled randomly.
-   >`FALSE` (default) → trials are kept in sequential order.
-   >
-- **`stream`** → Logical flag to control streaming output from the LLM. <br>
-   > The stream parameter determines whether the model should return responses incrementally (token by token) or all at once.<br>
-   > `TRUE` → streaming enabled; partial tokens are returned as they are generated.<br>
-   > `FALSE` → standard non-streaming behavior; the full response is returned after completion.<br>
-   > NULL (default) → PsyLingLLM uses the registry-defined (if support SSE then TRUE) default for the selected model.<br>
-   > _note_: If stream = TRUE but the selected model does not support streaming, PsyLingLLM will ignore this setting and fall back to non-streaming mode.<br>
-   > _note_: `FirstTokenLatency` is only available when `stream = TRUE`.<br>
-   > 
-- **`trial_prompt`** → A trial-level instruction applied to each experimental trial. Can be a single string or a per-row field in your data (optional).
-  >The `trial_prompt` defines the task instruction presented to the model **together** with each stimulus (Material).<br>
-  >It is combined with the stimulus text during request construction to form the user message for the LLM.<br>
-     >**Examples:**<br>
-     >`trial_prompt <- "Judge if the following sentence is grammatical:"`<br>
-     >`Material <- "The cats sits on the mat."`<br>
-     >The message sent to the LLM:<br>
-     >`"Judge if the following sentence is grammatical: The cats sits on the mat."`<br>
-  >When a `TrialPrompt` column **exists** in your dataset, its value takes precedence over the `trial_prompt` argument.<br>
-  >If both are missing, an empty string is used by default.<br>
-  >The `trial_prompt` applies to **all** trials unless overridden per row.<br>
-  >
-  
-- **`system_content`** → Optional system-level instruction (system prompt) that defines the LLM’s behavior or global context during the experiment.<br>
-   >The `system_content` argument specifies the system message sent to the model before any user message or stimulus.<br>
-   >It controls how the model interprets and responds to experimental inputs, shaping the overall behavior of the assistant (e.g., tone, task, perspective).<br>
-   >
-   >Used in chat-based interfaces. It is sent as the **first system message** in the conversation, providing the model with instructions on how to act.<br>
-   >This parameter is ignored only when the model template does not support system roles, in which case a one-time warning is issued.
-   >
-   >Researchers can use `system_content` to:<br>
-   > Standardize responses across trials<br>
-   > Manipulate the experimental context<br>
-   > Create conditions that test different cognitive or linguistic scenarios<br>
-   >
-   > **Examples:**<br>
-   > `"You are a participant in a psychology experiment."`<br>
-   > `"You are a child learning English."` (simulate a learner)  <br>
-   > `"You are a bilingual speaker fluent in English and Japanese."` (simulate bilingual processing)  <br>
-   > `"Always respond in JSON with fields { 'judgment': <Yes/No>, 'confidence': <0-1> }."`  <br>
-   >
-- **`assistant_content`** → Optional seed messages provided to the assistant before each trial. list of message objects (`list(role=..., content=...)`).<br>
-   >The `assistant_content` argument allows you to include pre-defined assistant messages.
-   >It simulates prior dialogue history or “context examples” in multi-turn or instruction-following settings.
-   >The argument is fully compatible with the registry-defined role structure (e.g., `system`, `user`, `assistant`) and is automatically normalized before sending the request to the LLM.
-   >
-- **`role_mapping`** → Optional mapping of abstract conversation roles (system, user, assistant) to the provider’s native role labels defined in the model’s API schema.<br>
-   >The `role_mapping` parameter specifies how PsyLingLLM translates between its internal role names and the role identifiers expected by your LLM provider’s API.<br>
-   >By default, PsyLingLLM preserves the abstract role names. Supply this argument only when an interface requires different provider role labels.<br>
-   >**Example:**<br>
-   ```r
-         role_mapping = list(
-           user = "human",
-           system = "system",
-           assistant = "assistant"
-         )
-   ```
-   >_Note_: If your custom mapping does not match the provider’s expected role labels, the request may fail or certain message parts (e.g., `system` or `assistant` prompts) may be ignored by the model.
-   >
-- **`optionals`** → Optional named list of provider-native request parameters.<br>
-   >Parameter names and values are sent unchanged. Registry parameter entries provide defaults and help text; they are not a cross-provider translation layer. Undeclared parameters produce a warning and are still forwarded so that the provider remains authoritative.<br>
-   >PsyLingLLM uses a tri-state logic to handle these optionals:<br>
-   >`Missing (not supplied)` → PsyLingLLM uses the registry defaults (input.optional_defaults) if present; otherwise, no optional parameters are sent.<br>
-   >`NULL` → Do not send any optional parameters; the API defaults are used.<br>
-   >`Named list` → Only the keys you provide are injected into the request; registry defaults are not merged.<br>
-   >An explicit `stream` argument takes precedence over `optionals$stream` and the registry streaming default.<br>
-   >
-   >Use the exact parameter names documented for the selected provider and interface. The same parameters can also be supplied directly through trailing `...`; when a name appears in both forms, the value in `...` wins with a warning.<br>
-   >
-   >**Examples:**<br>
-   ```r
-        optionals = list(
-          max_completion_tokens = 150,
-          temperature = 0.7,
-          top_p = 0.9
-        )
-
-        llm_caller(
-          model_key = "gpt-4o",
-          generation_interface = "chat",
-          material = "Example",
-          optionals = NULL,
-          max_completion_tokens = 150
-        )
-   ```
-   >
-
-#### Other Parameters
-- **`output_path`** → Optional file or directory path where PsyLingLLM saves experiment results and logs.
-   >The `output_path` argument specifies **where PsyLingLLM writes experiment results and logs**.<br>
-   >If not provided (NULL), PsyLingLLM automatically creates a default directory at `~/.psylingllm/results` and generates a timestamped filename in the format {model}_{YYYYMMDD_HHMMSS}.csv.<br>
-   >You can provide either:
-   >a **file path** (e.g., "results/my_experiment.csv")<br>
-   >- a **directory path** (e.g., "results/", auto-naming enabled).<br>
-   >
-   > The function automatically chooses the save method based on file extension:<br>
-   > `.csv` → uses `readr::write_excel_csv()` (UTF-8 encoded)<br>
-   > `.xls / .xlsx` → uses `writexl::write_xlsx()` <br> 
-   > unsupported or missing extension → defaults to .csv and appends it automatically<br>
-   >If the target directory does not exist, it will be created recursively.<br>
-   >  
-   >After saving, PsyLingLLM prints a confirmation message to the console showing the full path of the saved file.<br>
-   >Example auto-generated file:`~/.psylingllm/results/gpt-4o_20251103_134210.csv`<br>
-   >Corresponding logs are automatically written to the same location with a .log extension.<br>
-   >
-- **`timeout`** → Integer value specifying the maximum time (in seconds) allowed for each LLM API request.<br>
-   >The `timeout` parameter sets the upper limit for how long PsyLingLLM waits for a model response before aborting the request.<br>
-   >- `Default` → 120 seconds unless overridden by a global option.<br>
-   >
-   >If the model does not respond within this duration, the trial is automatically marked as a timeout error (`TrialStatus = "TIMEOUT"`).<br>
-   >This ensures that a single slow or unresponsive API call does not block the entire experiment run.<br>
-   >
-- **`overwrite`** → Logical flag indicating whether to overwrite existing output files.<br>
-   >The overwrite parameter controls whether `PsyLingLLM` should replace an existing result file when writing experiment outputs via `output_path`.<br>
-   >  
-   >`TRUE` (default) → overwrite existing files if they already exist.<br>
-   >`FALSE` → throw an error if the file already exists, preventing accidental data loss.<br>
-   >   
-   >This parameter is useful when you want to preserve previous experiment runs or enforce explicit versioning of output files.<br>
-   >
-- **`delay`** → Pause time (in seconds) between trials.<br>
-   >The delay parameter introduces a controlled time interval between successive API requests.<br>
-   >   
-   >- `Default` is `0` (no delay).<br>
-   >- Use a positive value (e.g., `delay = 1.5`) to insert a fixed pause between trials.<br>
-   >
-   >This can be useful in experiments where:<br>
-      >API rate limits must be respected (e.g., OpenAI or Anthropic quotas).<br>
-      >Controlled timing between stimuli is required (e.g., simulating human pacing).<br>
-      >You want to prevent server overload during batch trials.<br>
-   >   
-   >The delay applies after each trial (or conversation turn) and before the next request begins.<br>
-   >
-- **`return_raw`** → Logical flag indicating whether to include raw request and response objects in the returned results.<br>
-   >The return_raw parameter controls whether PsyLingLLM should attach the complete raw data for each API call — including the request body, headers, and raw response text — to the output data frame.<br>
-   >`FALSE` (default) → returns only structured trial results conforming to PsyLingLLM_Schema.<br>
-   >`TRUE` → adds additional columns containing the full raw request and response payloads for each trial.<br>
-   >This option is useful for debugging, model comparison, or advanced post-hoc analyses where you need to inspect the exact input/output exchanged with the LLM API.<br>
-
-  
-***
-<br>
-<br>
-## 2. Garden Path Sentences Judgment Task
-This example demonstrates how to conduct a repeated-trial psycholinguistic experiment using the `trial_experiment()` function in **PsyLingLLM**.<br>
-The task is based on the classical Garden Path Sentences paradigm, widely used to study syntactic reanalysis and semantic plausibility judgments.<br>
-
-- 🧩 **Input Materials**<br>
-First, import the example stimulus set from the package presets:<br>
-```r
-garden_path_sentences <- system.file("extdata", "garden_path_sentences.csv", package = "PsyLingLLM")
-```
-You will get:
-
-| Item | Condition   | Material                              | TrialPrompt                                   |
-|------|-------------|---------------------------------------|-----------------------------------------------|
-| 1    | GardenPath  | The old man the boats.                | Does the following sentence make sense? (Y/N) |
-| 2    | GardenPath  | The horse raced past the barn fell.   | Does the following sentence make sense? (Y/N) |
-| 3    | GardenPath  | Fat people eat accumulates.           | Does the following sentence make sense? (Y/N) |
-| 4    | GardenPath  | The man whistling tunes pianos.       | Does the following sentence make sense? (Y/N) |
-| 5    | Control     | The young man watches the boats.      | Does the following sentence make sense? (Y/N) |
-| 6    | Control     | The cat napping on the sofa purred.   | Does the following sentence make sense? (Y/N) |
-| 7    | Control     | The young man watches the boats.      | Does the following sentence make sense? (Y/N) |
-| 8    | Control     | The cat napping on the sofa purred.   | Does the following sentence make sense? (Y/N) |
-| 9    | Anomalous   | The clever dust the furniture.        | Does the following sentence make sense? (Y/N) |
-| 10   | Anomalous   | The cake baked in the oven laughed.   | Does the following sentence make sense? (Y/N) |
-| 11   | Anomalous   | Stone workers cut precisely floats.   | Does the following sentence make sense? (Y/N) |
-| 12   | Anomalous   | The student considering ideas clouds. | Does the following sentence make sense? (Y/N) |
-
-This dataset contains **three experimental conditions**:<br>
-`GardenPath` — syntactically ambiguous sentences that initially mislead the parser (e.g., The old man the boats).<br>
-`Control` — unambiguous and semantically coherent sentences (e.g., The young man watches the boats).<br>
-`Anomalous` — grammatically valid but semantically implausible sentences (e.g., The cake baked in the oven laughed).<br>
-Each condition includes 4 items, and we set the experiment to repeat twice, yielding a total of 3 × 4 × 2 = 24 randomized trials.<br>
-
--⚙️**Running the Experiment**
-```r
-system_content =
-  "You are a participant in a psychology experiment.
-Your task is to answer the following questions with ONLY a single character: Y for Yes or N for No.
-Do not provide any other text, explanation, or punctuation."
-
-Res <- trial_experiment(
-  data = garden_path_sentences,
-  api_key = api_key,
-  model_key = model,
-  system_content = system_content,
-  random = TRUE,
-  stream = TRUE,
-  repeats  = 2
-)
-```
-During execution, a real-time progress bar will display trial progress and model status:<br>
-`[████████████████████████████████████████] 100% Trial 24/24 - ETA: 00:00 - deepseek-reasoner`<br>
-Upon completion, the full trial results are automatically saved to the default results directory:<br>
-`[PsyLingLLM] Results saved: C:\Users\<username>\Documents\.psylingllm\results\deepseek-reasoner_20251105_153054.csv`<br>
-
--**Inspecting the Results**
-The output `CSV` file (or dataframe `Res`) contains structured records for each trial, including columns such as:<br>
-
-| Run | Item | Condition  | TrialPrompt                                   | Material                              | Response | Think(excerpt) | ModelName | TotalResponseTime | FirstTokenLatency | PromptTokens | CompletionTokens | TrialStatus | Streaming | Timestamp | RequestID |
-|-----|------|-----------|-----------------------------------------------|----------------------------------------|---------|--------------|-----------|-----------------|-----------------|--------------|-----------------|------------|----------|-----------|-----------|
-| 1   | 3    | GardenPath | Does the following sentence make sense? (Y/N) | Fat people eat accumulates.            | N       | Recognizes grammatical error; interprets intended meaning (“The fat that people eat accumulates”); concludes it’s ungrammatical → N. | deepseek-reasoner | 13.24165797 | 0.850236893 | 63 | 335 | SUCCESS | TRUE | 2025/11/5 21:44 | bb33b1d5-f470-4391-a51f-69d75e46933e |
-| 2   | 2    | GardenPath | Does the following sentence make sense? (Y/N) | The horse raced past the barn fell.    | N       | Identifies as a classic garden path sentence; recognizes structural ambiguity; initially confusing → N. | deepseek-reasoner | 24.77416396 | 1.013739824 | 66 | 623 | SUCCESS | TRUE | 2025/11/5 21:44 | 4660d6b6-b3a4-4ae0-9b66-69e914e15151 |
-| 3   | 7    | Control    | Does the following sentence make sense? (Y/N) | Dust people stir up settles.           | Y       | Parses as “The dust that people stir up settles”; interprets as grammatical and meaningful → Y. | deepseek-reasoner | 10.90155888 | 0.749494076 | 65 | 268 | SUCCESS | TRUE | 2025/11/5 21:44 | 95e6f0c5-a79a-4c68-afc0-9e815ae2aa25 |
-| 4   | 6    | Control    | Does the following sentence make sense? (Y/N) | The cat napping on the sofa purred.    | Y       | Finds sentence grammatically correct and semantically coherent → Y. | deepseek-reasoner | 11.68674183 | 1.829277039 | 68 | 257 | SUCCESS | TRUE | 2025/11/5 21:44 | 2e3eedee-b730-4803-a304-5745649a7de6 |
-| 5   | 12   | Anomalous  | Does the following sentence make sense? (Y/N) | The student considering ideas clouds.  | N       | Detects missing main verb; unclear predicate; semantically incomplete → N. | deepseek-reasoner | 23.54776788 | 0.937865019 | 64 | 583 | SUCCESS | TRUE | 2025/11/5 21:45 | 8abab036-25f0-4284-860c-84a1c0af8e73 |
-| 6   | 5    | Control    | Does the following sentence make sense? (Y/N) | The young man watches the boats.       | Y       | Clear subject–verb–object structure; grammatically and logically sound → Y. | deepseek-reasoner | 7.606292963 | 0.832577944 | 65 | 179 | SUCCESS | TRUE | 2025/11/5 21:45 | 4da0ed48-a3b1-467d-bce5-fa342bd5451a |
-| 7   | 4    | GardenPath | Does the following sentence make sense? (Y/N) | The man whistling tunes pianos.        | N       | Ambiguous structure; likely missing punctuation; as written ungrammatical → N. | deepseek-reasoner | 22.22325683 | 0.751473904 | 66 | 575 | SUCCESS | TRUE | 2025/11/5 21:45 | f68e9824-7451-4a43-89e3-cd309b4ec80c |
-| 8   | 1    | GardenPath | Does the following sentence make sense? (Y/N) | The old man the boats.                 | Y       | Recognizes it as a valid but deceptive garden path form; grammatically valid → Y. | deepseek-reasoner | 27.53471494 | 1.098387003 | 64 | 694 | SUCCESS | TRUE | 2025/11/5 21:46 | a9a4460d-5107-4a7b-8fac-24b972853008 |
-| 9   | 6    | Control    | Does the following sentence make sense? (Y/N) | The cat napping on the sofa purred.    | Y       | Recognizes grammatical and semantic coherence; depicts a plausible event → Y. | deepseek-reasoner | 8.194425106 | 0.719024897 | 68 | 197 | SUCCESS | TRUE | 2025/11/5 21:46 | 0aa3522b-a588-4ef8-89d9-33aca36a2a85 |
-| 10  | 1    | GardenPath | Does the following sentence make sense? (Y/N) | The old man the boats.                 | Y       | Identifies as a garden path structure; parses “The old” as noun phrase (elderly people) and “man” as verb; grammatically valid → Y. | deepseek-reasoner | 27.29363394 | 0.678291082 | 64 | 702 | SUCCESS | TRUE | 2025/11/5 21:46 | 029befd8-f1c0-4aac-972d-2bfc0ffaf6ac |
-| 11  | 3    | GardenPath | Does the following sentence make sense? (Y/N) | Fat people eat accumulates.            | N       | Detects grammatical error and missing subject/object relation; interprets intended meaning (“fat that people eat accumulates”) → N. | deepseek-reasoner | 12.98447394 | 1.055468798 | 63 | 312 | SUCCESS | TRUE | 2025/11/5 21:46 | c3568f34-4165-4b87-a1f4-aada2c899d4e |
-| 12  | 2    | GardenPath | Does the following sentence make sense? (Y/N) | The horse raced past the barn fell.    | N       | Notes classic garden path sentence; recognizes syntactic ambiguity; confusing structure → N. | deepseek-reasoner | 20.41931701 | 0.797111034 | 66 | 521 | SUCCESS | TRUE | 2025/11/5 21:47 | 3a2b9ef4-162b-4589-8d1b-23619fbcbf8e |
-| 13  | 11   | Anomalous  | Does the following sentence make sense? (Y/N) | Stone workers cut precisely floats.    | N       | Analyzes word order (“cut precisely floats”) as ungrammatical; finds semantic mismatch (“cut floats”) → N. | deepseek-reasoner | 43.22063398 | 1.764032841 | 64 | 1086 | SUCCESS | TRUE | 2025/11/5 21:48 | 7ba40a69-4103-437f-a22d-fb38d128f854 |
-| 14  | 10   | Anomalous  | Does the following sentence make sense? (Y/N) | The cake baked in the oven laughed.    | N       | Grammatically fine but semantically absurd (cakes cannot laugh) → N. | deepseek-reasoner | 16.3105619 | 0.911508083 | 66 | 397 | SUCCESS | TRUE | 2025/11/5 21:48 | 92a85d68-91a6-47f9-93e1-23c12f793517 |
-| 15  | 8    | Control    | Does the following sentence make sense? (Y/N) | The woman reading books knits.         | Y       | Parses reduced relative clause (“who is reading books”); grammatical and meaningful → Y. | deepseek-reasoner | 17.07503605 | 1.545840979 | 65 | 412 | SUCCESS | TRUE | 2025/11/5 21:48 | 3ec47ef7-8e5a-4fb8-8b5a-56d694f82674 |
-| 16  | 5    | Control    | Does the following sentence make sense? (Y/N) | The young man watches the boats.       | Y       | Straightforward subject–verb–object; syntactically and semantically coherent → Y. | deepseek-reasoner | 9.265040159 | 0.781780005 | 65 | 227 | SUCCESS | TRUE | 2025/11/5 21:48 | cbbe05a2-1b99-4af0-a3c7-cc3b43bfbad4 |
-| 17  | 9    | Anomalous  | Does the following sentence make sense? (Y/N) | The clever dust the furniture.         | N       | “The clever” not a standard noun phrase; verb-object unclear; does not make sense → N. | deepseek-reasoner | 16.87882781 | 0.929712057 | 64 | 428 | SUCCESS | TRUE | 2025/11/5 21:49 | aca51c8d-507a-480f-9a53-5f2b34335475 |
-| 18  | 9    | Anomalous  | Does the following sentence make sense? (Y/N) | The clever dust the furniture.         | N       | Same as above; ungrammatical; meaning unclear → N. | deepseek-reasoner | 14.84319496 | 0.570966959 | 64 | 391 | SUCCESS | TRUE | 2025/11/5 21:49 | 25a29a58-6f23-4146-91ab-329c17d4969d |
-| 19  | 11   | Anomalous  | Does the following sentence make sense? (Y/N) | Stone workers cut precisely floats.    | N       | Repeats prior anomalous sentence; word order and semantics problematic → N. | deepseek-reasoner | 22.27108002 | 1.033094168 | 64 | 569 | SUCCESS | TRUE | 2025/11/5 21:49 | 157e4b5d-d856-4f20-96e7-7cc5ba77fdcb |
-| 20  | 8    | Control    | Does the following sentence make sense? (Y/N) | The woman reading books knits.         | Y       | Same as previous occurrence; grammatical and coherent → Y. | deepseek-reasoner | 8.125644922 | 0.600242138 | 65 | 197 | SUCCESS | TRUE | 2025/11/5 21:49 | f32ce618-ebe3-47fe-8327-dfb9b3eebb06 |
-| 21  | 7    | Control    | Does the following sentence make sense? (Y/N) | Dust people stir up settles.           | Y       | Same as previous occurrence; parses correctly → Y. | deepseek-reasoner | 12.375669 | 0.665314913 | 65 | 319 | SUCCESS | TRUE | 2025/11/5 21:49 | edfe9918-0e8b-4456-abf7-07130d5093df |
-| 22  | 10   | Anomalous  | Does the following sentence make sense? (Y/N) | The cake baked in the oven laughed.    | N       | Same as previous occurrence; semantically absurd → N. | deepseek-reasoner | 19.31047702 | 1.418601036 | 66 | 473 | SUCCESS | TRUE | 2025/11/5 21:50 | 5e3eb99d-6937-40aa-8b8b-02fd38b51ce7 |
-| 23  | 12   | Anomalous  | Does the following sentence make sense? (Y/N) | The student considering ideas clouds.  | N       | Same as previous occurrence; incomplete sentence → N. | deepseek-reasoner | 19.02880406 | 0.945214033 | 64 | 488 | SUCCESS | TRUE | 2025/11/5 21:50 | f1bf4211-1a3a-4949-98e5-0caf277aa700 |
-| 24  | 4    | GardenPath | Does the following sentence make sense? (Y/N) | The man whistling tunes pianos.        | N       | Same as previous occurrence; ungrammatical → N. | deepseek-reasoner | 20.03945208 | 1.068171978 | 66 | 508 | SUCCESS | TRUE | 2025/11/5 21:50 | 769f6f0f-943b-4ef1-a265-6434339c42ab |
-
-Each row represents one LLM judgment, with `Think` reasoning traces.<br>
-
-You can visualize or summarize results using tidyverse tools, for instance:<br>
+PsyLingLLM preserves provider evidence when available, including HTTP status,
+message, provider error type, parameter, provider code, response body, response
+headers, and request ID. For backward compatibility, the public result status
+remains `599` for transport and provider failures; inspect `error$code` for the
+original provider status.
 
 ```r
-library(dplyr)
-summary_res <- res %>%
-  group_by(Condition) %>%
-  summarise(
-    mean_FTL    = mean(FirstTokenLatency, na.rm = TRUE),
-    mean_RT     = mean(TotalResponseTime, na.rm = TRUE),
-    mean_tokens = mean(CompletionTokens, na.rm = TRUE),
-    Y_prob      = mean(Response == "Y", na.rm = TRUE)  # Probability of responding "Y"
-  )
-
-print(summary_res)
-```
-You will get a summary like this::<br>
-| Condition   | mean_FTL | mean_RT | mean_tokens | Y_prob |
-|------------|----------|--------|------------|-------|
-| Anomalous  | 1.06     | 21.9   | 552        | 0     |
-| Control    | 0.965    | 10.7   | 257        | 1     |
-| GardenPath | 0.914    | 21.1   | 534        | 0.25  |
-
-You can visualize these results with a grouped bar or line plot to compare conditions across metrics. For example:
-
-```r
-library(dplyr)
-library(ggplot2)
-library(scales)
-plot_bar <- function(data, y_var, y_label, title) {
-  ggplot(data, aes(x = Condition, y = !!sym(y_var), fill = Condition)) +
-    geom_col(width = 0.6, color = "black") +
-    labs(title = title,
-         x = "Condition",
-         y = y_label) +
-    theme_minimal(base_size = 14) +
-    theme(legend.position = "none",
-          plot.title = element_text(hjust = 0.5, face = "bold"))
-}
-
-# 1. Total Response Time
-plot_bar(summary_res, "mean_RT", "Mean Total Response Time (s)", 
-         "Mean Total Response Time by Condition")
-
-# 2. First Token Latency
-plot_bar(summary_res, "mean_FTL", "Mean First Token Latency (s)", 
-         "Mean First Token Latency by Condition")
-
-# 3. Completion Tokens
-plot_bar(summary_res, "mean_tokens", "Mean Completion Tokens", 
-         "Mean Completion Tokens by Condition")
-
-# 4. Probability of responding "Y"
-ggplot(summary_res, aes(x = Condition, y = Y_prob, group = 1)) +
-  geom_line(color = "#2c7fb8", size = 1.2) +
-  geom_point(size = 3, color = "#2c7fb8") +
-  scale_y_continuous(labels = percent_format(accuracy = 1)) +
-  labs(title = "Probability of Responding 'Y' by Condition",
-       x = "Condition",
-       y = "Probability of 'Y'") +
-  theme_minimal(base_size = 14) +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-```
-
-<img width="738" height="502" alt="image" src="https://github.com/user-attachments/assets/e7ce62f3-bb64-47f3-b722-6190995f1c3b" />
-<img width="738" height="502" alt="image" src="https://github.com/user-attachments/assets/692275f8-051f-4710-bfc1-78d9ede40ecb" />
-<img width="738" height="502" alt="image" src="https://github.com/user-attachments/assets/25c55a6b-2891-4a26-bd64-872622d5bd00" />
-<img width="738" height="502" alt="image" src="https://github.com/user-attachments/assets/973adcae-2af3-4bd7-96d9-6c1a477d1a15" />
-
-
-🧠 **Interpretation**
-
-This experiment demonstrates how PsyLingLLM can replicate classic psycholinguistic paradigms, allowing quantitative comparison of LLM behavior across syntactic and semantic manipulations.<br>
-
-In reasoning models, the results show human-like processing patterns: `GardenPath` and `Anomalous` sentences take **longer** to process and generate **more tokens** than Control sentences. **Acceptance** judgments correspond with sentence type: `Control` sentences are always accepted, `GardenPath` sentences are partially (25%) accepted, and `Anomalous` sentences are never accepted.<br>
-
-
->_Note_: This is a methodological demonstration. Due to the limited number of trials, these results do not constitute a full statistical analysis.<br>
-
-
-   > _References_:
-   > Ferreira, F., & Henderson, J. M. (1991). Recovery from misanalyses of garden-path sentences. Journal of Memory and Language, 30(6), 725–745.
-   > Christianson, K., Hollingworth, A., Halliwell, J. F., & Ferreira, F. (2001). Thematic roles assigned along the garden path linger. Cognitive Psychology, 42(4), 368–407.
-
-***
-<br>
-<br>
-
-## 3. Sentence Completion Task
-This example demonstrates how to run a repeated-trial experiment where each stimulus is presented under multiple experimental conditions.
-Unlike single-trial experiments, the input data must include Item or Condition columns to allow proper replication and analysis.
-
-Load preset linguistic material shipped with the package:
-```r
-path <- system.file("extdata", "Sentence_Completion_Constraint.csv", package = "PsyLingLLM")
-```
-| Item | Condition_Constraint     | Condition_language | Material                                         |
-| ---- | -------------- | ---------- | ------------------------------------------------ |
-| 1    | HighConstraint | English    | John went to the bakery to buy a \_\_\_.     |
-| 1    | HighConstraint | Chinese    | 小军去面包店买了一个\_\_\_。                              |
-| 2    | LowConstraint  | English    | Mary looked out the window and saw a \_\_\_. |
-| 2    | LowConstraint  | Chinese    | 小丽望向窗外，看见了一个\_\_\_。                            |
-
-**Running the Experiment**
-```r
-result <- repeat_trial_experiment(
-  data = path,
-  repeats = 5,
-  api_key = api_key,
-  model = model,
-  api_url = api_url,
-  trial_prompt = "Complete the sentence below by filling in the blank (_____) in the most natural way.
-                  Return the full completed sentence only.
-                  Do not add any extra text.",
-  max_tokens = 1024,
-  enable_thinking = TRUE
-)
-```
-
-**Inspecting the Results**
-
-print(result$Response)
-<img width="1449" height="339" alt="image" src="https://github.com/user-attachments/assets/5759d95c-5a94-47c8-922e-3bfceab0c68f" />
-
-Outputs in experiment_results.csv:
-
-<img width="2475" height="648" alt="image" src="https://github.com/user-attachments/assets/01c8a328-ae4c-425f-8da1-375c5a347a13" />
-
-
-***
-## 4. Factorial Designs
-This example demonstrates a 2 × 2 factorial design manipulating:
-Each trial uses a **Carrier Sentence** with a placeholder `{AUX}`, which is automatically
-filled by the `fill_grammar` function according to the experimental condition:
-
-- **Grammaticality**: Determines whether the auxiliary verb is grammatically correct.
-- Grammatical → "are"
-- Ungrammatical → "is"
-- **Tense**: Adjusts the auxiliary verb for past tense.
-- Present → keep "are"/"is"
-- Past → convert to "were"/"was"
-
-
-**Step 1. Prepare carrier sentences (stimulus templates)**
->These are carrier sentences with a placeholder {OBJ}.
->Templates help control the context while manipulating only the critical word, ensuring effects can be attributed to the intended factors automatically.
->
-```r
-    # Carrier sentences with placeholders
-    items <- data.frame(
-      Material = c(
-        "The children {AUX} playing in the garden.",
-        "The dogs {AUX} chasing the cat in the yard."
-      ),
-      stringsAsFactors = FALSE
-    )
-```
-
-**Step 2. Define factors (crossed design)**
->A 2 × 2 factorial design: Congruity × Animacy.<br>
->This allows testing main effects and interactions. It should be defined in a list named `factors`.<br>
->
-```r
-    factors <- list(
-      Grammaticality = c("Grammatical", "Ungrammatical"),
-      Tense = c("Present", "Past")
-    )
-```
-
-**Step 3. Trial Prompt (Task Instructions)**
-
-```r
-trial_prompt <- "Is the following sentence grammatically correct? (Yes / No)"
-```
-
-
-**Step 4. Define a Fill Function**<br>
->PsyLingLLM allow user to input their own function to tell `factorial_trial_experiment` how to fill their cw into the carrier sentences.<br>
-```r
-fill_grammar <- function(cond, Carrier_Sentence) {
-  # cond[1] = Grammaticality, cond[2] = Tense
-  aux <- if (cond[1] == "Grammatical") "are" else "is"
-  if (cond[2] == "Past") {
-    aux <- if (aux == "are") "were" else "was"
-  }
-  gsub("\\{AUX\\}", aux, Carrier_Sentence)
+if (!is.null(response$error)) {
+  response$status
+  response$error$code
+  response$error$message
+  response$error$request_id
 }
 ```
->Grammaticality: chooses a grammatical (“are”) or ungrammatical (“is”) auxiliary.<br>
->Tense: shifts auxiliaries into past tense (“were” / “was”).<br>
->This operationalizes the factorial manipulation: different auxiliary verbs represent different conditions.
->
 
+Experiment functions convert these outcomes into `TrialStatus = "ERROR"` or
+`"TIMEOUT"` and continue where possible.
 
-**Step 5. Run Factorial Experiment**
-```r
-results <- factorial_trial_experiment(
-  data = data,
-  factors = factors,
-  condition_words = CW,
-  fill_function = fill_semantic,
-  trial_prompt = trial_prompt,
-  api_key = api_key,
-  model = model,
-  api_url = api_url,
-  random = TRUE,
-  repeats = 1,
-  enable_thinking = TRUE
-)
-```
->`factorial_trial_experiment()` automatically expands all Item × Condition combinations.<br>
->Each sentence is generated by `fill_grammar()` and paired with the task prompt.
->
+#### Raw data and credentials
 
-**Experiment Output**
+Runtime diagnostics redact secret-like fields, but `return_raw = TRUE` may
+still contain submitted research material and provider-generated content. Use
+it only for short-lived debugging and do not publish raw output without review.
 
-<img width="1437" height="87" alt="image" src="https://github.com/user-attachments/assets/6c60df16-c308-457c-baf9-1c1c0e786ef1" />
-<img width="2013" height="351" alt="image" src="https://github.com/user-attachments/assets/3dbaf657-6254-49aa-8f26-c90adb4c1ad9" />
+#### Reproducibility record
 
+For a reproducible experiment, record:
 
-***
-# 5. Conversation-style Experiment
+- PsyLingLLM and R versions;
+- Registry model key and exact interface ID;
+- a copy or checksum of the user registry used for the run;
+- provider-native parameters;
+- endpoint or deployment identity without credentials;
+- input-material version, trial order, and random seed;
+- execution date and provider request IDs;
+- support level and smoke-test result.
 
-This example demonstrates how to run a **conversation-style experiment** using `conversation_experiment()`,  
-where each trial is appended to the **conversation history** and the model's  
-responses are conditioned on **all previous trials**.  
+The bundled files in `inst/extdata` reproduce the documented materials and
+trial construction. Real model output is not guaranteed to be byte-identical
+because providers may update hosted model weights and serving behavior.
 
-This setup mimics a **web-based LLM interface**, where participants  
-see sequential questions and the conversation flows naturally.
+### Research design and interpretation
 
-> Unlike trial-based experiments (e.g., grammaticality judgments),  
-> this design introduces **memory effects**: the model “remembers” prior trials.  
->  
-> This allows researchers to study phenomena such as:  
-> - **Priming** (e.g., does exposure to correct grammar influence later judgments?)  
-> - **Fatigue or adaptation** (e.g., does accuracy drift over multiple trials?)  
-> - **Sequential dependencies** (e.g., consistency of responses across context)  
+Treat each API call as an observation generated by a model, protocol,
+deployment, prompt, decoding configuration, and execution environment. A model
+name alone is not a complete experimental condition.
 
-***
+Before data collection, specify:
 
-### Prepare the data
+- the experimental unit, factors, controls, target responses, and exclusions;
+- whether repetitions estimate stochastic variation or merely duplicate a
+  deterministic setting;
+- the exact Registry key, interface, endpoint class, and provider-native
+  parameters;
+- whether reasoning is enabled and whether completion usage includes hidden or
+  separate reasoning tokens;
+- whether timing is measured in streaming or non-streaming mode;
+- how provider errors, blank outputs, malformed answers, and retries are
+  handled;
+- whether inference generalizes across items, prompts, models, or providers.
 
-```r
-data <- data.frame(
-  TrialPrompt = c(
-    "Welcome! Let's start. Please read the following sentence carefully.",
-    "Now, consider this sentence:",
-    "Finally, evaluate this sentence:"
-  ),
-  Material = c(
-    "The cat is sleeping on the mat.",
-    "The children are playing in the park.",
-    "The dogs was barking loudly." # intentionally ungrammatical
-  ),
-  stringsAsFactors = FALSE
-)
+`FirstTokenLatency` measures transport-visible latency to the first streamed
+content event. It is not a direct cognitive reaction time. `TotalResponseTime`
+includes network and serving effects. `CompletionTokens` follows the provider's
+usage definition, which may include reasoning tokens that are not present in
+the final answer. Interpret all three measures with the relevant protocol and
+deployment metadata.
 
-```
-**Run the conversation experiment**
-```r
-results <- conversation_experiment(
-  data = data,
-  repeats = 1,
-  random = FALSE,
-  api_key = api_key,
-  model = model,
-  api_url = api_url,
-  system_prompt = "You are a participant in a psychology experiment.",
-  max_tokens = 1024,
-  enable_thinking = TRUE,
-  output_path = "conversation_results.csv"
-)
-```
-**Experiment Output**
-<img width="1428" height="75" alt="image" src="https://github.com/user-attachments/assets/1ca1cb06-2abf-4953-a05b-c4eda45c1ccb" />
+Reasoning fields can be useful for debugging and exploratory coding, but they
+are provider-generated text rather than guaranteed faithful traces of internal
+computation. Protect them as research data and avoid treating their presence as
+proof of a psychological mechanism.
 
-<img width="2129" height="411" alt="image" src="https://github.com/user-attachments/assets/bdb18697-95f1-43af-af40-9d194dec1f96" />
+The Garden Path demonstration cites:
 
+- Ferreira, F., & Henderson, J. M. (1991). Recovery from misanalyses of
+  garden-path sentences. *Journal of Memory and Language, 30*(6), 725-745.
+- Christianson, K., Hollingworth, A., Halliwell, J. F., & Ferreira, F. (2001).
+  Thematic roles assigned along the garden path linger. *Cognitive Psychology,
+  42*(4), 368-407.
 
->The output looks like a trial experiment,<br>
->except that each trial prompt now includes the entire conversation history.<br>
->
->**Example Conversation Context**
->
-> Second trial prompt input
+### Troubleshooting
 
-```json
-  {"role":"system","content":"You are a participant in a psychology experiment."},
-  {"role":"user","content":"Welcome! Let's start. Please read the following sentence carefully.\nThe cat is sleeping on the mat."},
-  {"role":"assistant","content":"Sure, I’ve read it. **“The cat is sleeping on the mat.”** Is there anything specific you’d like me to do with this sentence—comment on it, answer a question about it, or something else?"}
-```
+#### A model key resolves to an unexpected endpoint
 
-> Third trial prompt input<br>
+Inspect `get_registry_path()` and the corresponding user entry first. A user
+entry with the same model key replaces the bundled model entry. Remove or
+rename the user override only after backing it up; PsyLingLLM does not modify it
+automatically.
 
+#### A provider changed its model name or request parameter
 
-```json
-  {"role":"system","content":"You are a participant in a psychology experiment."},
-  {"role":"user","content":"Welcome! Let's start. Please read the following sentence carefully.\nThe cat is sleeping on the mat."},
-  {"role":"assistant","content":"Sure, I’ve read it. **“The cat is sleeping on the mat.”** Is there anything specific you’d like me to do with this sentence—comment on it, answer a question about it, or something else?"},
-  {"role":"user","content":"Now, consider this sentence:\nThe children are playing in the park."},
-  {"role":"assistant","content":"Got it! I’ve read the sentence: **“The children are playing in the park.”** Is there something specific you’d like me to do with it—analyze it, compare it to the first sentence, or something else?"}
-```
+Update the user Registry model ID or pass the new provider-native parameter
+unchanged. Do not substitute a similarly named parameter from another API
+generation. Run the registration smoke tests again after the update.
 
-***
+#### A custom endpoint returns 404
 
-# 6. Conversation Experiment with Feedback
+Confirm whether `api_url` expects the complete request URL or a base URL. For a
+custom Registry v1 entry, pass the complete endpoint used by the registered
+interface.
 
-This example demonstrates a **conversation-style experiment with dynamic feedback**  
-using `conversation_experiment_with_feedback()`.  
+#### R cannot reach the provider
 
-In this task, the model must judge whether a number is **prime**.  
-Difficulty is adjusted adaptively based on performance:
-
-- If the model answers **correctly**, the next trial presents a **larger number**.  
-- If the model answers **incorrectly**, the next trial presents a **smaller number**.  
-
-The number is always kept within the range **[2, 200]**, starting from **11**.
-
-### Prepare the initial data
+If the network requires an HTTP proxy, configure it explicitly for the current
+R process according to local policy:
 
 ```r
-my_data <- data.frame(
-  TrialPrompt = c("Is the following number a prime? 11"),
-  Material = c(""),
-  stringsAsFactors = FALSE
+Sys.setenv(
+  http_proxy = "http://127.0.0.1:7897",
+  https_proxy = "http://127.0.0.1:7897"
 )
 ```
 
-### Prime checking function
-```r
-is_prime <- function(n) {
-  if (n < 2) return(FALSE)
-  if (n == 2) return(TRUE)
-  if (n %% 2 == 0) return(FALSE)
-  for (i in seq(3, floor(sqrt(n)), by = 2)) {
-    if (n %% i == 0) return(FALSE)
-  }
-  return(TRUE)
-}
+Do not hard-code shared proxy credentials in a script or Registry file. A
+provider timeout, TLS error, or proxy failure is different from a valid
+provider HTTP error; inspect the normalized `error` evidence before changing
+request parameters.
 
-```
+### Testing and CRAN
 
-### Feedback function
-```r
-prime_feedback_fn <- function(response, row, history) {
-  # Extract number from the TrialPrompt
-  num <- as.integer(stringr::str_extract(row$TrialPrompt, "\\d+"))
-  if (is.na(num)) return(NULL)
+Normal package tests, examples, installation, and loading do not require API
+credentials or Internet access. Real-provider tests are explicit opt-in smoke
+tests and are not run during routine CRAN checks.
 
-  # Ground-truth
-  correct <- is_prime(num)
+When extending a provider, first add deterministic fixtures and mock-transport
+coverage. Run a short, user-approved live test separately after the offline
+contract passes.
 
-  # Parse model's answer (robust matching)
-  model_says_prime <- grepl("prime", response, ignore.case = TRUE)
-  model_says_not   <- grepl("not.*prime|non-prime", response, ignore.case = TRUE)
+### Contributing and support
 
-  is_correct <- (correct && model_says_prime) || (!correct && model_says_not)
+- Source: <https://github.com/HanMingPsy/PsyLingLLM-R>
+- Issues: <https://github.com/HanMingPsy/PsyLingLLM-R/issues>
+- Changes: [NEWS.md](NEWS.md)
 
-  # Difficulty adjustment
-  if (is_correct) {
-    step <- sample(5:15, 1)    # harder → larger number
-  } else {
-    step <- sample(-10:-2, 1)  # easier → smaller number
-  }
+When reporting an API problem, include the Registry key, interface ID,
+provider HTTP status, and a redacted error object. Never include an API key.
 
-  next_num <- max(2, min(200, num + step))
+### License
 
-  # Next trial
-  next_prompt <- paste0("Is the following number a prime? ", next_num)
-
-  return(list(
-    next_prompt   = next_prompt,
-    next_material = "",   # required for some implementations
-    meta = list(
-      num = num,
-      correct = correct,
-      model_says_prime = model_says_prime,
-      is_correct = is_correct,
-      next_num = next_num
-    ),
-    name = ifelse(is_correct, "correct→harder", "wrong→easier")
-  ))
-}
-
-```
-### Run the adaptive conversation experiment
-```r
-res <- conversation_experiment_with_feedback(
-  data = my_data,
-  api_key = api_key,
-  model = model,
-  api_url = api_url,
-  feedback_fn = prime_feedback_fn,
-  apply_mode = "insert_dynamic",  # dynamically insert new trials
-  max_trials = 10,                # stop after 10 trials
-  delay = 1                       # 1 sec delay between calls
-)
-```
-
-### Output
-This design mimics adaptive testing paradigms in psychology,
-where difficulty is adjusted dynamically according to participant performance.
-<img width="2246" height="924" alt="image" src="https://github.com/user-attachments/assets/93195edc-78ef-4854-878e-9580024ea237" />
-
-***
-# 7. Multi-Model Experiment
-
-This example demonstrates how to run the **same experiment across multiple models**  
-using `multi_model_experiment()`.  
-
-This function automates **batch comparison** by looping over a list of models (from a CSV/XLSX file)  
-and applying a chosen experiment function (e.g., `trial_experiment`).  
-
-***
-
-**Prepare the model list**
-
-The model file (`Model.xlsx`) must contain at least the following columns:
-
-| Model       | API_URL                   | API_Key      | Enable_Thinking      |
-|-------------|---------------------------|--------------|----------------------|
-| gpt-4o-mini | https://api.openai.com/v1 | OPENAI_KEY   | TRUE                 |
-| llama-3-70b | http://localhost:1234/v1  | LOCAL_KEY    | TRUE                 |
-
-> Additional metadata columns (e.g., Temperature, Notes) can also be included.
-
-***
-
-**Run the multi-model experiment**
-
-```r
-results <- multi_model_experiment(
-  data = system.file("extdata", "garden_path_sentences.csv", package = "PsyLingLLM"),
-  model_file = "Model.xlsx",
-  experiment_fn = trial_experiment,
-  max_tokens = 1024,
-  delay = 0
-)
-```
-
-**Multi-Model Experiment Output**
-
->When you run multi_model_experiment(), the results are organized both per model and collectively:
-><img width="1113" height="114" alt="image" src="https://github.com/user-attachments/assets/33ea340a-b091-4330-842c-9bb2bf9aba77" />
-
->**Per-Model Results**
->Each model’s trial results are saved in its own subfolder under the main output directory.
->Files include:
->experiment_results.csv or .xlsx — containing all trials for that model
-
->**Aggregate Results**
->A single summary file (e.g., MultiModel_Results) collects all models’ outputs in one table.
->Useful for direct comparison across models.
->The same columns are included as above, plus a ModelName column to distinguish models.
-
-<img width="1719" height="288" alt="image" src="https://github.com/user-attachments/assets/65d44bef-73e8-4a23-916c-e27aa5ba8d6b" />
-<img width="2163" height="489" alt="image" src="https://github.com/user-attachments/assets/8e6f610e-ab98-4bc1-b391-e7841216f5f2" />
-
-***
-...
-
-
-Experiment system
-```
-├── R/
-│ ├── llm_caller.R
-│ ├── trial_experiment.R
-│ ├── factorial_trial_experiment.R
-│ ├── conversation_experiment.R
-│ ├── conversation_experiment_with_feedback.R
-│ ├── multi_model.R
-│ ├── save_results.R
-│ ├── generate_experiment_materials.R
-│ ├── generate_factorial_experiment_list.R
-│ ├── get_model_config.R
-│ └── get_registry_entry.R
-├── inst/
-│   └── extdata/
-│       ├── Garden_path_sentences.csv
-│       └── Sentence_Completion.csv
-```
-
-Registry system
-```
-├── R/
-│ ├── register_orchestrator.R                  # llm_register(): end-to-end analysis → registry
-│ ├── register_probe_request.R                 # probe_llm_streaming(): POST (non-stream & SSE)
-│ ├── register_rank_endpoint.R                 # scoring (NS & ST) and keyword lexicon
-│ ├── register_build_input.R                   # build_standardized_input(), Pass-2 templates
-│ ├── register_read.R                          # structural inference & path helpers
-│ ├── register_classify.R                      # URL → interface classification
-│ ├── register_entry.R                         # build_registry_entry_from_analysis()
-│ ├── register_io.R                            # upsert into ~/.psylingllm/model_registry.yaml
-│ ├── register_preview.R                       # CI/human-readable preview
-│ ├── register_validate.R                      # Pass-2 consistency report
-│ └── register_utils.R                         # helpers (internal-only)
-├── inst/
-│   └── registry/
-│       └── system_registry.yaml               # bundled Registry v2 configuration
-```
-
-Utils
-```
-├── R/
-│ ├── json_utils.R
-│ ├── progress_bar.R
-│ ├── write_experiment_log.R
-│ ├── error_handling.R
-│ ├── llm_parser.R
-│ └── schema.R
-
-```
+PsyLingLLM is distributed under the MIT License. See [LICENSE](LICENSE).

@@ -1,0 +1,7 @@
+ConversationId,Turn,Condition,Material,TrialPrompt,Target
+memory-1,1,encoding,The target word is lantern. It names an object.,Read and remember the following information. Reply READY.,lantern
+memory-1,2,free_recall,Recall the target word from the first turn.,Answer with the target word only.,lantern
+memory-1,3,source_memory,Was the target word described as a living thing?,Answer YES or NO only.,NO
+memory-2,1,encoding,The target word is meadow. It names a place.,Read and remember the following information. Reply READY.,meadow
+memory-2,2,free_recall,Recall the target word from the first turn.,Answer with the target word only.,meadow
+memory-2,3,source_memory,Was the target word described as a place?,Answer YES or NO only.,YES
