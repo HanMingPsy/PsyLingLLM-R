@@ -105,6 +105,88 @@ test_that("xAI Responses uses the native nested reasoning wire shape", {
   expect_false("reasoning_effort" %in% names(request$body))
 })
 
+test_that("verified production interfaces declare native JSON object output", {
+  registry <- system_registry_v2_fixture()
+  cases <- list(
+    list(
+      model = "deepseek-chat",
+      interface = "chat",
+      adapter = "openai_chat_json_object",
+      parameter = "response_format"
+    ),
+    list(
+      model = "gpt-4o",
+      interface = "chat",
+      adapter = "openai_chat_json_object",
+      parameter = "response_format"
+    ),
+    list(
+      model = "gpt-5.6-luna",
+      interface = NULL,
+      adapter = "openai_responses_json_object",
+      parameter = "text"
+    ),
+    list(
+      model = "gpt-5.5-pro",
+      interface = NULL,
+      adapter = "openai_responses_json_object",
+      parameter = "text"
+    ),
+    list(
+      model = "qwen3.8-flash",
+      interface = "qwen-chat-completions-v1",
+      adapter = "openai_chat_json_object",
+      parameter = "response_format"
+    )
+  )
+
+  for (case in cases) {
+    config <- resolve_registry_entry(
+      case$model,
+      case$interface,
+      registry = registry
+    )
+    structured <- build_structured_output_parameters(config)
+    request <- build_llm_request(
+      config$interface$request$builder,
+      config,
+      new_llm_call_context(
+        trial_prompt = "Return one valid JSON object.",
+        material = "Offline fixture",
+        api_key = "TEST_TOKEN_PLACEHOLDER",
+        optionals_missing = FALSE,
+        optionals_value = structured$parameters,
+        stream = FALSE,
+        timeout = 30
+      )
+    )
+
+    expect_identical(structured$mode, "json_object", info = case$model)
+    expect_identical(structured$adapter, case$adapter, info = case$model)
+    expect_identical(
+      request$body[[case$parameter]],
+      structured$parameters[[case$parameter]],
+      info = case$model
+    )
+  }
+})
+
+test_that("the historical Responses compatibility interface stays unchanged", {
+  registry <- system_registry_v2_fixture()
+  config <- resolve_registry_entry(
+    "gpt-4o",
+    "responses",
+    registry = registry
+  )
+
+  expect_identical(config$interface$protocol, "legacy_v1")
+  expect_length(config$interface$structured_output, 0L)
+  expect_error(
+    build_structured_output_parameters(config),
+    class = "structured_output_error"
+  )
+})
+
 test_that("unverified Meta compatibility is explicit in registry metadata", {
   registry <- system_registry_v2_fixture()
   config <- resolve_registry_entry(

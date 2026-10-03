@@ -231,6 +231,9 @@ interfaces:
         reasoning_effort:
           description: Native DeepSeek reasoning-effort control.
           docs_url: https://api-docs.deepseek.com/guides/thinking_mode/
+        response_format:
+          description: Native DeepSeek JSON-output configuration.
+          docs_url: https://api-docs.deepseek.com/guides/json_mode/
     transport:
       non_stream: http_json
       stream: sse_json
@@ -249,6 +252,11 @@ interfaces:
       supported: true
       request_parameter: stream
       request_value: true
+    structured_output:
+      default_mode: json_object
+      modes:
+        json_object:
+          adapter: openai_chat_json_object
     capabilities:
       reasoning:
         response_channel: reasoning
@@ -286,6 +294,9 @@ interfaces:
         temperature:
           description: Native Chat Completions sampling temperature.
           docs_url: https://platform.openai.com/docs/api-reference/chat/create
+        response_format:
+          description: Native Chat Completions structured-output configuration.
+          docs_url: https://developers.openai.com/api/docs/guides/structured-outputs
     transport:
       non_stream: http_json
       stream: sse_json
@@ -302,6 +313,11 @@ interfaces:
       supported: true
       request_parameter: stream
       request_value: true
+    structured_output:
+      default_mode: json_object
+      modes:
+        json_object:
+          adapter: openai_chat_json_object
     defaults:
       max_tokens: 1024
       temperature: 0.7
@@ -394,6 +410,11 @@ interfaces:
       supported: true
       request_parameter: stream
       request_value: true
+    structured_output:
+      default_mode: json_object
+      modes:
+        json_object:
+          adapter: openai_responses_json_object
     capabilities:
       reasoning:
         response_channel: reasoning
@@ -437,6 +458,11 @@ interfaces:
       parser: openai_responses
     streaming:
       supported: false
+    structured_output:
+      default_mode: json_object
+      modes:
+        json_object:
+          adapter: openai_responses_json_object
     capabilities:
       reasoning:
         response_channel: reasoning
@@ -558,6 +584,9 @@ interfaces:
         thinking_budget:
           description: Native Qwen thinking-token budget where supported.
           docs_url: https://help.aliyun.com/zh/model-studio/deep-thinking
+        response_format:
+          description: Native Qwen structured-output configuration.
+          docs_url: https://help.aliyun.com/zh/model-studio/qwen-structured-output
     transport:
       non_stream: http_json
       stream: sse_json
@@ -567,6 +596,11 @@ interfaces:
       supported: true
       request_parameter: stream
       request_value: true
+    structured_output:
+      default_mode: json_object
+      modes:
+        json_object:
+          adapter: openai_chat_json_object
     capabilities:
       reasoning:
         response_channel: reasoning
