@@ -63,6 +63,21 @@ The verified test-only prototype is backed up by these commits:
 - `0a034e1 docs(package): rebuild experiment workflow guide`
 - `33852bb test(experiment): prototype natural language planning workflow`
 
+The first production foundation steps are now delivered:
+
+- `636a88d feat(experiment): add trial spec schema foundation`
+  adds the packaged Draft-07 schema, internal schema loading, strict JSON
+  parsing, R semantic validation, fixtures, and offline agreement tests.
+- `f49a2df feat(experiment): add reviewed trial plan workflow`
+  adds deterministic trial-data normalization, condition-type stability,
+  source-material fidelity review, Registry model/interface resolution,
+  execution preview, plan-integrity checks, and explicit approval objects.
+
+The next implementation boundary is the allowlisted compiler in step 4. It
+must produce a reviewable `trial_experiment()` call specification only; it must
+not execute the call or introduce credential handling. Execution-time secrets
+belong to a separately tested and approved boundary.
+
 Production implementation order:
 
 1. Add one versioned JSON Schema Draft-07 asset for the `trial` experiment
