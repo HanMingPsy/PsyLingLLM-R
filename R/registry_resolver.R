@@ -55,6 +55,7 @@ resolve_registry_entry <- function(model_key,
         transport = interface$transport,
         response = interface$response,
         streaming = interface$streaming %||% list(supported = FALSE),
+        structured_output = interface$structured_output %||% list(),
         capabilities = interface$capabilities %||% list(),
         metadata = interface$metadata %||% list()
       ),

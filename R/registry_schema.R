@@ -201,7 +201,7 @@ validate_registry_v2_interface <- function(interface, id, capability_ids) {
     required = c("protocol", "request", "transport", "response"),
     allowed = c(
       "protocol", "request", "transport", "response", "streaming",
-      "capabilities", "defaults", "metadata"
+      "structured_output", "capabilities", "defaults", "metadata"
     ),
     domain = "interfaces",
     entry_id = id
@@ -338,6 +338,11 @@ validate_registry_v2_interface <- function(interface, id, capability_ids) {
   }
 
   validate_registry_v2_streaming(interface$streaming, transport, id)
+  validate_registry_v2_structured_output(
+    interface$structured_output,
+    interface$protocol,
+    id
+  )
   validate_registry_v2_interface_capabilities(
     interface$capabilities, capability_ids, id
   )
@@ -349,6 +354,86 @@ validate_registry_v2_interface <- function(interface, id, capability_ids) {
   registry_schema_assert_optional_list(
     interface$metadata, "interfaces", id, "metadata"
   )
+
+  invisible(TRUE)
+}
+
+validate_registry_v2_structured_output <- function(
+    structured_output,
+    protocol,
+    interface_id) {
+  if (is.null(structured_output)) {
+    return(invisible(TRUE))
+  }
+  registry_schema_assert_fields(
+    structured_output,
+    required = c("default_mode", "modes"),
+    allowed = c("default_mode", "modes"),
+    domain = "interfaces",
+    entry_id = interface_id,
+    field = "structured_output"
+  )
+  registry_schema_assert_string(
+    structured_output$default_mode,
+    "interfaces",
+    interface_id,
+    "structured_output.default_mode"
+  )
+  registry_schema_assert_named_list(
+    structured_output$modes,
+    "interfaces",
+    interface_id,
+    "structured_output.modes",
+    allow_empty = FALSE
+  )
+  if (!structured_output$default_mode %in% names(structured_output$modes)) {
+    registry_schema_abort(
+      "Default structured-output mode must be declared in `modes`.",
+      "interfaces",
+      interface_id,
+      "structured_output.default_mode"
+    )
+  }
+
+  components <- registry_v2_component_ids()
+  adapter_modes <- registry_v2_structured_output_adapter_modes()
+  adapter_protocols <- registry_v2_structured_output_adapter_protocols()
+  for (mode in names(structured_output$modes)) {
+    registry_schema_assert_id(mode, "structured_output.modes")
+    binding <- structured_output$modes[[mode]]
+    field <- paste0("structured_output.modes.", mode)
+    registry_schema_assert_fields(
+      binding,
+      required = "adapter",
+      allowed = "adapter",
+      domain = "interfaces",
+      entry_id = interface_id,
+      field = field
+    )
+    registry_schema_assert_choice(
+      binding$adapter,
+      components$structured_output_adapters,
+      "interfaces",
+      interface_id,
+      paste0(field, ".adapter")
+    )
+    if (!identical(unname(adapter_modes[[binding$adapter]]), mode)) {
+      registry_schema_abort(
+        "Structured-output mode does not match its adapter.",
+        "interfaces",
+        interface_id,
+        field
+      )
+    }
+    if (!identical(unname(adapter_protocols[[binding$adapter]]), protocol)) {
+      registry_schema_abort(
+        "Structured-output adapter does not match the interface protocol.",
+        "interfaces",
+        interface_id,
+        paste0(field, ".adapter")
+      )
+    }
+  }
 
   invisible(TRUE)
 }
@@ -525,7 +610,28 @@ registry_v2_component_ids <- function() {
     response_parsers = c(
       "legacy_paths_v1", "openai_chat", "openai_responses",
       "anthropic_messages"
+    ),
+    structured_output_adapters = names(
+      registry_v2_structured_output_adapter_modes()
     )
+  )
+}
+
+registry_v2_structured_output_adapter_modes <- function() {
+  c(
+    openai_chat_json_object = "json_object",
+    openai_chat_json_schema = "json_schema",
+    openai_responses_json_object = "json_object",
+    openai_responses_json_schema = "json_schema"
+  )
+}
+
+registry_v2_structured_output_adapter_protocols <- function() {
+  c(
+    openai_chat_json_object = "openai_chat",
+    openai_chat_json_schema = "openai_chat",
+    openai_responses_json_object = "openai_responses",
+    openai_responses_json_schema = "openai_responses"
   )
 }
 
