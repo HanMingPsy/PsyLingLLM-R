@@ -68,7 +68,13 @@ the user registry remains authoritative for an individual experiment.
 
 ## Installation
 
-Install the development version from GitHub:
+After CRAN publication, install the released package with:
+
+```r
+install.packages("PsyLingLLM")
+```
+
+Until then, install the development version from GitHub:
 
 ```r
 install.packages("remotes")
@@ -470,7 +476,9 @@ typical progress line has this form:
 ```
 
 When `output_path = NULL`, experiment functions create timestamped results and
-logs under `~/.psylingllm/results`. For example:
+logs under the platform-specific directory returned by
+`tools::R_user_dir("PsyLingLLM", "data")`, inside its `results` subdirectory.
+For example:
 
 ```text
 deepseek-flash_20260920_132306.csv
@@ -480,7 +488,9 @@ deepseek-flash_20260920_132306.log
 `output_path` can be a full CSV/XLSX filename or a directory. A directory gets
 an automatically generated filename. `overwrite = FALSE` protects an existing
 explicit output file. Tests and package examples should instead use
-`tempdir()` so they do not write persistent user files.
+`tempdir()` so they do not write persistent user files. When a full path or
+directory is supplied, PsyLingLLM does not initialize the default result
+directory.
 
 #### `trial_experiment()` arguments
 
@@ -745,11 +755,11 @@ Static few-shot messages can be supplied through `assistant_content` as
 character values or structured message objects.
 
 Conversation output keeps the ordinary response, reasoning, timing, token,
-status, and request-ID fields and adds the request messages and history used for
-each turn. This makes it possible to audit the exact context that produced a
-response. Because context grows across turns, token use and latency are not
-directly comparable to isolated trials unless the analysis controls for prompt
-length and history policy.
+status, and request-ID fields and adds `AssistantContext`, `HistoryMode`, and
+`HistoryUsedMsgs`. The adaptive function additionally records the serialized
+request messages. Because context grows across turns, token use and latency are
+not directly comparable to isolated trials unless the analysis controls for
+prompt length and history policy.
 
 Inspect recall and source judgments without discarding failed turns:
 
@@ -767,7 +777,7 @@ before a costly run.
 
 ### Adaptive feedback
 
-`conversation_experiment_with_feedback()` calls a user-defined function after
+`adaptive_feedback_experiment()` calls a user-defined function after
 each successful response. The callback receives the response, current row, and
 a context list. It can select the next prompt and attach decision metadata.
 
@@ -822,7 +832,7 @@ prime_feedback <- function(response, row, context) {
   )
 }
 
-adaptive_result <- conversation_experiment_with_feedback(
+adaptive_result <- adaptive_feedback_experiment(
   model_key = "deepseek-flash",
   api_key = Sys.getenv("DEEPSEEK_API_KEY"),
   data = adaptive_data,
@@ -845,7 +855,7 @@ The callback contract is deliberately small:
 - `response` is the normalized answer from the completed turn;
 - `row` is the current experiment row;
 - `context` contains the evolving conversation state;
-- `next_prompt` and optional `next_material` determine the next turn;
+- `next_prompt` determines the next prompt when a change is requested;
 - `name` labels the feedback decision;
 - `meta` records analysis variables such as correctness and next difficulty.
 
@@ -854,6 +864,11 @@ dynamic insertion, validate callback outputs, and make the rule deterministic
 or record its random seed. Provider errors and timeouts must not be scored as
 participant answers; inspect `TrialStatus` before using the response in a
 feedback decision.
+
+Feedback execution is auditable through `FeedbackDecision`, `FeedbackStatus`,
+`FeedbackApplied`, `FeedbackNextPrompt`, `FeedbackMeta`, and
+`FeedbackMessage`. Callback errors are recorded as `FeedbackStatus = "ERROR"`
+without changing a successful provider response into a failed trial.
 
 ### Multi-model experiments
 
@@ -1033,7 +1048,8 @@ The main user-facing workflow functions are:
 | `trial_experiment()` | Independent or repeated row-wise trials |
 | `factorial_trial_experiment()` | Cross factors, realize carrier materials, and run the expanded design |
 | `conversation_experiment()` | Ordered multi-turn conversations with retained history |
-| `conversation_experiment_with_feedback()` | Adaptive conversations controlled by a callback |
+| `adaptive_feedback_experiment()` | Adaptive conversations controlled by a callback |
+| `conversation_experiment_with_feedback()` | Backward-compatible alias for `adaptive_feedback_experiment()` |
 | `multi_model_experiment()` | Run one trial design across Registry model rows |
 | `llm_caller()` | Make one normalized request without an experiment table |
 | `generate_llm_experiment_list()` | Inspect, repeat, randomize, and optionally save an ordinary trial list |
@@ -1058,8 +1074,14 @@ The default user registry path is:
 
 ```r
 get_registry_path()
-# ~/.psylingllm/model_registry.yaml
+# file.path(tools::R_user_dir("PsyLingLLM", "config"),
+#           "model_registry.yaml")
 ```
+
+PsyLingLLM also reads the historical
+`~/.psylingllm/model_registry.yaml` location without moving or rewriting it.
+When both files exist, entries from the standard `R_user_dir()` location take
+precedence over entries from the historical location.
 
 Inspect the effective public registry view and one resolved interface:
 
@@ -1093,6 +1115,11 @@ A native Registry v2 user file is also accepted, but it must currently be a
 self-contained bundle whose provider, interface, capability, and model
 references all resolve inside that document. Partial v2 overlays that refer to
 system-only interfaces are not supported.
+
+The automatic registration writer currently writes Registry v1 entries only.
+It rejects an existing Registry v2 bundle instead of creating a mixed v1/v2
+document. Edit a custom v2 bundle explicitly and run
+`validate_registry_schema()` before using it.
 
 User/system precedence is applied to complete model entries. If a user file
 defines the same model key as the system registry, the user entry replaces the
@@ -1342,7 +1369,7 @@ replace the user registry.
 | Provider or deployment | Bundled protocol | 0.4 status | Verification scope |
 |---|---|---|---|
 | OpenAI | Responses | **Live verified** | `gpt-5.6-luna`; non-stream and stream |
-| DeepSeek | Chat Completions, Responses | **Live verified** | `deepseek-flash`; non-stream and stream |
+| DeepSeek | Chat Completions, Responses | **Live verified** | `deepseek-flash`; non-stream, stream, two-turn history, and bounded adaptive feedback |
 | Qwen | Chat Completions, Responses | **Live verified** | `qwen3.8-flash`; workspace endpoint override, non-stream and stream, plus `trial_experiment()` |
 | Anthropic | Messages | **Offline verified** | Native request/parser contract; live compatibility also passed through a Qwen Anthropic-compatible endpoint, not an official Anthropic account |
 | Gemini | OpenAI-compatible Chat | **Offline verified (beta)** | Basic answer and streaming contract; thought-summary extraction is not claimed |
@@ -1354,8 +1381,9 @@ replace the user registry.
 | Ollama, vLLM | OpenAI-compatible Chat/Responses | **Deployment template** | Depends on server version, installed model, chat template, and served model name |
 | Meta Llama API | `/compat/v1` Chat compatibility | **Experimental** | Account catalog and compatibility response shape remain unverified |
 
-The live verification date for the maintained production paths above is
-2026-09-17. Check the upstream account catalog and maintain a user entry when a
+The maintained protocol paths were live-verified on 2026-09-17. The production
+DeepSeek conversation and adaptive experiment paths were rechecked on
+2026-10-04. Check the upstream account catalog and maintain a user entry when a
 model name, endpoint, authentication rule, or protocol changes.
 
 ### Runtime architecture
@@ -1545,6 +1573,10 @@ request parameters.
 Normal package tests, examples, installation, and loading do not require API
 credentials or Internet access. Real-provider tests are explicit opt-in smoke
 tests and are not run during routine CRAN checks.
+
+For package development, live tests require both provider credentials and the
+explicit `PSYLINGLLM_LIVE_API_TESTS=true` opt-in. Do not enable this variable in
+routine checks or automated CRAN-facing jobs.
 
 When extending a provider, first add deterministic fixtures and mock-transport
 coverage. Run a short, user-approved live test separately after the offline

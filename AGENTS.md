@@ -44,10 +44,12 @@ Do not solve adaptability by making YAML arbitrary or silently permissive.
 
 ## Current Migration Phase
 
-Current phase: **Phase 8 release validation remains complete. The internal
-Experiment Spec v1 trial workflow is implemented and live-verified with
-DeepSeek; public API design and formal CRAN submission remain separate approval
-boundaries.**
+Current phase: **Phase 8 local release validation is complete after the
+conversation API and persistence-safety maintenance pass. The exact updated tarball still requires
+the normal external multi-platform release checks before formal CRAN
+submission. The internal Experiment Spec v1 trial workflow is implemented and
+live-verified with DeepSeek; public planner API design and formal CRAN
+submission remain separate approval boundaries.**
 
 ### Current implementation track: Experiment Spec v1 foundation
 
@@ -346,18 +348,52 @@ Phase 8 local release preparation has now:
     with `Status: OK`. The tarball contains the production Registry and opt-in
     live-test source but excludes credentials, development plans, check output,
     temporary directories, and local API results.
+18. Added `adaptive_feedback_experiment()` as the canonical adaptive
+    conversation entry point while retaining
+    `conversation_experiment_with_feedback()` as an exact compatibility alias.
+    The ordinary and adaptive conversation paths now validate conversation
+    structure and execution controls before network work, preserve explicit
+    `optionals = NULL`, and record auditable feedback outcomes. The same
+    explicit-NULL forwarding defect was corrected in `multi_model_experiment()`.
+    The default result directory now uses
+    `tools::R_user_dir("PsyLingLLM", "data")`, and explicit output paths no
+    longer initialize that default directory. The complete offline suite
+    passed 1106 tests with 14
+    credential-gated tests skipped, and the rebuilt source tarball passed local
+    `R CMD check --as-cran --no-manual` with `Status: OK` under the Windows `C`
+    locale.
+19. Live-tested `conversation_experiment()` and
+    `adaptive_feedback_experiment()` against the production Registry
+    `deepseek-flash` entry on 2026-10-04. Ordinary two-turn history correctly
+    recovered the first-turn codeword, and bounded adaptive insertion applied
+    the callback prompt and returned the expected second-turn response. All 12
+    live assertions passed without exposing credentials; generated results
+    were confined to the R temporary directory.
+20. Hardened CRAN-facing persistence behavior. New user Registry writes now use
+    `tools::R_user_dir("PsyLingLLM", "config")`; the historical
+    `~/.psylingllm` Registry remains readable at lower precedence and is never
+    migrated or rewritten during loading. The v1 registration writer preserves
+    malformed files, rejects native v2 bundles, validates the complete result,
+    and replaces files through a same-directory temporary file. Experiment and
+    combined-result writes now create parent directories, use recoverable file
+    replacement, and raise errors instead of reporting false success. The
+    complete offline suite passed 1106 tests with 14 live tests skipped, and
+    the rebuilt tarball passed local `R CMD check --as-cran --no-manual` with
+    `Status: OK`.
 
 The full local `--as-cran` run reached all package checks successfully, but PDF
 manual generation was blocked by the host MiKTeX installation lacking
 `stringenc.sty`; Rd validation and the HTML manual passed. This is an external
 toolchain limitation, not evidence of an Rd defect. The final tarball has now
 passed R-devel/Win-builder and practical Windows, macOS, and Linux checks.
-The post-live-test Phase 8 release regression is complete. The final offline
-suite, source build, tarball inspection, and CRAN-style check all passed after
-the Registry, tests, README, NEWS, and this guide were updated. Formal CRAN
-submission remains a separate external action requiring explicit user
-approval. Real-provider smoke tests remain separately opt-in and require
-user-provided credentials.
+The post-maintenance Phase 8 local release regression is complete. The final
+offline suite, source build, tarball inspection, and CRAN-style check all
+passed after the Registry, experiments, tests, README, NEWS, and this guide
+were updated. The current source tarball must still repeat the configured
+external multi-platform checks before submission. Formal CRAN submission
+remains a separate external action requiring explicit user approval.
+Real-provider smoke tests remain separately opt-in and require user-provided
+credentials.
 
 ## CRAN Submission Standard
 
@@ -1587,7 +1623,8 @@ Experiment compatibility:
 - `R/trial_experiment.R`
 - `R/factorial_trial_experiment.R`
 - `R/conversation_experiment.R`
-- `R/conversation_experiment_with_feedback.R`
+- `R/adaptive_feedback_experiment.R`
+- `R/adaptive_feedback_utils.R`
 - `R/multi_model.R`
 - `R/schema.R`
 
