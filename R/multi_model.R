@@ -50,7 +50,9 @@
 #' @param stream Logical(1) or NULL. Default streaming policy if model row lacks `stream`.
 #' @param output_dir Optional character(1). If given, used as a base directory for per-model outputs
 #'        when the model row doesn't provide `output_path`.
-#' @param combined_output_path Optional character(1). If provided, write the combined results CSV here.
+#' @param combined_output_path Optional character(1). If provided, write the
+#'   combined results CSV here. Parent directories are created; write failures
+#'   raise an error.
 #'
 #' @return A data.frame/tibble concatenating all per-model results. Each chunk retains the
 #'         standard PsyLingLLM schema columns and is annotated with `ModelKey` (alias of ModelName).
@@ -177,7 +179,9 @@ multi_model_experiment <- function(
       return_raw = return_raw
     )
     # preserve optionals tri-state by adding argument only when decided above
-    if (isTRUE(pass_optionals)) call_args$optionals <- optionals_i
+    if (isTRUE(pass_optionals)) {
+      call_args["optionals"] <- list(optionals_i)
+    }
 
     res <- tryCatch(
       do.call(trial_experiment, call_args),
@@ -217,10 +221,24 @@ multi_model_experiment <- function(
 
   # optional combined CSV -----------------------------------------------------
   if (nz_chr(combined_output_path)) {
-    try({
-      readr::write_csv(combined, combined_output_path)
-      message("[PsyLingLLM] Combined results saved: ", combined_output_path)
-    }, silent = TRUE)
+    ensure_psylingllm_directory(
+      dirname(combined_output_path),
+      "combined result directory"
+    )
+    temporary <- tempfile(
+      pattern = ".combined-results-",
+      tmpdir = dirname(combined_output_path),
+      fileext = ".csv"
+    )
+    on.exit(if (file.exists(temporary)) unlink(temporary, force = TRUE),
+            add = TRUE)
+    readr::write_csv(combined, temporary)
+    replace_file_safely(
+      temporary,
+      combined_output_path,
+      overwrite = TRUE
+    )
+    message("[PsyLingLLM] Combined results saved: ", combined_output_path)
   }
 
   combined

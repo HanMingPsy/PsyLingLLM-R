@@ -133,3 +133,69 @@ test_that("registration diagnostics and templates do not expose credentials", {
   expect_identical(captured_headers$Authorization, "Bearer ${API_KEY}")
   expect_match(rendered, "[REDACTED]", fixed = TRUE)
 })
+
+test_that("the default Registry path uses the standard R config directory", {
+  expect_identical(
+    get_registry_path(),
+    file.path(
+      tools::R_user_dir("PsyLingLLM", "config"),
+      "model_registry.yaml"
+    )
+  )
+  expect_identical(
+    PsyLingLLM:::get_legacy_registry_path(),
+    file.path(path.expand("~"), ".psylingllm", "model_registry.yaml")
+  )
+})
+
+test_that("registration preserves malformed Registry files", {
+  registry_path <- file.path(withr::local_tempdir(), "model_registry.yaml")
+  writeLines(c("broken:", "  - [unclosed"), registry_path, useBytes = TRUE)
+  before <- readBin(registry_path, "raw", n = file.info(registry_path)$size)
+  entry <- yaml::read_yaml(test_path(
+    "fixtures", "registry-v1-minimal.yaml"
+  ))
+
+  expect_error(
+    register_endpoint_to_user_registry(entry, registry_path),
+    class = "registry_load_error"
+  )
+  after <- readBin(registry_path, "raw", n = file.info(registry_path)$size)
+  expect_identical(after, before)
+})
+
+test_that("the v1 registration writer rejects native Registry v2 files", {
+  registry_path <- file.path(withr::local_tempdir(), "model_registry.yaml")
+  file.copy(
+    test_path("fixtures", "registry-v2-valid.yaml"),
+    registry_path
+  )
+  before <- readBin(registry_path, "raw", n = file.info(registry_path)$size)
+  entry <- yaml::read_yaml(test_path(
+    "fixtures", "registry-v1-minimal.yaml"
+  ))
+
+  expect_error(
+    register_endpoint_to_user_registry(entry, registry_path),
+    "Registry v2"
+  )
+  after <- readBin(registry_path, "raw", n = file.info(registry_path)$size)
+  expect_identical(after, before)
+})
+
+test_that("registration writes a validated v1 Registry through a temporary file", {
+  registry_directory <- withr::local_tempdir()
+  registry_path <- file.path(registry_directory, "model_registry.yaml")
+  entry <- yaml::read_yaml(test_path(
+    "fixtures", "registry-v1-minimal.yaml"
+  ))
+
+  result <- register_endpoint_to_user_registry(entry, registry_path)
+
+  expect_true(file.exists(registry_path))
+  expect_identical(yaml::read_yaml(registry_path), result)
+  expect_false(any(grepl(
+    "^\\.registry-",
+    list.files(registry_directory, all.files = TRUE)
+  )))
+})

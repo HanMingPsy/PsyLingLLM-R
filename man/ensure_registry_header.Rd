@@ -10,6 +10,6 @@ ensure_registry_header(path = get_registry_path())
 \item{path}{character(1) registry yaml path}
 }
 \description{
-Creates ~/.psylingllm/ and writes a file header if the registry file
-does not exist yet or is empty.
+Creates the Registry directory and writes a file header if the Registry
+file does not exist yet or is empty.
 }

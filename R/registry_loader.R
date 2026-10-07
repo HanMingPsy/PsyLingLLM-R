@@ -13,12 +13,23 @@ get_system_registry_path <- function() {
 # This remains internal until the public registry contracts are migrated.
 load_registry_bundle <- function(system_path = get_system_registry_path(),
                                  user_path = get_registry_path(),
-                                 default_registry = NULL) {
+                                 default_registry = NULL,
+                                 legacy_user_path = NULL) {
+  if (is.null(legacy_user_path) &&
+      registry_paths_equal(user_path, get_registry_path())) {
+    legacy_user_path <- get_legacy_registry_path()
+  }
+  if (registry_paths_equal(user_path, legacy_user_path)) {
+    legacy_user_path <- NULL
+  }
   raw_system <- registry_read_source(
     system_path, source = "system", missing_ok = FALSE
   )
-  raw_user <- registry_read_source(
+  raw_user_current <- registry_read_source(
     user_path, source = "user", missing_ok = TRUE
+  )
+  raw_user_legacy <- registry_read_source(
+    legacy_user_path, source = "legacy user", missing_ok = TRUE
   )
   raw_default <- default_registry
 
@@ -34,9 +45,16 @@ load_registry_bundle <- function(system_path = get_system_registry_path(),
   }
 
   system <- registry_normalize_source(raw_system)
-  user <- registry_normalize_source(raw_user)
+  user_current <- registry_normalize_source(raw_user_current)
+  user_legacy <- registry_normalize_source(raw_user_legacy)
+  user <- registry_merge_sources(
+    registry_empty_v2(),
+    user_legacy,
+    user_current
+  )
   default <- registry_normalize_source(raw_default)
   merged <- registry_merge_sources(default, system, user)
+  raw_user <- if (length(raw_user_current)) raw_user_current else raw_user_legacy
 
   list(
     system = system,
@@ -55,6 +73,23 @@ load_registry_bundle <- function(system_path = get_system_registry_path(),
     ),
     paths = list(system = system_path, user = user_path)
   )
+}
+
+registry_paths_equal <- function(left, right) {
+  scalar_path <- function(value) {
+    is.character(value) && length(value) == 1L && !is.na(value) &&
+      nzchar(value)
+  }
+  if (!scalar_path(left) || !scalar_path(right)) {
+    return(FALSE)
+  }
+  left <- normalizePath(left, winslash = "/", mustWork = FALSE)
+  right <- normalizePath(right, winslash = "/", mustWork = FALSE)
+  if (identical(.Platform$OS.type, "windows")) {
+    left <- tolower(left)
+    right <- tolower(right)
+  }
+  identical(left, right)
 }
 
 registry_read_source <- function(path, source, missing_ok,

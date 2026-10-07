@@ -125,3 +125,55 @@ test_that("public load_registry preserves NULL for an empty YAML file", {
 
   expect_null(load_registry())
 })
+
+test_that("legacy and standard user Registry paths merge without migration", {
+  temporary_directory <- withr::local_tempdir()
+  standard_path <- file.path(temporary_directory, "config", "model_registry.yaml")
+  legacy_path <- file.path(temporary_directory, "legacy", "model_registry.yaml")
+  dir.create(dirname(standard_path), recursive = TRUE)
+  dir.create(dirname(legacy_path), recursive = TRUE)
+  file.copy(
+    loader_fixture_path("registry-v1-user-override.yaml"),
+    standard_path
+  )
+  file.copy(
+    loader_fixture_path("registry-v1-minimal.yaml"),
+    legacy_path
+  )
+  before <- tools::md5sum(c(standard_path, legacy_path))
+
+  bundle <- load_registry_bundle(
+    system_path = loader_fixture_path("registry-v1-multiple-interfaces.yaml"),
+    user_path = standard_path,
+    legacy_user_path = legacy_path
+  )
+
+  expect_true(all(c("fixture-model", "deepseek-chat") %in%
+    names(bundle$user$models)))
+  expect_identical(tools::md5sum(c(standard_path, legacy_path)), before)
+})
+
+test_that("the standard user Registry overrides the legacy Registry", {
+  temporary_directory <- withr::local_tempdir()
+  standard_path <- file.path(temporary_directory, "config.yaml")
+  legacy_path <- file.path(temporary_directory, "legacy.yaml")
+  legacy <- yaml::read_yaml(loader_fixture_path("registry-v1-minimal.yaml"))
+  standard <- legacy
+  standard[["fixture-model"]]$chat$provider <- "standard-user"
+  yaml::write_yaml(legacy, legacy_path)
+  yaml::write_yaml(standard, standard_path)
+
+  bundle <- load_registry_bundle(
+    system_path = loader_fixture_path("registry-v1-minimal.yaml"),
+    user_path = standard_path,
+    legacy_user_path = legacy_path
+  )
+  model <- bundle$user$models[["fixture-model"]]
+  interface <- bundle$user$interfaces[[model$default_interface]]
+
+  expect_identical(model$provider, "standard-user")
+  expect_identical(
+    interface$metadata$legacy_provider_label,
+    "standard-user"
+  )
+})

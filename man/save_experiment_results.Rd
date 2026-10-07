@@ -32,9 +32,13 @@ Invisible normalized file path
 Saves experiment results to a CSV or Excel file, conforming to
 PsyLingLLM_Schema. If `output_path` is NULL, a default filename is
 generated as \code{{model}_{YYYYMMDD_HHMMSS}.csv} in
-\code{~/PsyLingLLM_Results}.
+the `results` subdirectory of the package user-data directory returned by
+\code{tools::R_user_dir("PsyLingLLM", "data")}.
 }
 \details{
 Columns that are entirely NA (e.g., FirstTokenLatency when streaming = FALSE)
 will be removed automatically.
+Parent directories are created when needed. Data are written to a temporary
+file before the destination is replaced, and write failures raise an error
+rather than returning a path to a missing file.
 }

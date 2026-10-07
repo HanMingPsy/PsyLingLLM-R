@@ -9,22 +9,25 @@ register_endpoint_to_user_registry(entry, path = get_registry_path())
 \arguments{
 \item{entry}{A named list, typically returned by `build_registry_entry_from_analysis()`.}
 
-\item{path}{Optional registry YAML path (defaults to `get_registry_path()`).}
+\item{path}{Optional Registry v1 YAML path (defaults to
+`get_registry_path()`).}
 }
 \value{
 Invisibly returns the merged registry list.
 }
 \description{
-This function inserts or updates an LLM endpoint entry in a YAML-based
-user registry. If an entry with the same key (e.g. "deepseek-chat@chutes.ai")
-already exists, new generation interface nodes (e.g. `chat`, `completion`)
-are merged instead of overwriting the whole model section.
+This Registry v1 writer inserts or updates an LLM endpoint entry in a
+YAML-based user registry. If an entry with the same key (e.g.
+"deepseek-chat@chutes.ai") already exists, new generation interface nodes
+(e.g. `chat`, `completion`) are merged instead of overwriting the whole
+model section. Native Registry v2 bundles are rejected rather than mixed
+with v1 entries.
 }
 \details{
 Interface nodes are automatically detected by structure — any list
 containing fields like `input`, `output`, `streaming`, or `provider`
 will be treated as an interface definition.
 
-The registry file is rewritten with header comments and each model
-section separated by comment lines for readability.
+The complete result is validated and written to a temporary file before the
+original is replaced. Invalid existing YAML is never silently discarded.
 }

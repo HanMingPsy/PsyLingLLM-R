@@ -57,7 +57,9 @@ multi_model_experiment(
 \item{output_dir}{Optional character(1). If given, used as a base directory for per-model outputs
 when the model row doesn't provide `output_path`.}
 
-\item{combined_output_path}{Optional character(1). If provided, write the combined results CSV here.}
+\item{combined_output_path}{Optional character(1). If provided, write the
+combined results CSV here. Parent directories are created; write failures
+raise an error.}
 }
 \value{
 A data.frame/tibble concatenating all per-model results. Each chunk retains the

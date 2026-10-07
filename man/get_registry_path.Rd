@@ -10,5 +10,8 @@ get_registry_path()
 Path to user registry YAML
 }
 \description{
-Always use ~/.psylingllm/model_registry.yaml on all systems.
+Uses the platform-specific user configuration directory returned by
+\code{tools::R_user_dir("PsyLingLLM", "config")}. The historical
+\code{~/.psylingllm/model_registry.yaml} location remains readable but is
+not rewritten automatically.
 }
