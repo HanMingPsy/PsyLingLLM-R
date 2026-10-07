@@ -55,7 +55,7 @@ and \code{factorial_trial_experiment()}.
   \item{RequestID}{Character or NA. Provider request identifier if returned.}
   \item{RequestMessages}{Character (JSON). Messages sent to API for this trial,
   including system + prior turns + current user. Distinct from ConversationHistory,
-  which also includes the model’s reply.}
+  which also includes the model's reply.}
   \item{ConversationHistory}{Character (JSON). Full conversation history
   including assistant replies after this trial.}
 }

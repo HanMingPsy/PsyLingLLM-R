@@ -144,7 +144,7 @@ nl_psylingllm_toolbox_prompt <- function() {
     "generate_llm_experiment_list() and trial_experiment() run ordinary trials.",
     "generate_llm_factorial_experiment_list() and factorial_trial_experiment()",
     "run factorial designs. conversation_experiment() runs ordered turns,",
-    "conversation_experiment_with_feedback() adds feedback, and",
+    "adaptive_feedback_experiment() adds feedback, and",
     "multi_model_experiment() compares models.",
     "",
     "Input schemas:",

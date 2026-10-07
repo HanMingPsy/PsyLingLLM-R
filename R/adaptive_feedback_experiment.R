@@ -1,7 +1,10 @@
-#' Run LLM Conversation Experiment with Feedback (no injected rows in replace_next)
+#' Run an Adaptive Feedback Experiment
 #'
-#' Multi-turn conversations identified by `ConversationId` and ordered by `Turn`.
-#' Rolling history (seed + past turns) is passed to `llm_caller()` via `assistant_content`.
+#' Runs multi-turn conversations identified by \code{ConversationId} and ordered
+#' by \code{Turn}. After each successful response, \code{feedback_fn} may
+#' replace the next planned prompt or insert a bounded dynamic turn. Rolling
+#' history is passed to \code{llm_caller()} through
+#' \code{assistant_content}.
 #'
 #' Feedback semantics:
 #' - apply_mode = "replace_next": DO NOT insert extra rows; simply overwrite the
@@ -31,24 +34,36 @@
 #' @param role_mapping Optional mapping for local labels; not forced into `llm_caller()` unless supplied.
 #' @param history_mode "all" or "last". Default "all".
 #' @param max_history_turns Integer(1) or Inf. Only for "all". Each turn contributes 2 messages.
-#' @param max_turns Integer(1) or NULL. Per-conv cap for insert_dynamic. Ignored for replace_next.
+#' @param max_turns Positive integer or \code{NULL}. Required as the
+#'   per-conversation execution cap for \code{apply_mode = "insert_dynamic"};
+#'   ignored for \code{apply_mode = "replace_next"}.
 #' @param stream Logical(1) or NULL. NULL uses registry default; otherwise force streaming/non-streaming.
 #' @param timeout Integer(1). Per-request timeout seconds.
 #' @param repeats Integer(1). Conversation block repetitions before randomization.
 #' @param random Logical(1). Shuffle conversation order (Turn order preserved inside).
 #' @param apply_mode "replace_next" or "insert_dynamic".
-#' @param feedback_fn function(response, row, context) -> list(name, next_prompt, meta).
+#' @param feedback_fn Function called as \code{feedback_fn(response, row,
+#'   context)} after each successful response. It must return \code{NULL} or
+#'   a named list containing only \code{name}, \code{next_prompt}, and
+#'   \code{meta}. Text fields must be non-empty scalar strings when supplied,
+#'   and \code{meta} must be JSON-serializable.
 #' @param delay Numeric(1). Seconds between turns.
 #' @param output_path Character or NULL. Where to save results/logs.
 #' @param overwrite Logical(1). Overwrite outputs.
 #' @param return_raw Logical(1). Include raw request/response.
 #' @importFrom stats setNames
 #'
-#' @return Tibble with PsyLingLLM schema per executed turn. The additional
-#'   \code{ResponseStatus} field distinguishes empty final answers from usable
-#'   responses without changing \code{TrialStatus} compatibility.
+#' @return Invisibly, a tibble with the PsyLingLLM result schema for each
+#'   executed turn. Existing feedback fields are retained and the additional
+#'   \code{FeedbackStatus}, \code{FeedbackApplied},
+#'   \code{FeedbackNextPrompt}, and \code{FeedbackMessage} fields make
+#'   callback decisions auditable. \code{ResponseStatus} distinguishes empty
+#'   final answers without changing \code{TrialStatus} compatibility.
+#'
+#' @details \code{conversation_experiment_with_feedback()} is retained as a
+#'   compatibility alias with the same arguments and behavior.
 #' @export
-conversation_experiment_with_feedback <- function(
+adaptive_feedback_experiment <- function(
     model_key,
     generation_interface = "chat",
     api_key,
@@ -73,6 +88,9 @@ conversation_experiment_with_feedback <- function(
     overwrite = TRUE,
     return_raw = FALSE
 ) {
+  if (missing(feedback_fn)) {
+    stop("`feedback_fn` must be supplied.", call. = FALSE)
+  }
   history_mode <- match.arg(history_mode)
   apply_mode <- match.arg(apply_mode)
 
@@ -99,7 +117,17 @@ conversation_experiment_with_feedback <- function(
     data <- dplyr::mutate(data, Turn = dplyr::row_number())
     data <- dplyr::ungroup(data)
   }
-  if (!is.numeric(data$Turn)) stop("`Turn` must be numeric/integer for ordering.")
+  data <- dplyr::arrange(data, ConversationId, Turn)
+  validate_adaptive_feedback_arguments(
+    data = data,
+    feedback_fn = feedback_fn,
+    apply_mode = apply_mode,
+    max_turns = max_turns,
+    repeats = repeats,
+    random = random,
+    max_history_turns = max_history_turns,
+    delay = delay
+  )
 
   # Repeats: duplicate conv blocks
   if (isTRUE(repeats > 1L)) {
@@ -169,7 +197,11 @@ conversation_experiment_with_feedback <- function(
   data$Timestamp <- NA_character_
   data$RequestID <- NA_character_
   data$FeedbackDecision <- NA_character_
+  data$FeedbackStatus <- NA_character_
+  data$FeedbackApplied <- NA
+  data$FeedbackNextPrompt <- NA_character_
   data$FeedbackMeta <- NA_character_
+  data$FeedbackMessage <- NA_character_
   data$RequestMessages <- NA_character_
 
   # Log start
@@ -190,13 +222,11 @@ conversation_experiment_with_feedback <- function(
   planned_counts <- table(data$ConversationId)
 
   if (identical(apply_mode, "insert_dynamic")) {
-    if (!is.null(max_turns)) {
-      per_conv_cap <- setNames(rep(as.integer(max_turns), length(conv_ids)), conv_ids)
-      steps_target <- length(conv_ids) * as.integer(max_turns)
-    } else {
-      per_conv_cap <- setNames(rep(Inf, length(conv_ids)), conv_ids)
-      steps_target <- sum(as.integer(planned_counts))  # grows if we insert
-    }
+    per_conv_cap <- setNames(
+      rep(as.integer(max_turns), length(conv_ids)),
+      conv_ids
+    )
+    steps_target <- length(conv_ids) * as.integer(max_turns)
   } else { # replace_next
     per_conv_cap <- as.integer(planned_counts)
     names(per_conv_cap) <- names(planned_counts)
@@ -210,7 +240,7 @@ conversation_experiment_with_feedback <- function(
   executed <- 0L
   exec_count_by_cid <- setNames(integer(length(conv_ids)), conv_ids)
 
-  # Main loop
+  # Execute turns and apply feedback decisions.
   i <- 1L
   while (i <= nrow(data)) {
     cid <- as.character(data$ConversationId[i])
@@ -257,7 +287,7 @@ conversation_experiment_with_feedback <- function(
       timeout = timeout,
       return_raw = return_raw
     )
-    if (!missing(optionals)) call_args$optionals <- optionals
+    if (!missing(optionals)) call_args["optionals"] <- list(optionals)
 
     llm_resp <- tryCatch(
       do.call(llm_caller, call_args),
@@ -267,11 +297,6 @@ conversation_experiment_with_feedback <- function(
     t1 <- Sys.time()
     executed <- executed + 1L
     exec_count_by_cid[[cid]] <- exec_count_by_cid[[cid]] + 1L
-
-    # Dynamic progress growth (only if uncapped insert_dynamic)
-    if (identical(apply_mode, "insert_dynamic") && is.infinite(per_conv_cap[[cid]]) && executed > steps_target) {
-      steps_target <- executed
-    }
 
     result_status <- classify_llm_result(llm_resp)
     status_num <- result_status$provider_status
@@ -294,7 +319,11 @@ conversation_experiment_with_feedback <- function(
       data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       data$RequestID[i] <- NA_character_
       data$FeedbackDecision[i] <- NA_character_
+      data$FeedbackStatus[i] <- "NOT_RUN"
+      data$FeedbackApplied[i] <- FALSE
+      data$FeedbackNextPrompt[i] <- NA_character_
       data$FeedbackMeta[i] <- NA_character_
+      data$FeedbackMessage[i] <- "Feedback was not evaluated after a timeout."
 
       write_experiment_log(
         logfile, stage = "warning", run_id = i,
@@ -324,7 +353,11 @@ conversation_experiment_with_feedback <- function(
       data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       data$RequestID[i] <- NA_character_
       data$FeedbackDecision[i] <- NA_character_
+      data$FeedbackStatus[i] <- "NOT_RUN"
+      data$FeedbackApplied[i] <- FALSE
+      data$FeedbackNextPrompt[i] <- NA_character_
       data$FeedbackMeta[i] <- NA_character_
+      data$FeedbackMessage[i] <- "Feedback was not evaluated after an API error."
 
       write_experiment_log(
         logfile, stage = "error", run_id = i,
@@ -382,24 +415,33 @@ conversation_experiment_with_feedback <- function(
     }
 
     # Feedback
-    fb <- NULL
-    if (is.function(feedback_fn)) {
-      ctx <- list(
-        conversation_id = cid,
-        turn            = safe_int(data$Turn[i]),
-        history_size    = length(hist_use),
-        last_answer     = answer
-      )
-      fb <- tryCatch(feedback_fn(answer, data[i, , drop = FALSE], ctx),
-                     error = function(e) { warning("feedback_fn error: ", e$message); NULL })
-    }
+    ctx <- list(
+      conversation_id = cid,
+      turn = safe_int(data$Turn[i]),
+      history_size = length(hist_use),
+      last_answer = answer,
+      apply_mode = apply_mode,
+      executed_turns = exec_count_by_cid[[cid]],
+      max_turns = per_conv_cap[[cid]]
+    )
+    evaluation <- evaluate_adaptive_feedback(
+      feedback_fn = feedback_fn,
+      response = answer,
+      row = data[i, , drop = FALSE],
+      context = ctx
+    )
+    fb <- evaluation$feedback
     data$FeedbackDecision[i] <- safe_chr(fb$name)
-    data$FeedbackMeta[i] <- if (!is.null(fb$meta)) {
-      safe_chr(tryCatch(jsonlite::toJSON(fb$meta, auto_unbox = TRUE, null = "null"),
-                        error = function(e) NA_character_))
-    } else NA_character_
+    data$FeedbackNextPrompt[i] <- safe_chr(fb$next_prompt)
+    data$FeedbackMeta[i] <- serialize_adaptive_feedback_meta(fb$meta)
+    data$FeedbackApplied[i] <- FALSE
 
-    if (!is.null(fb) && nz_chr(fb$next_prompt)) {
+    if (!is.null(evaluation$error)) {
+      data$FeedbackStatus[i] <- "ERROR"
+      data$FeedbackMessage[i] <- evaluation$error
+    } else if (is.null(fb) || !nz_chr(fb$next_prompt)) {
+      data$FeedbackStatus[i] <- "NO_CHANGE"
+    } else {
       if (identical(apply_mode, "replace_next")) {
         # Overwrite the next planned row (same conversation, next index) — no row insertion.
         same_conv <- which(as.character(data$ConversationId) == cid)
@@ -407,6 +449,14 @@ conversation_experiment_with_feedback <- function(
         if (length(next_candidates)) {
           nxt <- next_candidates[1]
           data$TrialPrompt[nxt] <- fb$next_prompt
+          data$FeedbackStatus[i] <- "APPLIED"
+          data$FeedbackApplied[i] <- TRUE
+        } else {
+          data$FeedbackStatus[i] <- "NOT_APPLIED"
+          data$FeedbackMessage[i] <- paste(
+            "No later planned turn was available in conversation",
+            cid
+          )
         }
       } else { # insert_dynamic
         if (exec_count_by_cid[[cid]] < per_conv_cap[[cid]]) {
@@ -416,10 +466,15 @@ conversation_experiment_with_feedback <- function(
           new_row$Material <- ""
           new_row$TrialPrompt <- fb$next_prompt
 
-          wipe <- c("Response","Think","AssistantContext","HistoryMode","HistoryUsedMsgs",
-                    "TotalResponseTime","FirstTokenLatency","PromptTokens","CompletionTokens",
-                    "TrialStatus","ResponseStatus","Streaming","Timestamp","RequestID",
-                    "FeedbackDecision","FeedbackMeta","RequestMessages")
+          wipe <- c(
+            "Response", "Think", "AssistantContext", "HistoryMode",
+            "HistoryUsedMsgs", "TotalResponseTime", "FirstTokenLatency",
+            "PromptTokens", "CompletionTokens", "TrialStatus",
+            "ResponseStatus", "Streaming", "Timestamp", "RequestID",
+            "FeedbackDecision", "FeedbackStatus", "FeedbackApplied",
+            "FeedbackNextPrompt", "FeedbackMeta", "FeedbackMessage",
+            "RequestMessages"
+          )
           new_row[wipe] <- NA
 
           top <- data[1:i, , drop = FALSE]
@@ -431,8 +486,14 @@ conversation_experiment_with_feedback <- function(
                          as.numeric(data$Turn) >= next_turn &
                          seq_len(nrow(data)) != (i + 1L))
           if (length(sel)) data$Turn[sel] <- as.numeric(data$Turn[sel]) + 1
-
-          if (is.infinite(per_conv_cap[[cid]])) steps_target <- steps_target + 1L
+          data$FeedbackStatus[i] <- "APPLIED"
+          data$FeedbackApplied[i] <- TRUE
+        } else {
+          data$FeedbackStatus[i] <- "NOT_APPLIED"
+          data$FeedbackMessage[i] <- paste(
+            "The max_turns limit was reached for conversation",
+            cid
+          )
         }
       }
     }
@@ -467,4 +528,9 @@ conversation_experiment_with_feedback <- function(
 
   invisible(data)
 }
+#'
+#' @rdname adaptive_feedback_experiment
+#' @export
+conversation_experiment_with_feedback <- adaptive_feedback_experiment
+
 utils::globalVariables(c("Turn", "ConversationId", "..block.."))

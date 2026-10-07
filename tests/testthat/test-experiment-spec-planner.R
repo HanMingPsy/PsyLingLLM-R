@@ -17,6 +17,7 @@ test_that("planner prompt teaches the toolbox and strict local boundary", {
   expect_match(prompt, "trial_experiment()", fixed = TRUE)
   expect_match(prompt, "factorial_trial_experiment()", fixed = TRUE)
   expect_match(prompt, "conversation_experiment()", fixed = TRUE)
+  expect_match(prompt, "adaptive_feedback_experiment()", fixed = TRUE)
   expect_match(prompt, "multi_model_experiment()", fixed = TRUE)
   expect_match(prompt, "Registry v2", fixed = TRUE)
   expect_match(prompt, "deterministic", fixed = TRUE)

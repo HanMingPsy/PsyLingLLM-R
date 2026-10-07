@@ -2,7 +2,7 @@
 % Please edit documentation in R/conversation_experiment.R
 \name{conversation_experiment}
 \alias{conversation_experiment}
-\title{Run Multi-turn Conversation Experiment (assistant-native, registry-driven)}
+\title{Run a Multi-turn Conversation Experiment}
 \usage{
 conversation_experiment(
   model_key,
@@ -79,11 +79,10 @@ A data.frame/tibble with PsyLingLLM schema columns per turn:
   Timestamp, RequestID, plus HistoryMode and HistoryUsedMsgs.
 }
 \description{
-Executes multi-turn conversations where each conversation is identified by
-`ConversationId` and ordered by `Turn`. Running history is maintained as a
-list of structured role messages (`list(role=..., content=...)`) and passed
-to \code{llm_caller()} via `assistant_content`. This mirrors web chat:
-`(system) + seed messages + history + current user -> assistant reply`.
+Executes registry-driven multi-turn conversations identified by
+\code{ConversationId} and ordered by \code{Turn}. Running history is kept as
+structured role messages and passed to \code{llm_caller()} through
+\code{assistant_content}.
 }
 \details{
 Request assembly (URL, headers, body/messages, defaults) is driven entirely

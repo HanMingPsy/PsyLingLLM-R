@@ -8,6 +8,7 @@ test_that("the existing public export surface remains available", {
     "coerce_path_segments",
     "common_error_blacklist",
     "complete_headers_for_pass2",
+    "adaptive_feedback_experiment",
     "conversation_experiment",
     "conversation_experiment_with_feedback",
     "default_keyword_lexicon",

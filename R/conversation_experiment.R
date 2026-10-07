@@ -1,10 +1,9 @@
-#' Run Multi-turn Conversation Experiment (assistant-native, registry-driven)
+#' Run a Multi-turn Conversation Experiment
 #'
-#' Executes multi-turn conversations where each conversation is identified by
-#' `ConversationId` and ordered by `Turn`. Running history is maintained as a
-#' list of structured role messages (`list(role=..., content=...)`) and passed
-#' to \code{llm_caller()} via `assistant_content`. This mirrors web chat:
-#' `(system) + seed messages + history + current user -> assistant reply`.
+#' Executes registry-driven multi-turn conversations identified by
+#' \code{ConversationId} and ordered by \code{Turn}. Running history is kept as
+#' structured role messages and passed to \code{llm_caller()} through
+#' \code{assistant_content}.
 #'
 #' Request assembly (URL, headers, body/messages, defaults) is driven entirely
 #' by the registry via \code{llm_caller()} — this function never mutates headers.
@@ -105,9 +104,14 @@ conversation_experiment <- function(
     data <- dplyr::mutate(data, Turn = dplyr::row_number())
     data <- dplyr::ungroup(data)
   }
-  if (!is.numeric(data$Turn)) {
-    stop("`Turn` must be numeric/integer for ordering.")
-  }
+  data <- dplyr::arrange(data, ConversationId, Turn)
+  validate_conversation_experiment_arguments(
+    data = data,
+    repeats = repeats,
+    random = random,
+    max_history_turns = max_history_turns,
+    delay = delay
+  )
 
   # ---- Conversation-level repeats: duplicate each ConversationId block ----
   if (isTRUE(repeats > 1L)) {
@@ -231,7 +235,7 @@ conversation_experiment <- function(
       return_raw = return_raw
     )
     # preserve tri-state: only pass optionals when user actually supplied it
-    if (!missing(optionals)) call_args$optionals <- optionals
+    if (!missing(optionals)) call_args["optionals"] <- list(optionals)
 
     llm_resp <- tryCatch(
       do.call(llm_caller, call_args),
@@ -247,7 +251,8 @@ conversation_experiment <- function(
     if (identical(result_status$category, "TIMEOUT")) {
       data$Response[ri] <- NA_character_
       data$AssistantContext[ri] <- NA_character_
-      data$HistoryMode <- history_mode
+      data$HistoryMode[ri] <- history_mode
+      data$HistoryUsedMsgs[ri] <- length(hist_use)
       data$Think[ri] <- NA_character_
       data$TotalResponseTime[ri] <- as.numeric(difftime(t1, t0, units = "secs"))
       data$FirstTokenLatency[ri] <- NA_real_
@@ -273,7 +278,8 @@ conversation_experiment <- function(
     if (identical(result_status$category, "ERROR")) {
       data$Response[ri] <- NA_character_
       data$AssistantContext[ri] <- NA_character_
-      data$HistoryMode <- history_mode
+      data$HistoryMode[ri] <- history_mode
+      data$HistoryUsedMsgs[ri] <- length(hist_use)
       data$Think[ri] <- NA_character_
       data$TotalResponseTime[ri] <- as.numeric(difftime(t1, t0, units = "secs"))
       data$FirstTokenLatency[ri] <- NA_real_
@@ -300,7 +306,7 @@ conversation_experiment <- function(
     data$Response[ri] <- answer
     data$Think[ri] <- safe_chr(llm_resp$thinking)
     data$AssistantContext[ri] <- safe_chr(as_json(hist_use))
-    data$HistoryMode <- history_mode
+    data$HistoryMode[ri] <- history_mode
     data$HistoryUsedMsgs[ri] <- length(hist_use)
     data$TotalResponseTime[ri] <- as.numeric(difftime(t1, t0, units = "secs"))
 
@@ -334,7 +340,10 @@ conversation_experiment <- function(
         list(list(role = local_roles$assistant, content = answer))
       )
       if (!is.null(max_history_turns) && length(histories[[cid]]) > max_history_turns * 2) {
-        histories[[cid]] <- tail(histories[[cid]], max_history_turns * 2)
+        histories[[cid]] <- utils::tail(
+          histories[[cid]],
+          max_history_turns * 2
+        )
       }
     }
 
