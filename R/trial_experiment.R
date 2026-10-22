@@ -14,6 +14,13 @@
 #' - Provider HTTP errors retain public \code{status = 599}, preserve the
 #'   original status in \code{error$code}, and are marked as \code{"ERROR"}.
 #'
+#' Raw response handling:
+#' - When \code{return_raw = TRUE}, the redacted raw request and provider
+#'   response returned by \code{llm_caller()} are retained in a list-column
+#'   named \code{raw}.
+#' - The \code{raw} list-column is returned in memory but is excluded from the
+#'   ordinary CSV or Excel result file.
+#'
 #' @param model_key Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").
 #' @param generation_interface Character(1). Interface name; defaults to "chat".
 #' @param api_key Character(1). Provider API key.
@@ -34,12 +41,15 @@
 #' @param delay Numeric(1). Delay (seconds) between trials.
 #' @param output_path Character or NULL. Where to save results/logs (compatible with prior schema).
 #' @param overwrite Logical(1). Overwrite existing output files.
-#' @param return_raw Logical(1). Include raw request/response for debugging.
+#' @param return_raw Logical(1). Retain the redacted raw request/response in an
+#'   in-memory list-column named \code{raw}. Raw objects are not written to the
+#'   ordinary result file.
 #'
 #' @return A data.frame/tibble with PsyLingLLM schema columns:
 #'   Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if stream),
 #'   PromptTokens, CompletionTokens, TrialStatus, ResponseStatus, Streaming,
-#'   Timestamp, RequestID.
+#'   Timestamp, RequestID. When \code{return_raw = TRUE}, the returned object
+#'   also contains a \code{raw} list-column with one element per trial.
 #' @export
 trial_experiment <- function(
     model_key,
@@ -99,6 +109,9 @@ trial_experiment <- function(
   data$Streaming <- NA
   data$Timestamp <- NA_character_
   data$RequestID <- NA_character_
+  if (isTRUE(return_raw)) {
+    data$raw <- vector("list", n_trials)
+  }
 
   # ---- Log start ------------------------------------------------------------
   write_experiment_log(
@@ -141,6 +154,12 @@ trial_experiment <- function(
       ),
       error = function(e) handle_llm_error(run_id = i, err = e, category = "network")
     )
+
+    if (isTRUE(return_raw)) {
+      # Single-bracket assignment preserves a NULL placeholder for failed
+      # trials instead of shortening the list-column.
+      data$raw[i] <- list(llm_resp$raw %||% NULL)
+    }
 
     t1 <- Sys.time()
     result_status <- classify_llm_result(llm_resp)
@@ -210,7 +229,7 @@ trial_experiment <- function(
     data$ResponseStatus[i] <- result_status$response_status
     data$Streaming[i] <- llm_resp$streaming %||% isTRUE(stream)
     data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
-    data$RequestID[i] <- llm_resp$usage$id
+    data$RequestID[i] <- safe_chr(llm_resp$usage$id)
 
     # Mid-run logs preserved
     if (!is.null(llm_resp$LogMessage)) {
@@ -229,8 +248,13 @@ trial_experiment <- function(
   update_progress_bar(n_trials, n_trials, start_time, bar_width, model_key)
   cat("\n")
 
+  data_to_save <- data
+  if ("raw" %in% names(data_to_save)) {
+    data_to_save$raw <- NULL
+  }
+
   save_experiment_results(
-    data,
+    data_to_save,
     output_path = result_file,
     model = model_key,
     overwrite = overwrite,

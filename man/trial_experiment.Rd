@@ -63,13 +63,16 @@ parameters.}
 
 \item{overwrite}{Logical(1). Overwrite existing output files.}
 
-\item{return_raw}{Logical(1). Include raw request/response for debugging.}
+\item{return_raw}{Logical(1). Retain the redacted raw request/response in an
+in-memory list-column named \code{raw}. Raw objects are not written to the
+ordinary result file.}
 }
 \value{
 A data.frame/tibble with PsyLingLLM schema columns:
   Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if stream),
   PromptTokens, CompletionTokens, TrialStatus, ResponseStatus, Streaming,
-  Timestamp, RequestID.
+  Timestamp, RequestID. When \code{return_raw = TRUE}, the returned object
+  also contains a \code{raw} list-column with one element per trial.
 }
 \description{
 Executes repeated trials using a registry-defined LLM interface. All request
@@ -86,4 +89,11 @@ Error/timeout handling:
   and is marked as \code{"TIMEOUT"} without stopping the loop.
 - Provider HTTP errors retain public \code{status = 599}, preserve the
   original status in \code{error$code}, and are marked as \code{"ERROR"}.
+
+Raw response handling:
+- When \code{return_raw = TRUE}, the redacted raw request and provider
+  response returned by \code{llm_caller()} are retained in a list-column
+  named \code{raw}.
+- The \code{raw} list-column is returned in memory but is excluded from the
+  ordinary CSV or Excel result file.
 }
