@@ -153,10 +153,29 @@ classify_llm_result <- function(result) {
   } else {
     scalar_character(error)
   }
+  error_type <- if (is.list(error)) {
+    scalar_character(error$type)
+  } else {
+    NA_character_
+  }
+  error_reason <- if (is.list(error)) {
+    scalar_character(error$reason)
+  } else {
+    NA_character_
+  }
+  parser_error <- identical(error_type, "parser_error") ||
+    identical(error_reason, "invalid_json")
+  error_http_status <- if (is.list(error)) {
+    scalar_integer(error$http_status)
+  } else {
+    NA_integer_
+  }
 
   provider_http_error <- !is.na(provider_status) &&
     provider_status >= 400L && provider_status != 599L
-  category <- if (identical(public_status, 599L) && provider_http_error) {
+  category <- if (parser_error) {
+    "ERROR"
+  } else if (identical(public_status, 599L) && provider_http_error) {
     "ERROR"
   } else if (identical(public_status, 599L)) {
     "TIMEOUT"
@@ -167,7 +186,9 @@ classify_llm_result <- function(result) {
   }
   response_status <- scalar_character(result$response_status)
   if (is.na(response_status)) {
-    if (!identical(category, "SUCCESS")) {
+    if (parser_error) {
+      response_status <- "PARSE_ERROR"
+    } else if (!identical(category, "SUCCESS")) {
       response_status <- category
     } else {
       answer <- result$answer %||% result$response
@@ -181,7 +202,13 @@ classify_llm_result <- function(result) {
     category = category,
     response_status = response_status,
     public_status = public_status,
-    provider_status = if (provider_http_error) provider_status else public_status,
+    provider_status = if (parser_error && !is.na(error_http_status)) {
+      error_http_status
+    } else if (provider_http_error) {
+      provider_status
+    } else {
+      public_status
+    },
     message = message
   )
 }

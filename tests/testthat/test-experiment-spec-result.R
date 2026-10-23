@@ -69,6 +69,21 @@ test_that("provider failures remain valid result evidence", {
   expect_identical(validation$summary$response_status$ERROR, 1L)
 })
 
+test_that("parser failures remain valid result evidence", {
+  compiled <- experiment_result_compiled_call()
+  result <- experiment_result_fixture(compiled)
+  result$Response[[2L]] <- NA_character_
+  result$TrialStatus[[2L]] <- "ERROR"
+  result$ResponseStatus[[2L]] <- "PARSE_ERROR"
+  result$RequestID[[2L]] <- NA_character_
+
+  validation <- validate_experiment_result(compiled, result)
+
+  expect_true(validation$valid)
+  expect_identical(validation$summary$trial_status$ERROR, 1L)
+  expect_identical(validation$summary$response_status$PARSE_ERROR, 1L)
+})
+
 test_that("result validator rejects contract and scientific mismatches", {
   compiled <- experiment_result_compiled_call()
   result <- experiment_result_fixture(compiled)

@@ -61,6 +61,16 @@ normalize_llm_result <- function(config,
   }
 
   legacy_response <- as_legacy_nonstream_response(transport_response)
+  raw_nonstream <- list(
+    status = legacy_response$status,
+    text = legacy_response$text,
+    parsed = legacy_response$parsed
+  )
+  if (is_transport_json_parse_failure(transport_response, FALSE)) {
+    raw_nonstream$headers <- transport_response$headers
+    raw_nonstream$raw_body <- transport_response$raw_body
+    raw_nonstream$parse_error <- transport_response$error
+  }
   list(
     status = public_status,
     interface = compatibility_entry$interface,
@@ -73,11 +83,7 @@ normalize_llm_result <- function(config,
     raw = if (isTRUE(return_raw)) {
       redact_llm_diagnostics(list(
         request = raw_request,
-        response = list(non_stream = list(
-          status = legacy_response$status,
-          text = legacy_response$text,
-          parsed = legacy_response$parsed
-        ))
+        response = list(non_stream = raw_nonstream)
       ))
     } else {
       NULL
@@ -88,6 +94,10 @@ normalize_llm_result <- function(config,
 
 classify_normalized_response <- function(parsed_response) {
   if (!is.null(parsed_response$error)) {
+    if (identical(parsed_response$error$type, "parser_error") ||
+        identical(parsed_response$error$reason, "invalid_json")) {
+      return("PARSE_ERROR")
+    }
     error_code <- suppressWarnings(
       as.integer(parsed_response$error$code %||% NA_integer_)
     )

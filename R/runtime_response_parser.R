@@ -34,9 +34,51 @@ parse_llm_response <- function(response,
     )
   }
 
+  if (is_transport_json_parse_failure(response, streaming)) {
+    parsed <- new_transport_json_parse_failure(response)
+    validate_llm_parsed_response(parsed, parser_id)
+    return(parsed)
+  }
+
   parsed <- parser(response, config, streaming)
   validate_llm_parsed_response(parsed, parser_id)
   parsed
+}
+
+is_transport_json_parse_failure <- function(response, streaming) {
+  !streaming && is.list(response$error) &&
+    identical(response$error$type, "parser_error") &&
+    identical(response$error$reason, "invalid_json")
+}
+
+new_transport_json_parse_failure <- function(response) {
+  request_id <- response_request_id(response)
+  message <- paste0(
+    "Provider response could not be parsed as JSON: ",
+    response$error$message
+  )
+  structure(
+    list(
+      status = response$status,
+      streaming = FALSE,
+      answer = "",
+      reasoning = NULL,
+      usage = list(prompt = NULL, completion = NULL),
+      request_id = request_id,
+      finish_reason = NULL,
+      error = list(
+        code = 599L,
+        message = message,
+        type = "parser_error",
+        reason = "invalid_json",
+        http_status = response$status,
+        body = response$text %||% response$raw_body,
+        headers = response$headers,
+        request_id = request_id
+      )
+    ),
+    class = c("psylingllm_parsed_response", "list")
+  )
 }
 
 llm_response_parsers <- function() {

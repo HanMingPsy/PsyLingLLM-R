@@ -14,6 +14,16 @@ make_transport_request <- function(stream = FALSE) {
   )
 }
 
+read_hex_transport_fixture <- function(name) {
+  hex <- paste(
+    readLines(testthat::test_path("fixtures", name), warn = FALSE),
+    collapse = ""
+  )
+  hex <- gsub("\\s+", "", hex)
+  starts <- seq.int(1L, nchar(hex), by = 2L)
+  as.raw(strtoi(substring(hex, starts, starts + 1L), base = 16L))
+}
+
 test_that("injected transport receives the request and encoded payload once", {
   calls <- 0L
   captured <- NULL
@@ -151,6 +161,43 @@ test_that("HTTP error status receives a structured generic error", {
     list(type = "http", message = "HTTP error")
   )
   expect_identical(response$parsed$error, "rate limited")
+})
+
+test_that("non-stream transport preserves malformed JSON evidence", {
+  body <- read_hex_transport_fixture(
+    "openai-chat-malformed-control-byte.hex"
+  )
+  headers <- c(`x-request-id` = "request-malformed")
+  local_mocked_bindings(
+    new_handle = function() structure(list(), class = "curl_handle"),
+    handle_setheaders = function(...) invisible(NULL),
+    handle_setopt = function(...) invisible(NULL),
+    curl_fetch_memory = function(url, handle) {
+      list(status_code = 200L, headers = headers, content = body)
+    },
+    .package = "curl"
+  )
+
+  raw_response <- do_nonstream_request(
+    "https://example.invalid/v1/chat/completions",
+    list(`Content-Type` = "application/json"),
+    "{}"
+  )
+  response <- normalize_llm_transport_response(
+    raw_response,
+    "http_json",
+    "{}"
+  )
+
+  expect_identical(raw_response$raw_body, body)
+  expect_identical(raw_response$text, rawToChar(body))
+  expect_null(raw_response$parsed)
+  expect_match(raw_response$parse_error, "lexical error", ignore.case = TRUE)
+  expect_identical(response$status, 200L)
+  expect_identical(response$error$type, "parser_error")
+  expect_identical(response$error$reason, "invalid_json")
+  expect_identical(response$error$http_status, 200L)
+  expect_identical(response$raw_body, body)
 })
 
 test_that("HTTP transports apply the caller timeout to connection setup", {

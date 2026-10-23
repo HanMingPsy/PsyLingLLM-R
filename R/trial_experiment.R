@@ -13,6 +13,9 @@
 #'   and is marked as \code{"TIMEOUT"} without stopping the loop.
 #' - Provider HTTP errors retain public \code{status = 599}, preserve the
 #'   original status in \code{error$code}, and are marked as \code{"ERROR"}.
+#' - Non-empty HTTP success bodies that cannot be parsed as JSON are marked
+#'   with \code{TrialStatus = "ERROR"} and
+#'   \code{ResponseStatus = "PARSE_ERROR"}.
 #'
 #' Raw response handling:
 #' - When \code{return_raw = TRUE}, the redacted raw request and provider
@@ -198,14 +201,29 @@ trial_experiment <- function(
       data$PromptTokens[i] <- NA_integer_
       data$CompletionTokens[i] <- NA_integer_
       data$TrialStatus[i] <- "ERROR"
-      data$ResponseStatus[i] <- "ERROR"
+      data$ResponseStatus[i] <- result_status$response_status
       data$Streaming[i] <- llm_resp$streaming %||% isTRUE(stream)
       data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       data$RequestID[i] <- NA_character_
 
+      failure_message <- if (identical(
+        result_status$response_status,
+        "PARSE_ERROR"
+      )) {
+        sprintf(
+          "Trial %d response parsing failed (HTTP %s): %s",
+          i,
+          status_num,
+          err_msg
+        )
+      } else {
+        sprintf("Trial %d HTTP %s: %s", i, status_num, err_msg)
+      }
       write_experiment_log(
-        logfile, stage = "error", run_id = i,
-        msg = sprintf("Trial %d HTTP %s: %s", i, status_num, err_msg)
+        logfile,
+        stage = "error",
+        run_id = i,
+        msg = failure_message
       )
       Sys.sleep(delay)
       update_progress_bar(i, n_trials, start_time, bar_width, model_key)

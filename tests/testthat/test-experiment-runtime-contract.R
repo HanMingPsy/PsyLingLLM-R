@@ -63,6 +63,23 @@ test_that("trial experiments preserve success and timeout result fields", {
         )
       ))
 
+      if (call_index == 4L) return(list(
+        status = 599L,
+        answer = "",
+        thinking = NULL,
+        response_status = "PARSE_ERROR",
+        first_token_latency = NA_real_,
+        usage = list(prompt = NULL, completion = NULL, id = NULL),
+        streaming = FALSE,
+        error = list(
+          code = 599L,
+          message = "Provider response could not be parsed as JSON",
+          type = "parser_error",
+          reason = "invalid_json",
+          http_status = 200L
+        )
+      ))
+
       list(
         status = 200L,
         answer = "  ",
@@ -79,7 +96,9 @@ test_that("trial experiments preserve success and timeout result fields", {
   result <- trial_experiment(
     model_key = "fixture-model",
     api_key = "not-a-real-key",
-    data = data.frame(Material = c("First", "Second", "Third", "Fourth")),
+    data = data.frame(
+      Material = c("First", "Second", "Third", "Fourth", "Fifth")
+    ),
     output_path = output_directory,
     delay = 0
   )
@@ -102,25 +121,27 @@ test_that("trial experiments preserve success and timeout result fields", {
   expect_true(all(expected_result_fields %in% names(result)))
   expect_identical(
     result$TrialStatus,
-    c("SUCCESS", "TIMEOUT", "ERROR", "SUCCESS")
+    c("SUCCESS", "TIMEOUT", "ERROR", "ERROR", "SUCCESS")
   )
   expect_identical(
     result$ResponseStatus,
-    c("OK", "TIMEOUT", "ERROR", "EMPTY_RESPONSE")
+    c("OK", "TIMEOUT", "ERROR", "PARSE_ERROR", "EMPTY_RESPONSE")
   )
   expect_identical(result$Response[[1]], "Fixture answer")
   expect_true(is.na(result$Response[[2]]))
   expect_true(is.na(result$Response[[3]]))
-  expect_identical(result$Response[[4]], "  ")
+  expect_true(is.na(result$Response[[4]]))
+  expect_identical(result$Response[[5]], "  ")
   expect_identical(result$Think[[1]], "Fixture reasoning")
   expect_true(is.na(result$Think[[2]]))
   expect_true(is.na(result$Think[[3]]))
+  expect_true(is.na(result$Think[[4]]))
   expect_identical(result$PromptTokens[[1]], 8L)
   expect_identical(result$CompletionTokens[[1]], 3L)
   expect_identical(result$RequestID[[1]], "request-success")
   expect_true(is.na(result$RequestID[[2]]))
   expect_true(is.na(result$RequestID[[3]]))
-  expect_identical(result$Streaming, c(FALSE, FALSE, FALSE, FALSE))
+  expect_identical(result$Streaming, rep(FALSE, 5L))
   expect_false("raw" %in% names(result))
 })
 
@@ -137,6 +158,17 @@ test_that("normalized failures distinguish timeouts from provider errors", {
     status = 500L,
     error = list(code = 500L, message = "Server error")
   ))
+  parser <- classify_llm_result(list(
+    status = 599L,
+    response_status = "PARSE_ERROR",
+    error = list(
+      code = 599L,
+      message = "Invalid JSON",
+      type = "parser_error",
+      reason = "invalid_json",
+      http_status = 200L
+    )
+  ))
 
   expect_identical(timeout$category, "TIMEOUT")
   expect_identical(timeout$provider_status, 599L)
@@ -147,6 +179,9 @@ test_that("normalized failures distinguish timeouts from provider errors", {
   expect_identical(legacy_http$provider_status, 500L)
   expect_identical(timeout$response_status, "TIMEOUT")
   expect_identical(provider$response_status, "ERROR")
+  expect_identical(parser$category, "ERROR")
+  expect_identical(parser$response_status, "PARSE_ERROR")
+  expect_identical(parser$provider_status, 200L)
 })
 
 test_that("trial experiments preserve ordered raw evidence outside flat result files", {

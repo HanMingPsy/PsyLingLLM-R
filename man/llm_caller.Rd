@@ -77,9 +77,10 @@ A list with fields: \code{status}, \code{interface}, \code{model_key},
   \code{streaming}, \code{usage}, \code{answer}, \code{thinking},
   \code{response_status}, and optionally \code{raw} or \code{error}.
   \code{response_status} is one of \code{"OK"}, \code{"EMPTY_RESPONSE"},
-  \code{"TIMEOUT"}, or \code{"ERROR"}. Transport and provider failures
-  retain the compatibility status \code{599}; the original HTTP status and
-  provider evidence remain available in \code{error}.
+  \code{"PARSE_ERROR"}, \code{"TIMEOUT"}, or \code{"ERROR"}. Transport,
+  parser, and provider failures retain the compatibility status \code{599};
+  the original HTTP status and provider evidence remain available in
+  \code{error}.
 }
 \description{
 Builds a protocol request from the resolved model registry entry. Provider-native

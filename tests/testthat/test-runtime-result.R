@@ -221,6 +221,57 @@ test_that("transport status 599 remains a timeout-compatible result", {
   expect_identical(result$response_status, "TIMEOUT")
 })
 
+test_that("malformed provider JSON is an auditable parser failure", {
+  text <- '{"id":"request-malformed","content":"bad\u0001token"}'
+  body <- charToRaw(text)
+  transport <- normalize_llm_transport_response(
+    list(
+      status = 200L,
+      headers = c(
+        `x-request-id` = "request-malformed",
+        authorization = "Bearer secret-value"
+      ),
+      raw_body = body,
+      text = text,
+      parsed = NULL,
+      parse_error = "lexical error: invalid character inside string",
+      error = NULL
+    ),
+    "http_json",
+    '{"model":"fixture-model"}'
+  )
+  parsed <- parse_llm_response(transport, "openai_chat")
+
+  result <- normalize_llm_result(
+    make_result_config(),
+    make_result_entry(),
+    make_result_request(),
+    transport,
+    parsed,
+    return_raw = TRUE
+  )
+
+  expect_identical(result$status, 599L)
+  expect_identical(result$response_status, "PARSE_ERROR")
+  expect_identical(result$error$type, "parser_error")
+  expect_identical(result$error$reason, "invalid_json")
+  expect_identical(result$error$http_status, 200L)
+  expect_identical(
+    result$raw$response$non_stream$raw_body,
+    body
+  )
+  expect_identical(
+    result$raw$response$non_stream$headers[["authorization"]],
+    "Bearer [REDACTED]"
+  )
+  expect_identical(
+    result$raw$response$non_stream$parse_error$type,
+    "parser_error"
+  )
+  rendered <- paste(capture.output(str(result)), collapse = "\n")
+  expect_false(grepl("secret-value", rendered, fixed = TRUE))
+})
+
 test_that("successful responses without a final answer are classified", {
   transport <- normalize_llm_transport_response(
     list(status = 200L, text = "{}", parsed = list(), error = NULL),

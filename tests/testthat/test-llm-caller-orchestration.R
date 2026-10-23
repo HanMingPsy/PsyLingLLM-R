@@ -131,3 +131,43 @@ test_that("bundled v1 models run through the canonical pipeline offline", {
     list(prompt = 4L, completion = 2L, id = "offline-request")
   )
 })
+
+test_that("llm_caller surfaces malformed non-stream provider JSON", {
+  local_user_registry <- file.path(
+    withr::local_tempdir(),
+    "registry.yaml"
+  )
+  body <- charToRaw('{"choices":[{"message":{"content":"Y\u0001"}}]}')
+
+  local_mocked_bindings(
+    get_registry_path = function() local_user_registry,
+    do_nonstream_request = function(...) {
+      list(
+        status = 200L,
+        headers = c(`x-request-id` = "request-malformed"),
+        raw_body = body,
+        text = rawToChar(body),
+        parsed = NULL,
+        parse_error = "lexical error: invalid character inside string",
+        error = NULL
+      )
+    },
+    .package = "PsyLingLLM"
+  )
+
+  result <- llm_caller(
+    model_key = "deepseek-chat",
+    material = "Offline fixture",
+    api_key = "TEST_TOKEN_PLACEHOLDER",
+    stream = FALSE,
+    return_raw = TRUE
+  )
+
+  expect_identical(result$status, 599L)
+  expect_identical(result$response_status, "PARSE_ERROR")
+  expect_identical(result$error$type, "parser_error")
+  expect_identical(result$error$reason, "invalid_json")
+  expect_identical(result$error$http_status, 200L)
+  expect_identical(result$error$request_id, "request-malformed")
+  expect_identical(result$raw$response$non_stream$raw_body, body)
+})

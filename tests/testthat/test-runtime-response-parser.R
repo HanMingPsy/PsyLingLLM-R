@@ -2,7 +2,11 @@ make_parser_transport_response <- function(streaming = FALSE,
                                            status = 200L,
                                            parsed = NULL,
                                            events = list(),
-                                           error = NULL) {
+                                           error = NULL,
+                                           text = NULL,
+                                           raw_body = NULL,
+                                           headers = NULL,
+                                           parse_error = NULL) {
   legacy <- if (streaming) {
     list(
       status = status,
@@ -14,10 +18,17 @@ make_parser_transport_response <- function(streaming = FALSE,
   } else {
     list(
       status = status,
-      text = if (is.null(parsed)) NULL else jsonlite::toJSON(
-        parsed, auto_unbox = TRUE
-      ),
+      headers = headers,
+      raw_body = raw_body,
+      text = if (!is.null(text)) {
+        text
+      } else if (is.null(parsed)) {
+        NULL
+      } else {
+        jsonlite::toJSON(parsed, auto_unbox = TRUE)
+      },
       parsed = parsed,
+      parse_error = parse_error,
       error = error
     )
   }
@@ -145,6 +156,30 @@ test_that("legacy parser preserves transport error compatibility", {
     result$error[c("code", "message")],
     list(code = 599L, message = "Fixture timeout")
   )
+})
+
+test_that("non-empty malformed JSON becomes a protocol-independent error", {
+  body <- charToRaw('{"choices":[{"message":{"content":"Y')
+  response <- make_parser_transport_response(
+    status = 200L,
+    text = rawToChar(body),
+    raw_body = body,
+    headers = c(`x-request-id` = "request-malformed"),
+    parse_error = "lexical error: invalid character inside string"
+  )
+
+  result <- parse_llm_response(response, "openai_chat")
+
+  expect_identical(result$status, 200L)
+  expect_identical(result$answer, "")
+  expect_null(result$reasoning)
+  expect_identical(result$request_id, "request-malformed")
+  expect_identical(result$error$code, 599L)
+  expect_identical(result$error$type, "parser_error")
+  expect_identical(result$error$reason, "invalid_json")
+  expect_identical(result$error$http_status, 200L)
+  expect_identical(result$error$body, rawToChar(body))
+  expect_match(result$error$message, "could not be parsed as JSON")
 })
 
 test_that("parser IDs and configuration fail before semantic parsing", {

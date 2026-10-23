@@ -87,6 +87,13 @@ normalize_llm_transport_response <- function(response, transport_id,
   }
   status <- validate_transport_status(response$status, transport_id)
   error_message <- validate_transport_error(response$error, transport_id)
+  parse_error_message <- validate_transport_parse_error(
+    response$parse_error %||% NULL,
+    transport_id
+  )
+  parse_failure <- is.null(response$error) && status >= 200L &&
+    status < 300L && !is.null(parse_error_message) &&
+    is.null(response$parsed) && !is.null(nonempty_transport_text(response$text))
   error <- if (!is.null(response$error)) {
     list(
       type = if (identical(status, 599L)) {
@@ -95,6 +102,13 @@ normalize_llm_transport_response <- function(response, transport_id,
         "http"
       },
       message = error_message
+    )
+  } else if (parse_failure) {
+    list(
+      type = "parser_error",
+      reason = "invalid_json",
+      message = parse_error_message,
+      http_status = status
     )
   } else if (status >= 400L) {
     list(type = "http", message = "HTTP error")
@@ -152,6 +166,30 @@ validate_transport_error <- function(error, transport_id) {
     )
   }
   error
+}
+
+validate_transport_parse_error <- function(error, transport_id) {
+  if (is.null(error)) {
+    return(NULL)
+  }
+  valid <- is.character(error) && length(error) == 1L &&
+    !is.na(error) && nzchar(error)
+  if (!valid) {
+    llm_transport_abort(
+      "Transport returned an invalid JSON parse error.",
+      transport_id = transport_id,
+      reason = "invalid_response"
+    )
+  }
+  error
+}
+
+nonempty_transport_text <- function(value) {
+  if (!is.character(value) || length(value) != 1L || is.na(value) ||
+      !nzchar(value)) {
+    return(NULL)
+  }
+  value
 }
 
 validate_llm_transport_response <- function(response) {
@@ -281,11 +319,20 @@ new_sse_json_collector <- function(clock = Sys.time) {
   list(feed = feed, finish = finish, snapshot = snapshot)
 }
 
-parse_transport_json <- function(text) {
+parse_transport_json_result <- function(text) {
   tryCatch(
-    jsonlite::fromJSON(text, simplifyVector = FALSE),
-    error = function(error) NULL
+    list(
+      value = jsonlite::fromJSON(text, simplifyVector = FALSE),
+      error = NULL
+    ),
+    error = function(error) {
+      list(value = NULL, error = conditionMessage(error))
+    }
   )
+}
+
+parse_transport_json <- function(text) {
+  parse_transport_json_result(text)$value
 }
 
 # Compatibility executors retained for existing internal mocks.
@@ -324,7 +371,7 @@ do_nonstream_request <- function(url,
   }
 
   text <- rawToChar(response$content)
-  parsed <- parse_transport_json(text)
+  json_result <- parse_transport_json_result(text)
   if (isTRUE(debug)) {
     cat("----- [DEBUG non-stream] headers -----\n")
     print(redact_llm_diagnostics(headers))
@@ -337,7 +384,8 @@ do_nonstream_request <- function(url,
     headers = response$headers %||% NULL,
     raw_body = response$content,
     text = text,
-    parsed = parsed,
+    parsed = json_result$value,
+    parse_error = json_result$error,
     error = NULL
   )
 }

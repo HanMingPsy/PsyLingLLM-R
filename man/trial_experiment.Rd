@@ -89,6 +89,9 @@ Error/timeout handling:
   and is marked as \code{"TIMEOUT"} without stopping the loop.
 - Provider HTTP errors retain public \code{status = 599}, preserve the
   original status in \code{error$code}, and are marked as \code{"ERROR"}.
+- Non-empty HTTP success bodies that cannot be parsed as JSON are marked
+  with \code{TrialStatus = "ERROR"} and
+  \code{ResponseStatus = "PARSE_ERROR"}.
 
 Raw response handling:
 - When \code{return_raw = TRUE}, the redacted raw request and provider

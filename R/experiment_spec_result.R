@@ -120,7 +120,9 @@ validate_experiment_result <- function(compiled, result) {
   }
 
   allowed_trial_status <- c("SUCCESS", "ERROR", "TIMEOUT")
-  allowed_response_status <- c("OK", "EMPTY_RESPONSE", "ERROR", "TIMEOUT")
+  allowed_response_status <- c(
+    "OK", "EMPTY_RESPONSE", "PARSE_ERROR", "ERROR", "TIMEOUT"
+  )
   trial_status_valid <- experiment_result_allowed_values(
     result,
     "TrialStatus",
@@ -149,7 +151,11 @@ validate_experiment_result <- function(compiled, result) {
     expected_trial_status <- ifelse(
       result$ResponseStatus == "TIMEOUT",
       "TIMEOUT",
-      ifelse(result$ResponseStatus == "ERROR", "ERROR", "SUCCESS")
+      ifelse(
+        result$ResponseStatus %in% c("ERROR", "PARSE_ERROR"),
+        "ERROR",
+        "SUCCESS"
+      )
     )
     if (!identical(result$TrialStatus, expected_trial_status)) {
       add_error(
