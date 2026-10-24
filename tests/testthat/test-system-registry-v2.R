@@ -313,7 +313,12 @@ test_that("a v1 user model still overrides the bundled v2 model", {
 })
 
 test_that("every bundled interface completes the offline caller pipeline", {
-  local_user_registry <- file.path(withr::local_tempdir(), "registry.yaml")
+  registry_directory <- withr::local_tempdir()
+  local_user_registry <- file.path(registry_directory, "registry.yaml")
+  legacy_user_registry <- file.path(
+    registry_directory,
+    "legacy-registry.yaml"
+  )
   chat_payload <- jsonlite::fromJSON(
     test_path("fixtures", "openai-chat-nonstream.json"),
     simplifyVector = FALSE
@@ -325,6 +330,7 @@ test_that("every bundled interface completes the offline caller pipeline", {
 
   local_mocked_bindings(
     get_registry_path = function() local_user_registry,
+    get_legacy_registry_path = function() legacy_user_registry,
     do_nonstream_request = function(url, headers, json_payload, timeout, debug) {
       parsed <- if (grepl("/responses$", url)) {
         responses_payload
