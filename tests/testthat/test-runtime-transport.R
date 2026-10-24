@@ -251,6 +251,35 @@ test_that("JSON recovery changes only unescaped controls inside strings", {
   )
 })
 
+test_that("non-stream transport recovers NUL before R string conversion", {
+  body <- as.raw(c(
+    charToRaw('{"value":"before'),
+    0x00,
+    charToRaw('after"}')
+  ))
+  local_mocked_bindings(
+    new_handle = function() structure(list(), class = "curl_handle"),
+    handle_setheaders = function(...) invisible(NULL),
+    handle_setopt = function(...) invisible(NULL),
+    curl_fetch_memory = function(url, handle) {
+      list(status_code = 200L, headers = character(), content = body)
+    },
+    .package = "curl"
+  )
+
+  raw_response <- do_nonstream_request(
+    "https://example.invalid/v1/chat/completions",
+    list(`Content-Type` = "application/json"),
+    "{}"
+  )
+
+  expect_null(raw_response$text)
+  expect_identical(raw_response$raw_body, body)
+  expect_true(is.list(raw_response$parsed))
+  expect_identical(raw_response$parse_recovery$count, 1L)
+  expect_null(raw_response$parse_error)
+})
+
 test_that("HTTP transports apply the caller timeout to connection setup", {
   captured <- list()
   local_mocked_bindings(

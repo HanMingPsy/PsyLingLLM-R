@@ -321,13 +321,23 @@ new_sse_json_collector <- function(clock = Sys.time) {
   list(feed = feed, finish = finish, snapshot = snapshot)
 }
 
-parse_transport_json_result <- function(text, raw_body = NULL) {
-  strict <- tryCatch(
-    list(value = jsonlite::fromJSON(text, simplifyVector = FALSE), error = NULL),
-    error = function(error) {
-      list(value = NULL, error = conditionMessage(error))
-    }
-  )
+parse_transport_json_result <- function(text = NULL, raw_body = NULL) {
+  strict <- if (is.character(text) && length(text) == 1L) {
+    tryCatch(
+      list(
+        value = jsonlite::fromJSON(text, simplifyVector = FALSE),
+        error = NULL
+      ),
+      error = function(error) {
+        list(value = NULL, error = conditionMessage(error))
+      }
+    )
+  } else {
+    list(
+      value = NULL,
+      error = "Provider response could not be converted to an R string."
+    )
+  }
   if (is.null(strict$error)) {
     return(c(strict, list(recovery = NULL)))
   }
@@ -479,7 +489,10 @@ do_nonstream_request <- function(url,
     ))
   }
 
-  text <- rawToChar(response$content)
+  text <- tryCatch(
+    rawToChar(response$content),
+    error = function(error) NULL
+  )
   json_result <- parse_transport_json_result(text, raw_body = response$content)
   if (isTRUE(debug)) {
     cat("----- [DEBUG non-stream] headers -----\n")
