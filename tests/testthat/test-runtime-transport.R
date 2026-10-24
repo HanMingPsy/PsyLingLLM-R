@@ -208,6 +208,42 @@ test_that("non-stream transport recovers unescaped JSON control bytes", {
   expect_identical(response$raw_body, body)
 })
 
+test_that("non-stream transport decodes multibyte provider JSON as UTF-8", {
+  body <- read_hex_transport_fixture("deepseek-chat-logprobs-utf8.hex")
+  headers <- c(`x-request-id` = "request-utf8")
+  local_mocked_bindings(
+    new_handle = function() structure(list(), class = "curl_handle"),
+    handle_setheaders = function(...) invisible(NULL),
+    handle_setopt = function(...) invisible(NULL),
+    curl_fetch_memory = function(url, handle) {
+      list(status_code = 200L, headers = headers, content = body)
+    },
+    .package = "curl"
+  )
+
+  raw_response <- do_nonstream_request(
+    "https://example.invalid/v1/chat/completions",
+    list(`Content-Type` = "application/json"),
+    "{}"
+  )
+
+  expect_identical(raw_response$raw_body, body)
+  expect_identical(Encoding(raw_response$text), "UTF-8")
+  expect_null(raw_response$parse_error)
+  expect_null(raw_response$parse_recovery)
+  expect_identical(raw_response$parsed$choices[[1L]]$message$content, "Y")
+  expect_identical(
+    raw_response$parsed$choices[[1L]]$logprobs$content[[1L]]$
+      top_logprobs[[2L]]$token,
+    "\u2581\u662f"
+  )
+  expect_identical(
+    raw_response$parsed$choices[[1L]]$logprobs$content[[1L]]$
+      top_logprobs[[3L]]$token,
+    " \u5426"
+  )
+})
+
 test_that("non-stream transport leaves other malformed JSON as errors", {
   body <- charToRaw('{"choices":[{"message":{"content":"Y')
   headers <- c(`x-request-id` = "request-truncated")

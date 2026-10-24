@@ -322,6 +322,18 @@ new_sse_json_collector <- function(clock = Sys.time) {
 }
 
 parse_transport_json_result <- function(text = NULL, raw_body = NULL) {
+  if (is.raw(raw_body)) {
+    decoded_text <- tryCatch(
+      decode_utf8_raw_text(raw_body),
+      error = function(error) NULL
+    )
+    if (!is.null(decoded_text)) {
+      text <- decoded_text
+    }
+  } else if (is.character(text) && length(text) == 1L) {
+    Encoding(text) <- "UTF-8"
+  }
+
   strict <- if (is.character(text) && length(text) == 1L) {
     tryCatch(
       list(
@@ -348,7 +360,7 @@ parse_transport_json_result <- function(text = NULL, raw_body = NULL) {
     return(c(strict, list(recovery = NULL)))
   }
 
-  repaired_text <- rawToChar(repaired$body)
+  repaired_text <- decode_utf8_raw_text(repaired$body)
   recovered <- tryCatch(
     list(
       value = jsonlite::fromJSON(repaired_text, simplifyVector = FALSE),
@@ -490,7 +502,7 @@ do_nonstream_request <- function(url,
   }
 
   text <- tryCatch(
-    rawToChar(response$content),
+    decode_utf8_raw_text(response$content),
     error = function(error) NULL
   )
   json_result <- parse_transport_json_result(text, raw_body = response$content)

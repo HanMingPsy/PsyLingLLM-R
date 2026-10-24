@@ -128,3 +128,13 @@ as_json <- function(x) {
            error = function(e) NA_character_)
 }
 
+decode_utf8_raw_text <- function(value) {
+  if (!is.raw(value)) {
+    stop("UTF-8 response input must be a raw vector.", call. = FALSE)
+  }
+
+  text <- rawToChar(value)
+  Encoding(text) <- "UTF-8"
+  text
+}
+

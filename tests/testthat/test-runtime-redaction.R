@@ -41,6 +41,22 @@ test_that("raw diagnostic headers redact credential-bearing lines", {
   expect_match(redacted, "set-cookie: [REDACTED]", fixed = TRUE)
 })
 
+test_that("raw diagnostic redaction preserves UTF-8 provider evidence", {
+  source <- charToRaw(enc2utf8(paste0(
+    '{"token":"\u2581\u662f","reasoning":"\u5224\u65ad\u5b8c\u6210\u3002",',
+    '"Authorization":"Bearer provider-secret"}'
+  )))
+
+  redacted <- redact_llm_diagnostics(source)
+  text <- decode_utf8_raw_text(redacted)
+
+  expect_identical(Encoding(text), "UTF-8")
+  expect_match(text, "\u2581\u662f", fixed = TRUE)
+  expect_match(text, "\u5224\u65ad\u5b8c\u6210\u3002", fixed = TRUE)
+  expect_false(grepl("provider-secret", text, fixed = TRUE))
+  expect_match(text, "Bearer [REDACTED]", fixed = TRUE)
+})
+
 test_that("debug output is redacted while transport input remains intact", {
   headers <- list(
     Authorization = "Bearer fake-header-secret",

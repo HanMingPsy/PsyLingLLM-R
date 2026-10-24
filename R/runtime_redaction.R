@@ -28,7 +28,9 @@ redact_llm_diagnostics <- function(value, field_name = NULL) {
 
   if (is.raw(value)) {
     return(tryCatch(
-      charToRaw(redact_diagnostic_text(rawToChar(value))),
+      charToRaw(enc2utf8(redact_diagnostic_text(
+        decode_utf8_raw_text(value)
+      ))),
       error = function(error) charToRaw("[REDACTED BINARY]")
     ))
   }
