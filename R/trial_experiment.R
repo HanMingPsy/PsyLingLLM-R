@@ -21,8 +21,10 @@
 #' - When \code{return_raw = TRUE}, the redacted raw request and provider
 #'   response returned by \code{llm_caller()} are retained in a list-column
 #'   named \code{raw}.
-#' - The \code{raw} list-column is returned in memory but is excluded from the
-#'   ordinary CSV or Excel result file.
+#' - The \code{raw} list-column is returned in memory and excluded from CSV.
+#'   For Excel output, the ordinary result remains in \code{Results} and a
+#'   redacted, path-based projection is written to \code{Raw}. The in-memory
+#'   object remains the lossless source for \code{saveRDS()}.
 #'
 #' @param model_key Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").
 #' @param generation_interface Character(1). Interface name; defaults to "chat".
@@ -45,8 +47,8 @@
 #' @param output_path Character or NULL. Where to save results/logs (compatible with prior schema).
 #' @param overwrite Logical(1). Overwrite existing output files.
 #' @param return_raw Logical(1). Retain the redacted raw request/response in an
-#'   in-memory list-column named \code{raw}. Raw objects are not written to the
-#'   ordinary result file.
+#'   in-memory list-column named \code{raw}. CSV excludes nested RAW; Excel
+#'   adds a tabular \code{Raw} sheet without changing the \code{Results} sheet.
 #'
 #' @return A data.frame/tibble with PsyLingLLM schema columns:
 #'   Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if stream),
@@ -266,13 +268,8 @@ trial_experiment <- function(
   update_progress_bar(n_trials, n_trials, start_time, bar_width, model_key)
   finish_progress_bar()
 
-  data_to_save <- data
-  if ("raw" %in% names(data_to_save)) {
-    data_to_save$raw <- NULL
-  }
-
   save_experiment_results(
-    data_to_save,
+    data,
     output_path = result_file,
     model = model_key,
     overwrite = overwrite,

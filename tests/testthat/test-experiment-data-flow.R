@@ -77,6 +77,7 @@ test_that("conversation experiments preserve ordered data and history", {
   expect_length(calls[[2L]]$assistant_content, 2L)
   expect_match(calls[[1L]]$material, "First material", fixed = TRUE)
   expect_match(calls[[2L]]$material, "Second material", fixed = TRUE)
+  expect_false("raw" %in% names(result))
 })
 
 test_that("factorial experiments preserve generated conditions and stimuli", {
@@ -118,4 +119,69 @@ test_that("factorial experiments preserve generated conditions and stimuli", {
   )
   expect_identical(result$TrialStatus, c("SUCCESS", "SUCCESS"))
   expect_true(all(!is.na(result$RequestID)))
+  expect_false("raw" %in% names(result))
+})
+
+test_that("conversation and factorial experiments retain ordered RAW records", {
+  output_directory <- withr::local_tempdir()
+  mock_experiment_side_effects(output_directory)
+  call_index <- 0L
+
+  local_mocked_bindings(
+    llm_caller = function(material, return_raw, ...) {
+      call_index <<- call_index + 1L
+      response <- make_experiment_success(
+        paste0("answer-", call_index),
+        paste0("request-", call_index)
+      )
+      if (isTRUE(return_raw)) {
+        response$raw <- list(
+          request = list(body = list(material = material)),
+          response = list(parsed = list(id = paste0("request-", call_index)))
+        )
+      }
+      response
+    },
+    .package = "PsyLingLLM"
+  )
+
+  conversation <- conversation_experiment(
+    model_key = "fixture-model",
+    api_key = "not-a-real-key",
+    data = data.frame(
+      ConversationId = c("C1", "C1"),
+      Turn = 1:2,
+      Material = c("First", "Second")
+    ),
+    delay = 0,
+    output_path = output_directory,
+    return_raw = TRUE
+  )
+  factorial <- factorial_trial_experiment(
+    model_key = "fixture-model",
+    api_key = "not-a-real-key",
+    data = data.frame(Material = "Condition {LEVEL}"),
+    factors = list(Level = c("A", "B")),
+    fill_method = function(condition, material, word) {
+      sub("{LEVEL}", condition$Level, material, fixed = TRUE)
+    },
+    delay = 0,
+    output_path = output_directory,
+    return_raw = TRUE
+  )
+
+  expect_length(conversation$raw, nrow(conversation))
+  expect_identical(
+    vapply(conversation$raw, function(x) x$response$parsed$id, character(1)),
+    c("request-1", "request-2")
+  )
+  expect_length(factorial$raw, nrow(factorial))
+  expect_identical(
+    vapply(factorial$raw, function(x) x$response$parsed$id, character(1)),
+    c("request-3", "request-4")
+  )
+  expect_false(any(c("LogProbY", "LogProbN", "YNLogOdds") %in%
+    names(conversation)))
+  expect_false(any(c("LogProbY", "LogProbN", "YNLogOdds") %in%
+    names(factorial)))
 })

@@ -67,14 +67,17 @@
 #' @param output_path Character or \code{NULL}. Path to save results/logs
 #'   (same behavior as \code{trial_experiment()}).
 #' @param overwrite Logical(1). Overwrite existing outputs.
-#' @param return_raw Logical(1). Include raw request/response for debugging.
+#' @param return_raw Logical(1). Retain one redacted raw request/response per
+#'   trial in an in-memory \code{raw} list-column. CSV excludes nested RAW;
+#'   Excel adds a tabular \code{Raw} sheet.
 #'
 #' @return A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:
 #'   \code{Response}, \code{Think}, \code{ModelName}, \code{TotalResponseTime},
 #'   \code{FirstTokenLatency}, \code{PromptTokens}, \code{CompletionTokens},
 #'   \code{TrialStatus}, \code{ResponseStatus}, \code{Streaming},
 #'   \code{Timestamp}, \code{RequestID}, plus \code{Stimulus} and
-#'   \code{ConditionLabel}.
+#'   \code{ConditionLabel}. When \code{return_raw = TRUE}, the result also
+#'   contains one RAW object per row.
 #'
 #' @export
 factorial_trial_experiment <- function(
@@ -179,6 +182,9 @@ factorial_trial_experiment <- function(
   trials$Streaming <- NA
   trials$Timestamp <- NA_character_
   trials$RequestID <- NA_character_
+  if (isTRUE(return_raw)) {
+    trials$raw <- vector("list", n_trials)
+  }
 
   # ---- Log start ------------------------------------------------------------
   write_experiment_log(
@@ -222,6 +228,10 @@ factorial_trial_experiment <- function(
       error = function(e) handle_llm_error(run_id = i, err = e, category = "network")
     )
 
+    if (isTRUE(return_raw)) {
+      trials$raw[i] <- list(parsed_resp$raw %||% NULL)
+    }
+
     t1 <- Sys.time()
     result_status <- classify_llm_result(parsed_resp)
     status_num <- result_status$provider_status
@@ -259,7 +269,7 @@ factorial_trial_experiment <- function(
       trials$PromptTokens[i] <- NA_integer_
       trials$CompletionTokens[i] <- NA_integer_
       trials$TrialStatus[i] <- "ERROR"
-      trials$ResponseStatus[i] <- "ERROR"
+      trials$ResponseStatus[i] <- result_status$response_status
       trials$Streaming[i] <- parsed_resp$streaming %||% isTRUE(stream)
       trials$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       trials$RequestID[i] <- NA_character_

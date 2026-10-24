@@ -36,8 +36,15 @@ the `results` subdirectory of the package user-data directory returned by
 \code{tools::R_user_dir("PsyLingLLM", "data")}.
 }
 \details{
-Columns that are entirely NA (e.g., FirstTokenLatency when streaming = FALSE)
-will be removed automatically.
+Package-defined result columns are retained even when every value is
+missing, so the saved result schema remains stable across streaming and
+non-streaming runs. Other entirely empty columns are removed.
+
+If \code{data} contains a \code{raw} list-column, CSV output excludes that
+nested column. Excel output writes the ordinary table to \code{Results} and
+a redacted, path-based tabular projection to \code{Raw}. Large projections
+are continued in \code{Raw_2}, \code{Raw_3}, and so on. The in-memory RAW
+objects are not modified; use \code{saveRDS()} for lossless persistence.
 Parent directories are created when needed. Data are written to a temporary
 file before the destination is replaced, and write failures raise an error
 rather than returning a path to a missing file.

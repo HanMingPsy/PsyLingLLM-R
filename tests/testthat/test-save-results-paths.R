@@ -56,3 +56,84 @@ test_that("result write failures are errors and do not report a false path", {
   )
   expect_false(file.exists(output_path))
 })
+
+test_that("flat result files retain standard columns and exclude RAW", {
+  output_directory <- withr::local_tempdir()
+  result <- data.frame(
+    Response = "Y",
+    FirstTokenLatency = NA_real_,
+    RequestID = "request-1",
+    stringsAsFactors = FALSE
+  )
+  result$raw <- list(list(
+    request = list(headers = list(Authorization = "Bearer secret-value")),
+    response = list(parsed = list(answer = "Y"))
+  ))
+  output_path <- file.path(output_directory, "results.csv")
+
+  suppressMessages(save_experiment_results(result, output_path))
+  restored <- readr::read_csv(output_path, show_col_types = FALSE)
+
+  expect_true("FirstTokenLatency" %in% names(restored))
+  expect_false("raw" %in% names(restored))
+})
+
+test_that("Excel output adds a redacted path-based RAW sheet", {
+  skip_if_not_installed("readxl")
+  output_directory <- withr::local_tempdir()
+  result <- data.frame(
+    Response = c("Y", "N"),
+    FirstTokenLatency = c(NA_real_, NA_real_),
+    RequestID = c("request-1", NA_character_),
+    stringsAsFactors = FALSE
+  )
+  original_raw <- list(
+    list(
+      request = list(headers = list(Authorization = "Bearer secret-value")),
+      response = list(parsed = list(
+        usage = list(reasoning_tokens = 4L),
+        logprobs = list(content = list(list(token = "Y", logprob = -0.1)))
+      ))
+    ),
+    NULL
+  )
+  result$raw <- original_raw
+  output_path <- file.path(output_directory, "results.xlsx")
+
+  suppressMessages(save_experiment_results(result, output_path))
+
+  expect_identical(readxl::excel_sheets(output_path), c("Results", "Raw"))
+  flat <- readxl::read_xlsx(output_path, sheet = "Results")
+  raw <- readxl::read_xlsx(output_path, sheet = "Raw")
+  expect_true("FirstTokenLatency" %in% names(flat))
+  expect_false("raw" %in% names(flat))
+  expect_true(all(c(
+    "ResultRow", "RequestID", "FieldPath", "ValueType",
+    "ValueEncoding", "ValueChunk", "ValueChunks", "Value"
+  ) %in% names(raw)))
+  expect_true(any(raw$FieldPath == "$response$parsed$usage$reasoning_tokens"))
+  expect_true(any(raw$FieldPath == "$response$parsed$logprobs$content[1]$token"))
+  expect_true(any(raw$Value == '"[REDACTED]"', na.rm = TRUE))
+  expect_false(any(grepl("secret-value", raw$Value, fixed = TRUE), na.rm = TRUE))
+  expect_identical(result$raw, original_raw)
+})
+
+test_that("large RAW projections continue onto numbered sheets", {
+  raw <- data.frame(
+    ResultRow = 1:5,
+    RequestID = NA_character_,
+    FieldPath = paste0("$value[", 1:5, "]"),
+    ValueType = "integer",
+    ValueEncoding = "scalar",
+    ValueChunk = 1L,
+    ValueChunks = 1L,
+    Value = as.character(1:5),
+    stringsAsFactors = FALSE
+  )
+
+  sheets <- PsyLingLLM:::split_raw_sheets(raw, max_excel_rows = 3L)
+
+  expect_identical(names(sheets), c("Raw", "Raw_2", "Raw_3"))
+  expect_identical(unname(vapply(sheets, nrow, integer(1))), c(2L, 2L, 1L))
+  expect_identical(do.call(rbind, unname(sheets))$Value, raw$Value)
+})

@@ -40,7 +40,8 @@ multi_model_experiment(
 
 \item{overwrite}{Logical(1). Overwrite per-model outputs.}
 
-\item{return_raw}{Logical(1). Include raw request/response in per-call results.}
+\item{return_raw}{Logical(1). Retain redacted RAW records in each model's
+returned rows. Combined CSV output excludes the nested \code{raw} column.}
 
 \item{system_content}{Optional character(1). Fallback system message if model row lacks one.}
 
@@ -62,8 +63,10 @@ combined results CSV here. Parent directories are created; write failures
 raise an error.}
 }
 \value{
-A data.frame/tibble concatenating all per-model results. Each chunk retains the
-        standard PsyLingLLM schema columns and is annotated with `ModelKey` (alias of ModelName).
+A data.frame/tibble concatenating all per-model results. Each chunk
+  retains the standard PsyLingLLM schema columns and is annotated with
+  \code{ModelKey} (alias of \code{ModelName}). When
+  \code{return_raw = TRUE}, the result retains one RAW object per row.
 }
 \description{
 Executes the same trial table on multiple models. Each row of `models`

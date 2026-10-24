@@ -43,3 +43,34 @@ test_that("combined multi-model results create their parent directory", {
   expect_true(file.exists(output_path))
   expect_equal(nrow(result), 0L)
 })
+
+test_that("combined multi-model CSV excludes nested RAW records", {
+  output_path <- file.path(withr::local_tempdir(), "combined.csv")
+  local_mocked_bindings(
+    trial_experiment = function(model_key, return_raw, ...) {
+      result <- data.frame(
+        Response = "ok",
+        ModelName = model_key,
+        RequestID = paste0("request-", model_key),
+        stringsAsFactors = FALSE
+      )
+      if (isTRUE(return_raw)) {
+        result$raw <- list(list(response = list(parsed = list(answer = "ok"))))
+      }
+      result
+    },
+    .package = "PsyLingLLM"
+  )
+
+  result <- suppressMessages(multi_model_experiment(
+    models = data.frame(model_key = c("model-a", "model-b")),
+    data = data.frame(Material = "fixture"),
+    return_raw = TRUE,
+    combined_output_path = output_path
+  ))
+  restored <- readr::read_csv(output_path, show_col_types = FALSE)
+
+  expect_true("raw" %in% names(result))
+  expect_length(result$raw, nrow(result))
+  expect_false("raw" %in% names(restored))
+})

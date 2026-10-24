@@ -49,14 +49,17 @@
 #' @param delay Numeric(1). Delay (seconds) between turns.
 #' @param output_path Character or NULL. Where to save results/logs.
 #' @param overwrite Logical(1). Overwrite existing outputs.
-#' @param return_raw Logical(1). Include raw request/response for debugging.
+#' @param return_raw Logical(1). Retain one redacted raw request/response per
+#'   turn in an in-memory \code{raw} list-column. CSV excludes nested RAW;
+#'   Excel adds a tabular \code{Raw} sheet.
 #' @importFrom stats setNames
 
 #'
 #' @return A data.frame/tibble with PsyLingLLM schema columns per turn:
 #'   Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if present),
 #'   PromptTokens, CompletionTokens, TrialStatus, ResponseStatus, Streaming,
-#'   Timestamp, RequestID, plus HistoryMode and HistoryUsedMsgs.
+#'   Timestamp, RequestID, plus HistoryMode and HistoryUsedMsgs. When
+#'   \code{return_raw = TRUE}, the result also contains one RAW object per row.
 #' @export
 conversation_experiment <- function(
     model_key,
@@ -183,6 +186,9 @@ conversation_experiment <- function(
   data$Timestamp <- NA_character_
   data$RequestID <- NA_character_
   data$HistoryUsedMsgs <- NA_integer_
+  if (isTRUE(return_raw)) {
+    data$raw <- vector("list", nrow(data))
+  }
 
   # ---- Log start ----
   write_experiment_log(
@@ -242,6 +248,10 @@ conversation_experiment <- function(
       error = function(e) handle_llm_error(run_id = ri, err = e, category = "network")
     )
 
+    if (isTRUE(return_raw)) {
+      data$raw[ri] <- list(llm_resp$raw %||% NULL)
+    }
+
     t1 <- Sys.time()
     result_status <- classify_llm_result(llm_resp)
     status_num <- result_status$provider_status
@@ -286,7 +296,7 @@ conversation_experiment <- function(
       data$PromptTokens[ri] <- NA_integer_
       data$CompletionTokens[ri] <- NA_integer_
       data$TrialStatus[ri] <- "ERROR"
-      data$ResponseStatus[ri] <- "ERROR"
+      data$ResponseStatus[ri] <- result_status$response_status
       data$Streaming[ri] <- llm_resp$streaming %||% isTRUE(stream)
       data$Timestamp[ri] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       data$RequestID[ri] <- NA_character_

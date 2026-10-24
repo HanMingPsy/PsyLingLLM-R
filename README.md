@@ -513,7 +513,7 @@ directory.
 | `delay` | Pause in seconds after each request |
 | `output_path` | Result filename or directory; `NULL` uses the timestamped user results directory |
 | `overwrite` | Whether an existing explicit result file may be replaced |
-| `return_raw` | Requests raw runtime diagnostics from `llm_caller()`; experiment tables keep the standardized row schema, so use a direct caller request when the raw object itself must be inspected |
+| `return_raw` | Retains one redacted provider RAW object per result row. CSV remains flat; XLSX adds a path-based `Raw` sheet; use `saveRDS()` for lossless nested evidence |
 
 `trial_experiment()` and `factorial_trial_experiment()` default `optionals` to
 `NULL`, so they do not inject Registry optional defaults. The conversation
@@ -1470,8 +1470,35 @@ Experiment functions convert these outcomes into `TrialStatus = "ERROR"` or
 #### Raw data and credentials
 
 Runtime diagnostics redact secret-like fields, but `return_raw = TRUE` may
-still contain submitted research material and provider-generated content. Use
-it only for short-lived debugging and do not publish raw output without review.
+still contain submitted research material and provider-generated content.
+`trial_experiment()`, `factorial_trial_experiment()`,
+`conversation_experiment()`, and `adaptive_feedback_experiment()` retain these
+records in a `raw` list-column with one element per result row.
+
+```r
+result <- trial_experiment(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = data.frame(Material = "Reply with Y or N."),
+  output_path = "experiment.xlsx",
+  return_raw = TRUE
+)
+
+stopifnot(length(result$raw) == nrow(result))
+saveRDS(result, "experiment-with-raw.rds")
+```
+
+CSV output never serializes the nested `raw` column. XLSX output keeps the
+ordinary result in `Results` and writes a redacted field-path projection to
+`Raw` (continued as `Raw_2`, and so on, if necessary). The spreadsheet view is
+for inspection; the RDS object is the lossless archival form. Standard result
+columns such as `FirstTokenLatency` remain present with `NA` when unavailable.
+
+The package does not automatically request provider log probabilities and does
+not create task-specific measures such as `LogProbY`, `LogProbN`, or
+`YNLogOdds`. Request provider-native fields explicitly through `optionals` or
+`...`, then derive task-specific contrasts from the preserved evidence using a
+documented analysis rule. Do not publish RAW output without review.
 
 #### Reproducibility record
 

@@ -64,8 +64,8 @@ parameters.}
 \item{overwrite}{Logical(1). Overwrite existing output files.}
 
 \item{return_raw}{Logical(1). Retain the redacted raw request/response in an
-in-memory list-column named \code{raw}. Raw objects are not written to the
-ordinary result file.}
+in-memory list-column named \code{raw}. CSV excludes nested RAW; Excel
+adds a tabular \code{Raw} sheet without changing the \code{Results} sheet.}
 }
 \value{
 A data.frame/tibble with PsyLingLLM schema columns:
@@ -97,6 +97,8 @@ Raw response handling:
 - When \code{return_raw = TRUE}, the redacted raw request and provider
   response returned by \code{llm_caller()} are retained in a list-column
   named \code{raw}.
-- The \code{raw} list-column is returned in memory but is excluded from the
-  ordinary CSV or Excel result file.
+- The \code{raw} list-column is returned in memory and excluded from CSV.
+  For Excel output, the ordinary result remains in \code{Results} and a
+  redacted, path-based projection is written to \code{Raw}. The in-memory
+  object remains the lossless source for \code{saveRDS()}.
 }

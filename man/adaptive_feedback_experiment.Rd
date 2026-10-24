@@ -111,7 +111,9 @@ and \code{meta} must be JSON-serializable.}
 
 \item{overwrite}{Logical(1). Overwrite outputs.}
 
-\item{return_raw}{Logical(1). Include raw request/response.}
+\item{return_raw}{Logical(1). Retain one redacted raw request/response per
+result row in an in-memory \code{raw} list-column. CSV excludes nested
+RAW; Excel adds a tabular \code{Raw} sheet.}
 }
 \value{
 Invisibly, a tibble with the PsyLingLLM result schema for each
@@ -119,7 +121,8 @@ Invisibly, a tibble with the PsyLingLLM result schema for each
   \code{FeedbackStatus}, \code{FeedbackApplied},
   \code{FeedbackNextPrompt}, and \code{FeedbackMessage} fields make
   callback decisions auditable. \code{ResponseStatus} distinguishes empty
-  final answers without changing \code{TrialStatus} compatibility.
+  final answers without changing \code{TrialStatus} compatibility. When
+  \code{return_raw = TRUE}, the result also contains one RAW object per row.
 }
 \description{
 Runs multi-turn conversations identified by \code{ConversationId} and ordered

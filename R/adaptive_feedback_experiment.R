@@ -50,7 +50,9 @@
 #' @param delay Numeric(1). Seconds between turns.
 #' @param output_path Character or NULL. Where to save results/logs.
 #' @param overwrite Logical(1). Overwrite outputs.
-#' @param return_raw Logical(1). Include raw request/response.
+#' @param return_raw Logical(1). Retain one redacted raw request/response per
+#'   result row in an in-memory \code{raw} list-column. CSV excludes nested
+#'   RAW; Excel adds a tabular \code{Raw} sheet.
 #' @importFrom stats setNames
 #'
 #' @return Invisibly, a tibble with the PsyLingLLM result schema for each
@@ -58,7 +60,8 @@
 #'   \code{FeedbackStatus}, \code{FeedbackApplied},
 #'   \code{FeedbackNextPrompt}, and \code{FeedbackMessage} fields make
 #'   callback decisions auditable. \code{ResponseStatus} distinguishes empty
-#'   final answers without changing \code{TrialStatus} compatibility.
+#'   final answers without changing \code{TrialStatus} compatibility. When
+#'   \code{return_raw = TRUE}, the result also contains one RAW object per row.
 #'
 #' @details \code{conversation_experiment_with_feedback()} is retained as a
 #'   compatibility alias with the same arguments and behavior.
@@ -203,6 +206,9 @@ adaptive_feedback_experiment <- function(
   data$FeedbackMeta <- NA_character_
   data$FeedbackMessage <- NA_character_
   data$RequestMessages <- NA_character_
+  if (isTRUE(return_raw)) {
+    data$raw <- vector("list", nrow(data))
+  }
 
   # Log start
   write_experiment_log(
@@ -294,6 +300,10 @@ adaptive_feedback_experiment <- function(
       error = function(e) handle_llm_error(run_id = i, err = e, category = "network")
     )
 
+    if (isTRUE(return_raw)) {
+      data$raw[i] <- list(llm_resp$raw %||% NULL)
+    }
+
     t1 <- Sys.time()
     executed <- executed + 1L
     exec_count_by_cid[[cid]] <- exec_count_by_cid[[cid]] + 1L
@@ -348,7 +358,7 @@ adaptive_feedback_experiment <- function(
       data$PromptTokens[i] <- NA_integer_
       data$CompletionTokens[i] <- NA_integer_
       data$TrialStatus[i] <- "ERROR"
-      data$ResponseStatus[i] <- "ERROR"
+      data$ResponseStatus[i] <- result_status$response_status
       data$Streaming[i] <- llm_resp$streaming %||% isTRUE(stream)
       data$Timestamp[i] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
       data$RequestID[i] <- NA_character_
@@ -476,6 +486,9 @@ adaptive_feedback_experiment <- function(
             "RequestMessages"
           )
           new_row[wipe] <- NA
+          if (isTRUE(return_raw)) {
+            new_row$raw <- list(NULL)
+          }
 
           top <- data[1:i, , drop = FALSE]
           bottom <- if (i < nrow(data)) data[(i + 1):nrow(data), , drop = FALSE] else data[0, , drop = FALSE]

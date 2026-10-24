@@ -40,7 +40,8 @@
 #' @param delay Numeric(1). Delay (seconds) between trials for every model.
 #' @param timeout Integer(1). Per-request timeout in seconds.
 #' @param overwrite Logical(1). Overwrite per-model outputs.
-#' @param return_raw Logical(1). Include raw request/response in per-call results.
+#' @param return_raw Logical(1). Retain redacted RAW records in each model's
+#'   returned rows. Combined CSV output excludes the nested \code{raw} column.
 #' @param system_content Optional character(1). Fallback system message if model row lacks one.
 #' @param assistant_content Optional static few-shot seed: character vector or a list of message objects
 #'   (`list(role=..., content=...)`). These appear before rolling history and are preserved as-is.
@@ -54,8 +55,10 @@
 #'   combined results CSV here. Parent directories are created; write failures
 #'   raise an error.
 #'
-#' @return A data.frame/tibble concatenating all per-model results. Each chunk retains the
-#'         standard PsyLingLLM schema columns and is annotated with `ModelKey` (alias of ModelName).
+#' @return A data.frame/tibble concatenating all per-model results. Each chunk
+#'   retains the standard PsyLingLLM schema columns and is annotated with
+#'   \code{ModelKey} (alias of \code{ModelName}). When
+#'   \code{return_raw = TRUE}, the result retains one RAW object per row.
 #' @export
 multi_model_experiment <- function(
     models,
@@ -221,24 +224,13 @@ multi_model_experiment <- function(
 
   # optional combined CSV -----------------------------------------------------
   if (nz_chr(combined_output_path)) {
-    ensure_psylingllm_directory(
-      dirname(combined_output_path),
-      "combined result directory"
+    save_experiment_results(
+      combined,
+      output_path = combined_output_path,
+      model = "multi-model",
+      overwrite = TRUE,
+      auto_naming = FALSE
     )
-    temporary <- tempfile(
-      pattern = ".combined-results-",
-      tmpdir = dirname(combined_output_path),
-      fileext = ".csv"
-    )
-    on.exit(if (file.exists(temporary)) unlink(temporary, force = TRUE),
-            add = TRUE)
-    readr::write_csv(combined, temporary)
-    replace_file_safely(
-      temporary,
-      combined_output_path,
-      overwrite = TRUE
-    )
-    message("[PsyLingLLM] Combined results saved: ", combined_output_path)
   }
 
   combined

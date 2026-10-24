@@ -39,6 +39,16 @@ mock_adaptive_feedback_runtime <- function(.local_envir = parent.frame()) {
           id = paste0("adaptive-request-", index)
         ),
         streaming = FALSE,
+        raw = if (isTRUE(arguments$return_raw)) {
+          list(
+            request = list(body = list(material = arguments$material)),
+            response = list(parsed = list(
+              id = paste0("adaptive-request-", index)
+            ))
+          )
+        } else {
+          NULL
+        },
         error = NULL
       )
     },
@@ -95,6 +105,7 @@ test_that("adaptive feedback replaces the next planned prompt", {
   expect_identical(result$RequestID, c(
     "adaptive-request-1", "adaptive-request-2"
   ))
+  expect_false("raw" %in% names(result))
 })
 
 test_that("adaptive feedback inserts bounded dynamic turns", {
@@ -160,6 +171,38 @@ test_that("adaptive feedback inserts bounded dynamic turns", {
     function(arguments) is.null(arguments$optionals),
     logical(1)
   )))
+})
+
+test_that("adaptive feedback keeps RAW aligned after dynamic insertion", {
+  state <- mock_adaptive_feedback_runtime()
+  feedback <- function(response, row, context) {
+    if (context$turn < 3L) {
+      list(next_prompt = paste("Dynamic prompt", context$turn + 1L))
+    } else {
+      NULL
+    }
+  }
+
+  result <- adaptive_feedback_experiment(
+    model_key = "fixture-model",
+    api_key = "not-a-real-key",
+    data = data.frame(Material = "Starting material"),
+    feedback_fn = feedback,
+    apply_mode = "insert_dynamic",
+    max_turns = 3L,
+    delay = 0,
+    output_path = tempdir(),
+    return_raw = TRUE
+  )
+
+  expect_length(state$calls, 3L)
+  expect_length(result$raw, nrow(result))
+  expect_identical(
+    vapply(result$raw, function(x) x$response$parsed$id, character(1)),
+    paste0("adaptive-request-", 1:3)
+  )
+  expect_false(any(c("LogProbY", "LogProbN", "YNLogOdds") %in%
+    names(result)))
 })
 
 test_that("the legacy feedback name remains an exact compatibility alias", {

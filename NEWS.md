@@ -29,3 +29,13 @@
 - Hardened Registry and result persistence so malformed Registry files are
   preserved, v1 registration cannot corrupt v2 bundles, parent directories are
   created explicitly, and failed writes no longer report false success.
+- Restored one-to-one RAW evidence retention across trial, factorial,
+  conversation, adaptive-feedback, and multi-model experiment results. CSV
+  output remains flat, XLSX output can include a redacted path-based RAW view,
+  and complete nested results remain compatible with `saveRDS()`.
+- Added a narrow, auditable recovery path for otherwise valid provider JSON
+  containing unescaped control bytes inside strings. Original response bytes
+  remain available in RAW diagnostics; other malformed JSON remains a
+  structured parser error.
+- Kept standard result columns present when their values are unavailable so
+  streaming and non-streaming result files retain a stable tabular schema.

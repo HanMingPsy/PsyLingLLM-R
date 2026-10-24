@@ -82,7 +82,9 @@ otherwise forces streaming/non-streaming.}
 
 \item{overwrite}{Logical(1). Overwrite existing outputs.}
 
-\item{return_raw}{Logical(1). Include raw request/response for debugging.}
+\item{return_raw}{Logical(1). Retain one redacted raw request/response per
+trial in an in-memory \code{raw} list-column. CSV excludes nested RAW;
+Excel adds a tabular \code{Raw} sheet.}
 }
 \value{
 A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:
@@ -90,7 +92,8 @@ A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:
   \code{FirstTokenLatency}, \code{PromptTokens}, \code{CompletionTokens},
   \code{TrialStatus}, \code{ResponseStatus}, \code{Streaming},
   \code{Timestamp}, \code{RequestID}, plus \code{Stimulus} and
-  \code{ConditionLabel}.
+  \code{ConditionLabel}. When \code{return_raw = TRUE}, the result also
+  contains one RAW object per row.
 }
 \description{
 Builds a factorial trial list (carrier sentences × factor levels × optional CW),
