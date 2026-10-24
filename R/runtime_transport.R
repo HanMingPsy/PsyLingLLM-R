@@ -124,6 +124,7 @@ normalize_llm_transport_response <- function(response, transport_id,
       raw_body = response$raw_body %||% NULL,
       text = response$text %||% NULL,
       parsed = response$parsed %||% NULL,
+      parse_recovery = response$parse_recovery %||% NULL,
       frames = response$raw_lines %||% NULL,
       events = response$raw_json %||% list(),
       timing = list(
@@ -195,7 +196,8 @@ nonempty_transport_text <- function(value) {
 validate_llm_transport_response <- function(response) {
   required <- c(
     "transport_id", "status", "headers", "raw_body", "text", "parsed",
-    "frames", "events", "timing", "error", "request_payload", "legacy"
+    "parse_recovery", "frames", "events", "timing", "error",
+    "request_payload", "legacy"
   )
   valid <- is.list(response) && identical(names(response), required) &&
     is.character(response$transport_id) &&
@@ -319,20 +321,127 @@ new_sse_json_collector <- function(clock = Sys.time) {
   list(feed = feed, finish = finish, snapshot = snapshot)
 }
 
-parse_transport_json_result <- function(text) {
-  tryCatch(
+parse_transport_json_result <- function(text, raw_body = NULL) {
+  strict <- tryCatch(
+    list(value = jsonlite::fromJSON(text, simplifyVector = FALSE), error = NULL),
+    error = function(error) {
+      list(value = NULL, error = conditionMessage(error))
+    }
+  )
+  if (is.null(strict$error)) {
+    return(c(strict, list(recovery = NULL)))
+  }
+
+  source <- raw_body %||% charToRaw(text)
+  repaired <- escape_unescaped_json_control_bytes(source)
+  if (!length(repaired$offsets)) {
+    return(c(strict, list(recovery = NULL)))
+  }
+
+  repaired_text <- rawToChar(repaired$body)
+  recovered <- tryCatch(
     list(
-      value = jsonlite::fromJSON(text, simplifyVector = FALSE),
+      value = jsonlite::fromJSON(repaired_text, simplifyVector = FALSE),
       error = NULL
     ),
     error = function(error) {
       list(value = NULL, error = conditionMessage(error))
     }
   )
+  if (!is.null(recovered$error)) {
+    return(c(strict, list(recovery = NULL)))
+  }
+
+  list(
+    value = recovered$value,
+    error = NULL,
+    recovery = list(
+      method = "escape_unescaped_json_control_bytes",
+      count = length(repaired$offsets),
+      byte_offsets = repaired$offsets,
+      original_error = strict$error
+    )
+  )
 }
 
 parse_transport_json <- function(text) {
   parse_transport_json_result(text)$value
+}
+
+escape_unescaped_json_control_bytes <- function(body) {
+  if (!is.raw(body)) {
+    llm_transport_abort(
+      "JSON recovery input must be a raw vector.",
+      transport_id = "http_json",
+      reason = "invalid_response"
+    )
+  }
+  if (!length(body)) {
+    return(list(body = body, offsets = integer()))
+  }
+
+  quote_byte <- as.raw(0x22)
+  escape_byte <- as.raw(0x5c)
+  in_string <- FALSE
+  escaped <- FALSE
+  offsets <- integer()
+
+  for (index in seq_along(body)) {
+    byte <- body[[index]]
+    if (!in_string) {
+      if (identical(byte, quote_byte)) {
+        in_string <- TRUE
+      }
+      next
+    }
+    if (escaped) {
+      escaped <- FALSE
+      next
+    }
+    if (identical(byte, escape_byte)) {
+      escaped <- TRUE
+      next
+    }
+    if (identical(byte, quote_byte)) {
+      in_string <- FALSE
+      next
+    }
+    if (as.integer(byte) < 0x20L) {
+      offsets <- c(offsets, index)
+    }
+  }
+
+  if (!length(offsets)) {
+    return(list(body = body, offsets = offsets))
+  }
+
+  pieces <- vector("list", length(offsets) * 2L + 1L)
+  piece_index <- 1L
+  start <- 1L
+  for (offset in offsets) {
+    pieces[[piece_index]] <- if (offset > start) {
+      body[start:(offset - 1L)]
+    } else {
+      raw()
+    }
+    piece_index <- piece_index + 1L
+    pieces[[piece_index]] <- charToRaw(sprintf(
+      "\\u%04X",
+      as.integer(body[[offset]])
+    ))
+    piece_index <- piece_index + 1L
+    start <- offset + 1L
+  }
+  pieces[[piece_index]] <- if (start <= length(body)) {
+    body[start:length(body)]
+  } else {
+    raw()
+  }
+
+  list(
+    body = as.raw(unlist(pieces, use.names = FALSE)),
+    offsets = as.integer(offsets)
+  )
 }
 
 # Compatibility executors retained for existing internal mocks.
@@ -371,7 +480,7 @@ do_nonstream_request <- function(url,
   }
 
   text <- rawToChar(response$content)
-  json_result <- parse_transport_json_result(text)
+  json_result <- parse_transport_json_result(text, raw_body = response$content)
   if (isTRUE(debug)) {
     cat("----- [DEBUG non-stream] headers -----\n")
     print(redact_llm_diagnostics(headers))
@@ -385,6 +494,7 @@ do_nonstream_request <- function(url,
     raw_body = response$content,
     text = text,
     parsed = json_result$value,
+    parse_recovery = json_result$recovery,
     parse_error = json_result$error,
     error = NULL
   )

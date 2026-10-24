@@ -137,7 +137,7 @@ test_that("llm_caller surfaces malformed non-stream provider JSON", {
     withr::local_tempdir(),
     "registry.yaml"
   )
-  body <- charToRaw('{"choices":[{"message":{"content":"Y\u0001"}}]}')
+  body <- charToRaw('{"choices":[{"message":{"content":"Y')
 
   local_mocked_bindings(
     get_registry_path = function() local_user_registry,
@@ -148,7 +148,7 @@ test_that("llm_caller surfaces malformed non-stream provider JSON", {
         raw_body = body,
         text = rawToChar(body),
         parsed = NULL,
-        parse_error = "lexical error: invalid character inside string",
+        parse_error = "parse error: premature EOF",
         error = NULL
       )
     },

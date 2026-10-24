@@ -66,6 +66,10 @@ normalize_llm_result <- function(config,
     text = legacy_response$text,
     parsed = legacy_response$parsed
   )
+  if (!is.null(transport_response$parse_recovery)) {
+    raw_nonstream$parse_recovery <- transport_response$parse_recovery
+    raw_nonstream$raw_body <- transport_response$raw_body
+  }
   if (is_transport_json_parse_failure(transport_response, FALSE)) {
     raw_nonstream$headers <- transport_response$headers
     raw_nonstream$raw_body <- transport_response$raw_body

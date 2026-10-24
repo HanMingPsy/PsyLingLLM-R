@@ -272,6 +272,62 @@ test_that("malformed provider JSON is an auditable parser failure", {
   expect_false(grepl("secret-value", rendered, fixed = TRUE))
 })
 
+test_that("recovered JSON remains auditable without replacing raw evidence", {
+  hex <- paste(
+    readLines(
+      test_path("fixtures", "openai-chat-malformed-control-byte.hex"),
+      warn = FALSE
+    ),
+    collapse = ""
+  )
+  pairs <- substring(
+    hex,
+    seq.int(1L, nchar(hex), by = 2L),
+    seq.int(2L, nchar(hex), by = 2L)
+  )
+  body <- as.raw(strtoi(pairs, base = 16L))
+  json_result <- parse_transport_json_result(
+    rawToChar(body),
+    raw_body = body
+  )
+  transport <- normalize_llm_transport_response(
+    list(
+      status = 200L,
+      raw_body = body,
+      text = rawToChar(body),
+      parsed = json_result$value,
+      parse_recovery = json_result$recovery,
+      error = NULL
+    ),
+    "http_json",
+    '{"model":"fixture-model"}'
+  )
+  parsed <- parse_llm_response(transport, "openai_chat")
+
+  result <- normalize_llm_result(
+    make_result_config(),
+    make_result_entry(),
+    make_result_request(),
+    transport,
+    parsed,
+    return_raw = TRUE
+  )
+
+  expect_identical(result$status, 200L)
+  expect_identical(result$response_status, "OK")
+  expect_identical(result$answer, "Y")
+  expect_identical(result$raw$response$non_stream$raw_body, body)
+  expect_identical(
+    result$raw$response$non_stream$parse_recovery$method,
+    "escape_unescaped_json_control_bytes"
+  )
+  expect_identical(
+    result$raw$response$non_stream$parsed$choices[[1L]]$logprobs$
+      content[[1L]]$top_logprobs[[1L]]$token,
+    "\u0001"
+  )
+})
+
 test_that("successful responses without a final answer are classified", {
   transport <- normalize_llm_transport_response(
     list(status = 200L, text = "{}", parsed = list(), error = NULL),
