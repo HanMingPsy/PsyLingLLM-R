@@ -17,16 +17,31 @@
 #' @return Character scalar alias (lowercase kebab-case).
 #'
 #' @examples
-#' make_alias("unsloth/gemma-3-4b-it")
-#' #> "gemma-it"
-#' make_alias("meta-llama/llama-3.1-70b-instruct-128k", keep_version = "major")
-#' #> "llama-3-instruct"
-#' make_alias("mistralai/Mixtral-8x7B-Instruct-v0.1")
-#' #> "mixtral-instruct"
-#' make_alias("meituan-longcat/LongCat-Flash-Thinking-FP8")
-#' #> "longcat-flash-thinking"
-#' make_alias("deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", keep_version = "none")
-#' #> "deepseek-r1-distill-qwen"
+#' stopifnot(
+#'   identical(make_alias("unsloth/gemma-3-4b-it"), "gemma-it"),
+#'   identical(
+#'     make_alias(
+#'       "meta-llama/llama-3.1-70b-instruct-128k",
+#'       keep_version = "major"
+#'     ),
+#'     "llama-3-instruct"
+#'   ),
+#'   identical(
+#'     make_alias("mistralai/Mixtral-8x7B-Instruct-v0.1"),
+#'     "mixtral-instruct"
+#'   ),
+#'   identical(
+#'     make_alias("meituan-longcat/LongCat-Flash-Thinking-FP8"),
+#'     "longcat-flash-thinking"
+#'   ),
+#'   identical(
+#'     make_alias(
+#'       "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+#'       keep_version = "none"
+#'     ),
+#'     "deepseek-r1-distill-qwen"
+#'   )
+#' )
 #' @export
 make_alias <- function(model_id, keep_version = c("none", "major", "major_minor", "full")) {
   keep_version <- match.arg(keep_version)

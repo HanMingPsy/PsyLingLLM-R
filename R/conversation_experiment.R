@@ -362,7 +362,7 @@ conversation_experiment <- function(
 
   # ---- Finalize & save ----
   update_progress_bar(nrow(data), nrow(data), start_time, bar_width, model_key)
-  cat("\n")
+  finish_progress_bar()
 
   save_experiment_results(
     data,

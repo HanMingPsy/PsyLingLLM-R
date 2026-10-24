@@ -9,6 +9,10 @@ ensure_registry_header(path = get_registry_path())
 \arguments{
 \item{path}{character(1) registry yaml path}
 }
+\value{
+Invisibly returns a character scalar containing `path` after
+  ensuring the directory and header exist.
+}
 \description{
 Creates the Registry directory and writes a file header if the Registry
 file does not exist yet or is empty.

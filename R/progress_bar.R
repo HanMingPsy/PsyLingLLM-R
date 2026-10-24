@@ -8,7 +8,10 @@
 #'
 #' @importFrom utils flush.console
 #'
-#' @return NULL (prints the progress bar directly to the console)
+#' @return Invisibly returns `NULL`. When progress output is enabled, the
+#'   function updates the progress bar as a console side effect.
+#' @details Progress is emitted as a message and can be suppressed with
+#'   [suppressMessages()].
 #' @export
 update_progress_bar <- function(current, total, start_time, bar_width = 40, model_name = "") {
   pct <- current / total
@@ -28,8 +31,24 @@ update_progress_bar <- function(current, total, start_time, bar_width = 40, mode
   eta_str <- sprintf("%02d:%02d", eta_min, eta_sec)
 
   line_width <- 120
-  cat(sprintf("\r%-*s", line_width, ""))
-  cat(sprintf("\r[%s] %3.0f%% Trial %d/%d - ETA: %s - %s",
-              bar, pct * 100, current, total, eta_str, model_name))
+  message(sprintf("\r%-*s", line_width, ""), appendLF = FALSE)
+  message(
+    sprintf(
+      "\r[%s] %3.0f%% Trial %d/%d - ETA: %s - %s",
+      bar,
+      pct * 100,
+      current,
+      total,
+      eta_str,
+      model_name
+    ),
+    appendLF = FALSE
+  )
   flush.console()
+  invisible(NULL)
+}
+
+finish_progress_bar <- function() {
+  message("")
+  invisible(NULL)
 }

@@ -1,6 +1,6 @@
 Package: PsyLingLLM
 Type: Package
-Title: Tools for Psycholinguistic Experiments with Large Language Models
+Title: Controlled Psycholinguistic Experiments with Large Language Models
 Version: 0.4.0
 Authors@R: person(
     given = "Han",
@@ -8,13 +8,15 @@ Authors@R: person(
     email = "hanmingpsy@gmail.com",
     role = c("aut", "cre")
   )
-Description: Provides tools for designing and running controlled
-    psycholinguistic, psychological, cognitive, and educational experiments
-    with large language models. Registry-based configuration separates models,
-    providers, and application programming interfaces so that compatible
-    services can share experimental designs. Functions support randomized and
-    factorial trials, multi-turn conversations, response and reasoning capture,
-    timing and token measurements, and structured result export.
+Description: Runs controlled psycholinguistic, psychological, cognitive, and
+    educational experiments with large language models. Registry-based
+    configuration separates models, providers, and application programming
+    interfaces so that compatible services can share experimental designs.
+    Functions support randomized and factorial trials, multi-turn conversations,
+    response and reasoning capture, timing and token measurements, and structured
+    result export. For methodological context on using language models as
+    experimental participants, see Dillion et al. (2023)
+    <doi:10.1016/j.tics.2023.04.008>.
 Depends: R (>= 4.0)
 Imports:
     curl,

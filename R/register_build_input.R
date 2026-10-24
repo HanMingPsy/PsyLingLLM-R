@@ -406,6 +406,8 @@ strip_optionals_from_body <- function(body,
 #' @param body list
 #' @param optional_params named list of candidates to inject
 #' @param whitelist character vector of allowed keys
+#' @return A list containing `body` plus allowed, non-`NULL` optional
+#'   parameters.
 #' @export
 inject_optional_params <- function(body, optional_params = NULL, whitelist = NULL) {
   if (is.null(optional_params) || !length(optional_params)) return(body)

@@ -16,8 +16,10 @@ logical(1)
 Robustly checks lists, vectors, raw, and scalars. Returns a single TRUE/FALSE.
 }
 \examples{
-has_nonempty_text("hi")         # TRUE
-has_nonempty_text(c("", "x"))   # TRUE
-has_nonempty_text(character())  # FALSE
-has_nonempty_text(NULL)         # FALSE
+stopifnot(
+  has_nonempty_text("hi"),
+  has_nonempty_text(c("", "x")),
+  !has_nonempty_text(character()),
+  !has_nonempty_text(NULL)
+)
 }

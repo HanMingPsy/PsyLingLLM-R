@@ -59,9 +59,13 @@ Model key conventions:
   (e.g., `"deepseek-chat@proxy"`).
 }
 \examples{
-\dontrun{
-  ent <- get_registry_entry("deepseek-chat", generation_interface = "chat")
-  ent$input$role_mapping$user
-  ent$output$respond_path
-}
+ent <- get_registry_entry(
+  "deepseek-chat",
+  generation_interface = "chat",
+  path = tempfile("missing-user-registry-")
+)
+stopifnot(
+  identical(ent$interface, "chat"),
+  identical(ent$input$role_mapping$user, "user")
+)
 }

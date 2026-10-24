@@ -14,6 +14,7 @@
 ^cran-comments\.md$
 ^inst/design/current-architecture-backup\.md$
 ^output$
+^research$
 ^tmp$
 ^.*\.Rcheck$
 ^.*\.tar\.gz$

@@ -24,8 +24,13 @@ update_progress_bar(
 \item{model_name}{Name of the model, for display purposes}
 }
 \value{
-NULL (prints the progress bar directly to the console)
+Invisibly returns `NULL`. When progress output is enabled, the
+  function updates the progress bar as a console side effect.
 }
 \description{
 Update progress bar for an experiment
+}
+\details{
+Progress is emitted as a message and can be suppressed with
+  [suppressMessages()].
 }

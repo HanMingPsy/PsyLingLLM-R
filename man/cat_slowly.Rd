@@ -15,6 +15,12 @@ cat_slowly(lines, delay = 0.3, final_delay = 0, prefix = "")
 
 \item{prefix}{Optional string printed before each line (e.g. ">>> ").}
 }
+\value{
+Invisibly returns `NULL` after emitting the requested lines.
+}
 \description{
 Print lines gradually with delay (console-safe)
+}
+\examples{
+suppressMessages(cat_slowly("Preview", delay = 0))
 }

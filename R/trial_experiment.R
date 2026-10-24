@@ -264,7 +264,7 @@ trial_experiment <- function(
 
   # ---- Finalize & save ------------------------------------------------------
   update_progress_bar(n_trials, n_trials, start_time, bar_width, model_key)
-  cat("\n")
+  finish_progress_bar()
 
   data_to_save <- data
   if ("raw" %in% names(data_to_save)) {

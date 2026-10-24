@@ -8,9 +8,13 @@ Numeric segments are treated as zero-based JSON indices}
 json_get_by_path(obj, path)
 }
 \arguments{
-\item{obj}{list}
+\item{obj}{A nested JSON-like list.}
 
-\item{path}{mixed path spec}
+\item{path}{A path specification accepted by [coerce_path_segments()].}
+}
+\value{
+The value stored at `path`, with its original class preserved, or
+  `NULL` when a named component is absent.
 }
 \description{
 Extract a value by path from a parsed JSON-like list

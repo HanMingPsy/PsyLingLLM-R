@@ -99,7 +99,7 @@
 #' \code{\link{get_registry_entry}},
 #' \code{\link{llm_caller}}
 #'
-#' # Example: OpenAI-compatible chat endpoint
+#' \strong{Example: OpenAI-compatible chat endpoint}
 #' \code{
 #' llm_register(
 #'   url      = "https://api.openai.com/v1/chat/completions",
@@ -117,11 +117,11 @@
 #'   content_value = "Hello from PsyLingLLM!",
 #'   generation_interface = "chat",
 #'   optional_defaults   = list(stream = TRUE, max_tokens = 512),
-#'   auto_register = FALSE   # preview only
+#'   auto_register = FALSE
 #' )
 #' }
 #'
-#' # Example: DeepSeek-style endpoint (adjust URL/model to your provider)
+#' \strong{Example: DeepSeek-style endpoint (adjust URL/model to your provider)}
 #' \code{
 #' llm_register(
 #'   url      = "https://api.deepseek.com/v1/chat/completions",
@@ -425,7 +425,6 @@ llm_register <- function(url,
     # Print CI-style preview *before* asking for registration confirmation
     message("\n\n[PsyLingLLM] Model Registration Preview\n\n")
     preview_lines <- format_registration_preview(entry)
-    # cat(paste(preview_lines, collapse = "\n"), "\n")
     cat_slowly(preview_lines, delay = 0.025, final_delay = 1)
 
     # Ask user for confirmation

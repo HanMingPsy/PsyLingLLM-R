@@ -180,8 +180,10 @@ infer_structure_from_placeholder <- function(body, placeholder = "${CONTENT}") {
 
 #' Extract a value by path from a parsed JSON-like list
 #' Numeric segments are treated as zero-based JSON indices
-#' @param obj list
-#' @param path mixed path spec
+#' @param obj A nested JSON-like list.
+#' @param path A path specification accepted by [coerce_path_segments()].
+#' @return The value stored at `path`, with its original class preserved, or
+#'   `NULL` when a named component is absent.
 #' @keywords internal
 #' @export
 json_get_by_path <- function(obj, path) {
@@ -204,7 +206,10 @@ json_get_by_path <- function(obj, path) {
 
 #' Safely coerce various path specs to segment vector
 #' Accepts: list("a","b"), c("a","b"), "a.b", 'list("a","b")'
-#' @param p mixed
+#' @param p A list, atomic vector, dotted string, or list-like character
+#'   specification.
+#' @return An atomic vector of path segments, or `character(0)` when `p`
+#'   cannot be converted.
 #' @keywords internal
 #' @export
 coerce_path_segments <- function(p) {

@@ -144,7 +144,7 @@ guarded with \code{\\dontrun{}} or environment checks.
 \code{\link{get_registry_entry}},
 \code{\link{llm_caller}}
 
-# Example: OpenAI-compatible chat endpoint
+\strong{Example: OpenAI-compatible chat endpoint}
 \code{
 llm_register(
   url      = "https://api.openai.com/v1/chat/completions",
@@ -162,11 +162,11 @@ llm_register(
   content_value = "Hello from PsyLingLLM!",
   generation_interface = "chat",
   optional_defaults   = list(stream = TRUE, max_tokens = 512),
-  auto_register = FALSE   # preview only
+  auto_register = FALSE
 )
 }
 
-# Example: DeepSeek-style endpoint (adjust URL/model to your provider)
+\strong{Example: DeepSeek-style endpoint (adjust URL/model to your provider)}
 \code{
 llm_register(
   url      = "https://api.deepseek.com/v1/chat/completions",

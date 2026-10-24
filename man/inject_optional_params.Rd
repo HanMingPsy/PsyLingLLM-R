@@ -13,6 +13,10 @@ inject_optional_params(body, optional_params = NULL, whitelist = NULL)
 
 \item{whitelist}{character vector of allowed keys}
 }
+\value{
+A list containing `body` plus allowed, non-`NULL` optional
+  parameters.
+}
 \description{
 Inject optional params into a body using a whitelist
 }

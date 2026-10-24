@@ -17,6 +17,11 @@ Returns the names of fields inside the `usage` object if present.
 Safely handles absent/unnamed/atomic cases and always returns a character vector.
 }
 \examples{
-# extract_usage_fields(list(usage = list(prompt_tokens=12, total_tokens=34)))
-# -> c("prompt_tokens","total_tokens")
+stopifnot(identical(
+  extract_usage_fields(list(usage = list(
+    prompt_tokens = 12,
+    total_tokens = 34
+  ))),
+  c("prompt_tokens", "total_tokens")
+))
 }

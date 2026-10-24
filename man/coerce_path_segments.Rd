@@ -8,7 +8,12 @@ Accepts: list("a","b"), c("a","b"), "a.b", 'list("a","b")'}
 coerce_path_segments(p)
 }
 \arguments{
-\item{p}{mixed}
+\item{p}{A list, atomic vector, dotted string, or list-like character
+specification.}
+}
+\value{
+An atomic vector of path segments, or `character(0)` when `p`
+  cannot be converted.
 }
 \description{
 Safely coerce various path specs to segment vector

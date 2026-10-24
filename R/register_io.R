@@ -115,6 +115,8 @@ get_legacy_registry_path <- function() {
 #' Creates the Registry directory and writes a file header if the Registry
 #' file does not exist yet or is empty.
 #' @param path character(1) registry yaml path
+#' @return Invisibly returns a character scalar containing `path` after
+#'   ensuring the directory and header exist.
 #' @export
 ensure_registry_header <- function(path = get_registry_path()) {
   ensure_psylingllm_directory(dirname(path), "Registry directory")

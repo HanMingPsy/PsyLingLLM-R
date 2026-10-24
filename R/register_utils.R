@@ -18,8 +18,13 @@ trim_excerpt <- function(x, n = 160) {
 #' @param ns_parsed A parsed JSON-like list (e.g., `res$non_stream$parsed`).
 #' @return A character vector of usage field names (possibly length 0).
 #' @examples
-#' # extract_usage_fields(list(usage = list(prompt_tokens=12, total_tokens=34)))
-#' # -> c("prompt_tokens","total_tokens")
+#' stopifnot(identical(
+#'   extract_usage_fields(list(usage = list(
+#'     prompt_tokens = 12,
+#'     total_tokens = 34
+#'   ))),
+#'   c("prompt_tokens", "total_tokens")
+#' ))
 #' @export
 extract_usage_fields <- function(ns_parsed) {
   if (is.null(ns_parsed)) return(character())
@@ -47,10 +52,12 @@ extract_usage_fields <- function(ns_parsed) {
 #' @param val Any R object (e.g., result of json_get_by_path()).
 #' @return logical(1)
 #' @examples
-#' has_nonempty_text("hi")         # TRUE
-#' has_nonempty_text(c("", "x"))   # TRUE
-#' has_nonempty_text(character())  # FALSE
-#' has_nonempty_text(NULL)         # FALSE
+#' stopifnot(
+#'   has_nonempty_text("hi"),
+#'   has_nonempty_text(c("", "x")),
+#'   !has_nonempty_text(character()),
+#'   !has_nonempty_text(NULL)
+#' )
 #' @export
 has_nonempty_text <- function(val) {
   if (is.null(val) || length(val) == 0) return(FALSE)
@@ -405,7 +412,10 @@ register_endpoint_offline <- function(model,
 
   # ---------------- Preview ----------------
   message("\n[PsyLingLLM] Model Registration Preview\n")
-  utils::str(entry, max.level = 4)
+  message(paste(
+    utils::capture.output(utils::str(entry, max.level = 4)),
+    collapse = "\n"
+  ))
 
   # ---------------- Confirm & write ----------------
   do_register <- if (isTRUE(auto_register)) TRUE else {
@@ -432,16 +442,18 @@ register_endpoint_offline <- function(model,
 #' @param delay Numeric, seconds to wait between each line (default 0.3).
 #' @param final_delay Numeric, optional delay after the last line.
 #' @param prefix Optional string printed before each line (e.g. ">>> ").
+#' @return Invisibly returns `NULL` after emitting the requested lines.
+#' @examples
+#' suppressMessages(cat_slowly("Preview", delay = 0))
 #' @export
 cat_slowly <- function(lines, delay = 0.3, final_delay = 0, prefix = "") {
-  if (length(lines) == 0) return(invisible())
+  if (length(lines) == 0) return(invisible(NULL))
   for (ln in lines) {
-    cat(prefix, ln, "\n", sep = "")
-    flush.console()
+    message(paste0(prefix, ln))
     Sys.sleep(delay)
   }
   if (final_delay > 0) Sys.sleep(final_delay)
-  invisible()
+  invisible(NULL)
 }
 
 #' Translate HTTP status code to human-readable meaning

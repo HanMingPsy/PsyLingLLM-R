@@ -42,11 +42,15 @@
 #'   \item{interfaces}{Character vector of available interfaces for this model.}
 #' }
 #' @examples
-#' \dontrun{
-#'   ent <- get_registry_entry("deepseek-chat", generation_interface = "chat")
-#'   ent$input$role_mapping$user
-#'   ent$output$respond_path
-#' }
+#' ent <- get_registry_entry(
+#'   "deepseek-chat",
+#'   generation_interface = "chat",
+#'   path = tempfile("missing-user-registry-")
+#' )
+#' stopifnot(
+#'   identical(ent$interface, "chat"),
+#'   identical(ent$input$role_mapping$user, "user")
+#' )
 #' @export
 get_registry_entry <- function(model_key,
                                generation_interface = NULL,
