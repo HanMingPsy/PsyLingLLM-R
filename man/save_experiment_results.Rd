@@ -9,7 +9,8 @@ save_experiment_results(
   output_path = NULL,
   model = NULL,
   overwrite = TRUE,
-  auto_naming = TRUE
+  auto_naming = TRUE,
+  raw_output_path = NULL
 )
 }
 \arguments{
@@ -24,6 +25,12 @@ model name + timestamp in default folder.}
 
 \item{auto_naming}{logical If TRUE (default), and no explicit filename is
 provided, auto-generate filename as \code{model_timestamp.csv}.}
+
+\item{raw_output_path}{Character scalar ending in \code{.rds}, or
+\code{NULL}. When supplied, \code{data} must contain a one-record-per-row
+\code{raw} list-column. The complete result is written atomically as a
+redacted RDS archive. For Excel output, compact \code{RawIndex} and
+\code{RawMetadata} sheets are added; CSV output remains unchanged.}
 }
 \value{
 Invisible normalized file path
@@ -40,11 +47,20 @@ Package-defined result columns are retained even when every value is
 missing, so the saved result schema remains stable across streaming and
 non-streaming runs. Other entirely empty columns are removed.
 
-If \code{data} contains a \code{raw} list-column, CSV output excludes that
-nested column. Excel output writes the ordinary table to \code{Results} and
-a redacted, path-based tabular projection to \code{Raw}. Large projections
-are continued in \code{Raw_2}, \code{Raw_3}, and so on. The in-memory RAW
-objects are not modified; use \code{saveRDS()} for lossless persistence.
+If \code{data} contains a \code{raw} list-column, ordinary CSV and Excel
+result tables exclude that nested column. When \code{raw_output_path} is
+supplied, the complete result is saved losslessly as a redacted RDS archive.
+Excel output then adds a compact \code{RawIndex} sheet that maps each result
+row to its corresponding \code{raw[[i]]} record, plus a two-column
+\code{RawMetadata} sheet that describes the RDS archive once. Complete
+provider payloads are never expanded into Excel worksheets.
+
+The RDS archive supports nested serializable R values without flattening
+them to spreadsheet cells. Its standard type contract covers \code{NULL},
+atomic vectors, raw bytes, lists, data frames, factors, dates, and
+date-times. Use
+\code{get_trial_raw()}, \code{extract_process_metrics()}, or
+\code{extract_token_probabilities()} after \code{readRDS()}.
 Parent directories are created when needed. Data are written to a temporary
 file before the destination is replaced, and write failures raise an error
 rather than returning a path to a missing file.

@@ -21,10 +21,10 @@
 #' - When \code{return_raw = TRUE}, the redacted raw request and provider
 #'   response returned by \code{llm_caller()} are retained in a list-column
 #'   named \code{raw}.
-#' - The \code{raw} list-column is returned in memory and excluded from CSV.
-#'   For Excel output, the ordinary result remains in \code{Results} and a
-#'   redacted, path-based projection is written to \code{Raw}. The in-memory
-#'   object remains the lossless source for \code{saveRDS()}.
+#' - The \code{raw} list-column is returned in memory and excluded from ordinary
+#'   CSV and Excel result tables. When \code{raw_output_path} is supplied, the
+#'   complete result is saved as a redacted RDS archive and Excel output adds
+#'   compact \code{RawIndex} and \code{RawMetadata} sheets.
 #'
 #' @param model_key Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").
 #' @param generation_interface Character(1). Interface name; defaults to "chat".
@@ -47,8 +47,12 @@
 #' @param output_path Character or NULL. Where to save results/logs (compatible with prior schema).
 #' @param overwrite Logical(1). Overwrite existing output files.
 #' @param return_raw Logical(1). Retain the redacted raw request/response in an
-#'   in-memory list-column named \code{raw}. CSV excludes nested RAW; Excel
-#'   adds a tabular \code{Raw} sheet without changing the \code{Results} sheet.
+#'   in-memory list-column named \code{raw}. Ordinary result files exclude the
+#'   nested column.
+#' @param raw_output_path Character scalar ending in \code{.rds}, or
+#'   \code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+#'   complete redacted result as a lossless RDS archive. Excel output also adds
+#'   compact \code{RawIndex} and \code{RawMetadata} sheets.
 #'
 #' @return A data.frame/tibble with PsyLingLLM schema columns:
 #'   Response, Think, ModelName, TotalResponseTime, FirstTokenLatency (if stream),
@@ -74,7 +78,8 @@ trial_experiment <- function(
     delay = 0,
     output_path = NULL,
     overwrite = TRUE,
-    return_raw = FALSE
+    return_raw = FALSE,
+    raw_output_path = NULL
 ) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
   safe_chr <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_character_ else as.character(x)[1]
@@ -85,6 +90,11 @@ trial_experiment <- function(
   if (!("Material" %in% names(data))) stop("`data` must contain column `Material`.")
   data <- generate_llm_experiment_list(data, trial_prompt, repeats, random)
   n_trials <- nrow(data)
+  raw_output_path <- validate_raw_output_request(
+    raw_output_path,
+    return_raw = return_raw,
+    overwrite = overwrite
+  )
 
   # ---- Validate config ------------------------------------------------------
   validate_experiment_config(
@@ -273,7 +283,8 @@ trial_experiment <- function(
     output_path = result_file,
     model = model_key,
     overwrite = overwrite,
-    auto_naming = FALSE
+    auto_naming = FALSE,
+    raw_output_path = raw_output_path
   )
 
   elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))

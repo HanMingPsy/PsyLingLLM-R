@@ -28,7 +28,8 @@ adaptive_feedback_experiment(
   delay = 0,
   output_path = NULL,
   overwrite = TRUE,
-  return_raw = FALSE
+  return_raw = FALSE,
+  raw_output_path = NULL
 )
 
 conversation_experiment_with_feedback(
@@ -54,7 +55,8 @@ conversation_experiment_with_feedback(
   delay = 0,
   output_path = NULL,
   overwrite = TRUE,
-  return_raw = FALSE
+  return_raw = FALSE,
+  raw_output_path = NULL
 )
 }
 \arguments{
@@ -112,8 +114,13 @@ and \code{meta} must be JSON-serializable.}
 \item{overwrite}{Logical(1). Overwrite outputs.}
 
 \item{return_raw}{Logical(1). Retain one redacted raw request/response per
-result row in an in-memory \code{raw} list-column. CSV excludes nested
-RAW; Excel adds a tabular \code{Raw} sheet.}
+result row in an in-memory \code{raw} list-column. Ordinary result files
+exclude the nested column.}
+
+\item{raw_output_path}{Character scalar ending in \code{.rds}, or
+\code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+complete redacted result as a lossless RDS archive. Excel output also adds
+compact \code{RawIndex} and \code{RawMetadata} sheets.}
 }
 \value{
 Invisibly, a tibble with the PsyLingLLM result schema for each

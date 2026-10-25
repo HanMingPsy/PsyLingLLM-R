@@ -68,8 +68,12 @@
 #'   (same behavior as \code{trial_experiment()}).
 #' @param overwrite Logical(1). Overwrite existing outputs.
 #' @param return_raw Logical(1). Retain one redacted raw request/response per
-#'   trial in an in-memory \code{raw} list-column. CSV excludes nested RAW;
-#'   Excel adds a tabular \code{Raw} sheet.
+#'   trial in an in-memory \code{raw} list-column. Ordinary result files
+#'   exclude the nested column.
+#' @param raw_output_path Character scalar ending in \code{.rds}, or
+#'   \code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+#'   complete redacted result as a lossless RDS archive. Excel output also adds
+#'   compact \code{RawIndex} and \code{RawMetadata} sheets.
 #'
 #' @return A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:
 #'   \code{Response}, \code{Think}, \code{ModelName}, \code{TotalResponseTime},
@@ -101,12 +105,18 @@ factorial_trial_experiment <- function(
     delay = 0,
     output_path = NULL,
     overwrite = TRUE,
-    return_raw = FALSE
+    return_raw = FALSE,
+    raw_output_path = NULL
 ) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
   safe_chr <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_character_ else as.character(x)[1]
   safe_num <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_real_ else as.numeric(x)[1]
   safe_int <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_integer_ else as.integer(x)[1]
+  raw_output_path <- validate_raw_output_request(
+    raw_output_path,
+    return_raw = return_raw,
+    overwrite = overwrite
+  )
 
   # ---- Build factorial trial list ------------------------------------------
   if (!exists("generate_llm_factorial_experiment_list")) {
@@ -317,7 +327,8 @@ factorial_trial_experiment <- function(
     output_path = result_file,
     model = model_key,
     overwrite = overwrite,
-    auto_naming = FALSE
+    auto_naming = FALSE,
+    raw_output_path = raw_output_path
   )
 
   elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))

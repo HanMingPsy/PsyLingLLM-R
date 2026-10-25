@@ -50,8 +50,12 @@
 #' @param output_path Character or NULL. Where to save results/logs.
 #' @param overwrite Logical(1). Overwrite existing outputs.
 #' @param return_raw Logical(1). Retain one redacted raw request/response per
-#'   turn in an in-memory \code{raw} list-column. CSV excludes nested RAW;
-#'   Excel adds a tabular \code{Raw} sheet.
+#'   turn in an in-memory \code{raw} list-column. Ordinary result files exclude
+#'   the nested column.
+#' @param raw_output_path Character scalar ending in \code{.rds}, or
+#'   \code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+#'   complete redacted result as a lossless RDS archive. Excel output also adds
+#'   compact \code{RawIndex} and \code{RawMetadata} sheets.
 #' @importFrom stats setNames
 
 #'
@@ -81,7 +85,8 @@ conversation_experiment <- function(
     delay = 0,
     output_path = NULL,
     overwrite = TRUE,
-    return_raw = FALSE
+    return_raw = FALSE,
+    raw_output_path = NULL
 ) {
   history_mode <- match.arg(history_mode)
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
@@ -89,6 +94,11 @@ conversation_experiment <- function(
   safe_num <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_real_ else as.numeric(x)[1]
   safe_int <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_integer_ else as.integer(x)[1]
   nz_chr   <- function(x) is.character(x) && length(x) == 1 && nzchar(x)
+  raw_output_path <- validate_raw_output_request(
+    raw_output_path,
+    return_raw = return_raw,
+    overwrite = overwrite
+  )
 
   # ---- Expand trials via unified helper (row standardization; no random here) ----
   data <- generate_llm_experiment_list(
@@ -379,7 +389,8 @@ conversation_experiment <- function(
     output_path = result_file,
     model = model_key,
     overwrite = overwrite,
-    auto_naming = FALSE
+    auto_naming = FALSE,
+    raw_output_path = raw_output_path
   )
 
   elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))

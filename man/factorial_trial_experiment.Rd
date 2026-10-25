@@ -25,7 +25,8 @@ factorial_trial_experiment(
   delay = 0,
   output_path = NULL,
   overwrite = TRUE,
-  return_raw = FALSE
+  return_raw = FALSE,
+  raw_output_path = NULL
 )
 }
 \arguments{
@@ -83,8 +84,13 @@ otherwise forces streaming/non-streaming.}
 \item{overwrite}{Logical(1). Overwrite existing outputs.}
 
 \item{return_raw}{Logical(1). Retain one redacted raw request/response per
-trial in an in-memory \code{raw} list-column. CSV excludes nested RAW;
-Excel adds a tabular \code{Raw} sheet.}
+trial in an in-memory \code{raw} list-column. Ordinary result files
+exclude the nested column.}
+
+\item{raw_output_path}{Character scalar ending in \code{.rds}, or
+\code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+complete redacted result as a lossless RDS archive. Excel output also adds
+compact \code{RawIndex} and \code{RawMetadata} sheets.}
 }
 \value{
 A \code{data.frame} (or tibble) with PsyLingLLM schema columns per trial:

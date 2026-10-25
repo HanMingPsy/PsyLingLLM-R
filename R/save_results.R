@@ -10,11 +10,20 @@
 #' missing, so the saved result schema remains stable across streaming and
 #' non-streaming runs. Other entirely empty columns are removed.
 #'
-#' If \code{data} contains a \code{raw} list-column, CSV output excludes that
-#' nested column. Excel output writes the ordinary table to \code{Results} and
-#' a redacted, path-based tabular projection to \code{Raw}. Large projections
-#' are continued in \code{Raw_2}, \code{Raw_3}, and so on. The in-memory RAW
-#' objects are not modified; use \code{saveRDS()} for lossless persistence.
+#' If \code{data} contains a \code{raw} list-column, ordinary CSV and Excel
+#' result tables exclude that nested column. When \code{raw_output_path} is
+#' supplied, the complete result is saved losslessly as a redacted RDS archive.
+#' Excel output then adds a compact \code{RawIndex} sheet that maps each result
+#' row to its corresponding \code{raw[[i]]} record, plus a two-column
+#' \code{RawMetadata} sheet that describes the RDS archive once. Complete
+#' provider payloads are never expanded into Excel worksheets.
+#'
+#' The RDS archive supports nested serializable R values without flattening
+#' them to spreadsheet cells. Its standard type contract covers \code{NULL},
+#' atomic vectors, raw bytes, lists, data frames, factors, dates, and
+#' date-times. Use
+#' \code{get_trial_raw()}, \code{extract_process_metrics()}, or
+#' \code{extract_token_probabilities()} after \code{readRDS()}.
 #' Parent directories are created when needed. Data are written to a temporary
 #' file before the destination is replaced, and write failures raise an error
 #' rather than returning a path to a missing file.
@@ -26,6 +35,11 @@
 #' @param overwrite logical Whether to overwrite existing file. Default TRUE.
 #' @param auto_naming logical If TRUE (default), and no explicit filename is
 #'   provided, auto-generate filename as \code{model_timestamp.csv}.
+#' @param raw_output_path Character scalar ending in \code{.rds}, or
+#'   \code{NULL}. When supplied, \code{data} must contain a one-record-per-row
+#'   \code{raw} list-column. The complete result is written atomically as a
+#'   redacted RDS archive. For Excel output, compact \code{RawIndex} and
+#'   \code{RawMetadata} sheets are added; CSV output remains unchanged.
 #'
 #' @return Invisible normalized file path
 #' @export
@@ -33,7 +47,8 @@ save_experiment_results <- function(data,
                                     output_path = NULL,
                                     model = NULL,
                                     overwrite = TRUE,
-                                    auto_naming = TRUE) {
+                                    auto_naming = TRUE,
+                                    raw_output_path = NULL) {
   # If output_path is NULL → auto filename
   if (is.null(output_path)) {
     base_dir <- default_results_directory()
@@ -60,21 +75,28 @@ save_experiment_results <- function(data,
 
   ensure_psylingllm_directory(dirname(output_path), "result directory")
 
-  raw_records <- NULL
-  raw_links <- NULL
-  if ("raw" %in% names(data)) {
-    raw_records <- data$raw
-    raw_links <- data.frame(
-      ResultRow = seq_len(nrow(data)),
-      RequestID = if ("RequestID" %in% names(data)) {
-        as.character(data$RequestID)
-      } else {
-        rep(NA_character_, nrow(data))
-      },
-      stringsAsFactors = FALSE
-    )
-    data$raw <- NULL
+  has_raw <- "raw" %in% names(data)
+  normalized_raw_path <- validate_raw_output_request(
+    raw_output_path = raw_output_path,
+    return_raw = has_raw,
+    overwrite = overwrite
+  )
+  archive_data <- if (!is.null(normalized_raw_path)) {
+    prepare_raw_archive_data(data)
+  } else {
+    NULL
   }
+  raw_index <- if (!is.null(archive_data)) {
+    build_raw_index(archive_data)
+  } else {
+    NULL
+  }
+  raw_metadata <- if (!is.null(archive_data)) {
+    build_raw_metadata(normalized_raw_path)
+  } else {
+    NULL
+  }
+  if (has_raw) data$raw <- NULL
 
   # Clean the flat Results table while retaining its documented schema.
   if ("ErrorMessage" %in% colnames(data)) data$ErrorMessage <- NULL
@@ -92,6 +114,9 @@ save_experiment_results <- function(data,
   if (!(ext %in% c("csv", "xlsx", "xls"))) {
     stop("Unsupported extension: ", ext, call. = FALSE)
   }
+  if (file.exists(output_path) && !isTRUE(overwrite)) {
+    stop("[PsyLingLLM] File already exists: ", output_path, call. = FALSE)
+  }
   temporary <- tempfile(
     pattern = ".results-",
     tmpdir = dirname(output_path),
@@ -99,6 +124,17 @@ save_experiment_results <- function(data,
   )
   on.exit(if (file.exists(temporary)) unlink(temporary, force = TRUE),
           add = TRUE)
+  raw_temporary <- NULL
+  if (!is.null(archive_data)) {
+    raw_temporary <- tempfile(
+      pattern = ".raw-results-",
+      tmpdir = dirname(normalized_raw_path),
+      fileext = ".rds"
+    )
+    on.exit(if (file.exists(raw_temporary)) unlink(raw_temporary, force = TRUE),
+            add = TRUE)
+    saveRDS(archive_data, raw_temporary, compress = TRUE)
+  }
   if (ext == "csv") {
     readr::write_excel_csv(data, temporary)
   } else {
@@ -106,11 +142,18 @@ save_experiment_results <- function(data,
       stop("Package 'writexl' is required but not installed.")
     }
     workbook <- list(Results = data)
-    if (!is.null(raw_records)) {
-      raw_table <- tabulate_raw_records(raw_records, raw_links)
-      workbook <- c(workbook, split_raw_sheets(raw_table))
+    if (!is.null(raw_index)) {
+      workbook$RawIndex <- raw_index
+      workbook$RawMetadata <- raw_metadata
     }
     writexl::write_xlsx(workbook, path = temporary)
+  }
+  if (!is.null(raw_temporary)) {
+    replace_file_safely(
+      raw_temporary,
+      normalized_raw_path,
+      overwrite = overwrite
+    )
   }
   replace_file_safely(temporary, output_path, overwrite = overwrite)
   if (!file.exists(output_path)) {
@@ -119,6 +162,9 @@ save_experiment_results <- function(data,
 
   saved <- normalizePath(output_path, mustWork = TRUE)
   message("\n", sprintf("[PsyLingLLM] Results saved: %s", saved))
+  if (!is.null(normalized_raw_path)) {
+    message(sprintf("[PsyLingLLM] RAW archive saved: %s", normalized_raw_path))
+  }
   invisible(saved)
 }
 
@@ -133,161 +179,129 @@ is_empty_result_column <- function(column) {
   all(missing)
 }
 
-tabulate_raw_records <- function(raw_records, links = NULL) {
-  if (!is.list(raw_records)) {
-    stop("`raw` must be a list-column.", call. = FALSE)
+validate_raw_output_request <- function(raw_output_path,
+                                        return_raw,
+                                        overwrite = TRUE) {
+  if (is.null(raw_output_path)) {
+    return(NULL)
   }
-  record_count <- length(raw_records)
-  if (is.null(links)) {
-    links <- data.frame(
-      ResultRow = seq_len(record_count),
-      RequestID = rep(NA_character_, record_count),
-      stringsAsFactors = FALSE
-    )
+  if (!is.character(raw_output_path) || length(raw_output_path) != 1L ||
+      is.na(raw_output_path) || !nzchar(raw_output_path)) {
+    stop("`raw_output_path` must be NULL or one non-empty path.",
+         call. = FALSE)
   }
-  if (nrow(links) != record_count) {
-    stop("RAW records must correspond one-to-one with result rows.", call. = FALSE)
+  if (!isTRUE(return_raw)) {
+    stop("`raw_output_path` requires `return_raw = TRUE`.", call. = FALSE)
   }
-  if (!record_count) {
-    return(data.frame(
-      ResultRow = integer(),
-      RequestID = character(),
-      FieldPath = character(),
-      ValueType = character(),
-      ValueEncoding = character(),
-      ValueChunk = integer(),
-      ValueChunks = integer(),
-      Value = character(),
-      stringsAsFactors = FALSE
-    ))
+  if (!identical(tolower(tools::file_ext(raw_output_path)), "rds")) {
+    stop("`raw_output_path` must use the `.rds` extension.", call. = FALSE)
   }
-
-  rows <- vector("list", record_count)
-  for (index in seq_len(record_count)) {
-    flattened <- flatten_raw_value(
-      redact_llm_diagnostics(raw_records[[index]]),
-      path = "$"
-    )
-    flattened$ResultRow <- links$ResultRow[[index]]
-    flattened$RequestID <- links$RequestID[[index]]
-    rows[[index]] <- flattened[, c(
-      "ResultRow", "RequestID", "FieldPath", "ValueType",
-      "ValueEncoding", "ValueChunk", "ValueChunks", "Value"
-    )]
+  ensure_psylingllm_directory(dirname(raw_output_path), "RAW archive directory")
+  normalized <- normalizePath(raw_output_path, mustWork = FALSE)
+  if (file.exists(normalized) && !isTRUE(overwrite)) {
+    stop("[PsyLingLLM] File already exists: ", normalized, call. = FALSE)
   }
-  do.call(rbind, rows)
+  normalized
 }
 
-flatten_raw_value <- function(value, path) {
-  if (is.null(value)) {
-    return(new_raw_table_row(path, "null", "scalar", NA_character_))
+prepare_raw_archive_data <- function(data) {
+  if (!("raw" %in% names(data)) || !is.list(data$raw)) {
+    stop("A RAW archive requires a `raw` list-column.", call. = FALSE)
   }
-  if (is.raw(value)) {
-    encoded <- paste(sprintf("%02x", as.integer(value)), collapse = "")
-    return(new_raw_table_row(path, "raw", "hex", encoded))
+  if (length(data$raw) != nrow(data)) {
+    stop("RAW records must correspond one-to-one with result rows.",
+         call. = FALSE)
   }
-  if (inherits(value, "POSIXt")) {
-    value <- format(value, "%Y-%m-%dT%H:%M:%OS%z")
-  }
-  if (is.data.frame(value)) {
-    value <- as.list(value)
-  }
-  if (is.list(value)) {
-    if (!length(value)) {
-      return(new_raw_table_row(path, "list", "empty", NA_character_))
-    }
-    value_names <- names(value)
-    children <- lapply(seq_along(value), function(index) {
-      name <- if (!is.null(value_names) &&
-                  !is.na(value_names[[index]]) &&
-                  nzchar(value_names[[index]])) {
-        separator <- if (identical(path, "$")) "" else "$"
-        paste0(path, separator, value_names[[index]])
-      } else {
-        paste0(path, "[", index, "]")
-      }
-      flatten_raw_value(value[[index]], name)
-    })
-    return(do.call(rbind, children))
-  }
-  value_names <- names(value)
-  has_names <- !is.null(value_names) &&
-    any(!is.na(value_names) & nzchar(value_names))
-  if (length(value) > 1L || has_names) {
-    children <- lapply(seq_along(value), function(index) {
-      child_path <- if (has_names &&
-                        !is.na(value_names[[index]]) &&
-                        nzchar(value_names[[index]])) {
-        separator <- if (identical(path, "$")) "" else "$"
-        paste0(path, separator, value_names[[index]])
-      } else {
-        paste0(path, "[", index, "]")
-      }
-      flatten_raw_value(value[[index]], child_path)
-    })
-    return(do.call(rbind, children))
-  }
-
-  value_type <- typeof(value)
-  if (is.character(value)) {
-    encoded <- as.character(jsonlite::toJSON(
-      value,
-      auto_unbox = TRUE,
-      na = "null"
-    ))
-    encoding <- "json_string"
-  } else if (is.na(value)) {
-    encoded <- NA_character_
-    encoding <- "scalar"
-  } else {
-    encoded <- as.character(value)
-    encoding <- "scalar"
-  }
-  new_raw_table_row(path, value_type, encoding, encoded)
+  archive <- data
+  archive$raw <- lapply(archive$raw, redact_llm_diagnostics)
+  metadata <- raw_archive_metadata()
+  attr(archive, "psylingllm_raw_schema_version") <-
+    metadata$raw_schema_version
+  attr(archive, "psylingllm_archive_format") <- metadata$archive_format
+  attr(archive, "psylingllm_archive_object") <- metadata$archive_object
+  attr(archive, "psylingllm_supported_value_types") <-
+    metadata$supported_value_types
+  archive
 }
 
-new_raw_table_row <- function(path, value_type, encoding, value,
-                              chunk_size = 30000L) {
-  if (is.na(value) || nchar(value, type = "chars") <= chunk_size) {
-    return(data.frame(
-      FieldPath = path,
-      ValueType = value_type,
-      ValueEncoding = encoding,
-      ValueChunk = 1L,
-      ValueChunks = 1L,
-      Value = value,
-      stringsAsFactors = FALSE
-    ))
+build_raw_index <- function(data) {
+  if (!("raw" %in% names(data)) || length(data$raw) != nrow(data)) {
+    stop("RAW records must correspond one-to-one with result rows.",
+         call. = FALSE)
   }
-  starts <- seq.int(1L, nchar(value), by = chunk_size)
-  chunks <- substring(value, starts, pmin(starts + chunk_size - 1L, nchar(value)))
+  n <- nrow(data)
   data.frame(
-    FieldPath = rep(path, length(chunks)),
-    ValueType = rep(value_type, length(chunks)),
-    ValueEncoding = rep(encoding, length(chunks)),
-    ValueChunk = seq_along(chunks),
-    ValueChunks = rep(length(chunks), length(chunks)),
-    Value = chunks,
+    ResultRow = seq_len(n),
+    RawRecordIndex = seq_len(n),
+    RawAvailable = !vapply(data$raw, is.null, logical(1)),
+    RawPath = sprintf("raw[[%d]]", seq_len(n)),
     stringsAsFactors = FALSE
   )
 }
 
-split_raw_sheets <- function(raw_table, max_excel_rows = 1048576L) {
-  rows_per_sheet <- as.integer(max_excel_rows) - 1L
-  if (rows_per_sheet < 1L) {
-    stop("Excel row limit must allow at least one data row.", call. = FALSE)
+build_raw_metadata <- function(raw_output_path) {
+  metadata <- raw_archive_metadata()
+  data.frame(
+    Field = c(
+      "RawArtifact",
+      "ArchiveFormat",
+      "RawSchemaVersion",
+      "ArchiveObject",
+      "SupportedValueTypes",
+      "AnalysisFunctions"
+    ),
+    Value = c(
+      basename(raw_output_path),
+      metadata$archive_format,
+      metadata$raw_schema_version,
+      metadata$archive_object,
+      paste(metadata$supported_value_types, collapse = "|"),
+      paste(
+        c(
+          "get_trial_raw()",
+          "extract_process_metrics()",
+          "extract_token_probabilities()"
+        ),
+        collapse = "; "
+      )
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+raw_archive_metadata <- function() {
+  list(
+    archive_format = "RDS",
+    raw_schema_version = "psylingllm.raw.v1",
+    archive_object = "data.frame with raw list-column",
+    supported_value_types = c(
+      "NULL", "logical", "integer", "double", "complex", "character",
+      "raw", "list", "data.frame", "factor", "Date", "POSIXct"
+    )
+  )
+}
+
+save_raw_result_archive <- function(data, raw_output_path, overwrite = TRUE) {
+  normalized <- validate_raw_output_request(
+    raw_output_path = raw_output_path,
+    return_raw = "raw" %in% names(data),
+    overwrite = overwrite
+  )
+  archive <- prepare_raw_archive_data(data)
+  temporary <- tempfile(
+    pattern = ".raw-results-",
+    tmpdir = dirname(normalized),
+    fileext = ".rds"
+  )
+  on.exit(if (file.exists(temporary)) unlink(temporary, force = TRUE),
+          add = TRUE)
+  saveRDS(archive, temporary, compress = TRUE)
+  replace_file_safely(temporary, normalized, overwrite = overwrite)
+  if (!file.exists(normalized)) {
+    stop("RAW archive was not created: ", normalized, call. = FALSE)
   }
-  if (!nrow(raw_table)) {
-    return(list(Raw = raw_table))
-  }
-  sheet_index <- ceiling(seq_len(nrow(raw_table)) / rows_per_sheet)
-  pieces <- split(raw_table, sheet_index)
-  names(pieces) <- if (length(pieces) == 1L) {
-    "Raw"
-  } else {
-    c("Raw", paste0("Raw_", seq.int(2L, length(pieces))))
-  }
-  pieces
+  message(sprintf("[PsyLingLLM] RAW archive saved: %s", normalized))
+  invisible(normalized)
 }
 
 #' Resolve output and log file paths

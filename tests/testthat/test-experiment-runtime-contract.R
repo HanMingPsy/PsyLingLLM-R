@@ -278,7 +278,8 @@ test_that("trial experiments preserve ordered raw evidence outside flat result f
       random = FALSE,
       output_path = result_file,
       delay = 0,
-      return_raw = TRUE
+      return_raw = TRUE,
+      raw_output_path = raw_result_file
     )
   )
 
@@ -319,7 +320,7 @@ test_that("trial experiments preserve ordered raw evidence outside flat result f
   expect_identical(csv_result$Material, result$Material)
   expect_identical(csv_result$TrialStatus, result$TrialStatus)
 
-  saveRDS(result, raw_result_file)
+  expect_true(file.exists(raw_result_file))
   restored <- readRDS(raw_result_file)
   expect_identical(nrow(restored), nrow(result))
   expect_identical(restored$raw, result$raw)
@@ -331,7 +332,39 @@ test_that("trial experiments preserve ordered raw evidence outside flat result f
   expect_true(grepl("[REDACTED]", rendered_raw, fixed = TRUE))
 })
 
-test_that("trial_experiment public signature remains unchanged", {
+test_that("RAW archive conflicts fail before the first provider call", {
+  output_directory <- withr::local_tempdir(
+    pattern = "trial-raw-preflight-",
+    tmpdir = getwd()
+  )
+  raw_result_file <- file.path(output_directory, "existing.rds")
+  saveRDS(list(existing = TRUE), raw_result_file)
+  calls <- 0L
+
+  local_mocked_bindings(
+    llm_caller = function(...) {
+      calls <<- calls + 1L
+      stop("Provider call must not run")
+    },
+    .package = "PsyLingLLM"
+  )
+
+  expect_error(
+    trial_experiment(
+      model_key = "fixture-model",
+      api_key = "not-a-real-key",
+      data = data.frame(Material = "Fixture"),
+      output_path = file.path(output_directory, "results.csv"),
+      overwrite = FALSE,
+      return_raw = TRUE,
+      raw_output_path = raw_result_file
+    ),
+    "already exists"
+  )
+  expect_identical(calls, 0L)
+})
+
+test_that("trial_experiment appends only the reviewed RAW archive argument", {
   expect_identical(
     names(formals(trial_experiment)),
     c(
@@ -352,7 +385,8 @@ test_that("trial_experiment public signature remains unchanged", {
       "delay",
       "output_path",
       "overwrite",
-      "return_raw"
+      "return_raw",
+      "raw_output_path"
     )
   )
 })

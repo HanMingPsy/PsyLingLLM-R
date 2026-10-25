@@ -20,7 +20,8 @@ multi_model_experiment(
   optionals = NULL,
   stream = NULL,
   output_dir = NULL,
-  combined_output_path = NULL
+  combined_output_path = NULL,
+  raw_output_path = NULL
 )
 }
 \arguments{
@@ -61,6 +62,11 @@ when the model row doesn't provide `output_path`.}
 \item{combined_output_path}{Optional character(1). If provided, write the
 combined results CSV here. Parent directories are created; write failures
 raise an error.}
+
+\item{raw_output_path}{Character scalar ending in \code{.rds}, or
+\code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+complete combined result as a redacted RDS archive. Combined Excel output
+also receives compact \code{RawIndex} and \code{RawMetadata} sheets.}
 }
 \value{
 A data.frame/tibble concatenating all per-model results. Each chunk

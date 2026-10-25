@@ -22,7 +22,8 @@ trial_experiment(
   delay = 0,
   output_path = NULL,
   overwrite = TRUE,
-  return_raw = FALSE
+  return_raw = FALSE,
+  raw_output_path = NULL
 )
 }
 \arguments{
@@ -64,8 +65,13 @@ parameters.}
 \item{overwrite}{Logical(1). Overwrite existing output files.}
 
 \item{return_raw}{Logical(1). Retain the redacted raw request/response in an
-in-memory list-column named \code{raw}. CSV excludes nested RAW; Excel
-adds a tabular \code{Raw} sheet without changing the \code{Results} sheet.}
+in-memory list-column named \code{raw}. Ordinary result files exclude the
+nested column.}
+
+\item{raw_output_path}{Character scalar ending in \code{.rds}, or
+\code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+complete redacted result as a lossless RDS archive. Excel output also adds
+compact \code{RawIndex} and \code{RawMetadata} sheets.}
 }
 \value{
 A data.frame/tibble with PsyLingLLM schema columns:
@@ -97,8 +103,8 @@ Raw response handling:
 - When \code{return_raw = TRUE}, the redacted raw request and provider
   response returned by \code{llm_caller()} are retained in a list-column
   named \code{raw}.
-- The \code{raw} list-column is returned in memory and excluded from CSV.
-  For Excel output, the ordinary result remains in \code{Results} and a
-  redacted, path-based projection is written to \code{Raw}. The in-memory
-  object remains the lossless source for \code{saveRDS()}.
+- The \code{raw} list-column is returned in memory and excluded from ordinary
+  CSV and Excel result tables. When \code{raw_output_path} is supplied, the
+  complete result is saved as a redacted RDS archive and Excel output adds
+  compact \code{RawIndex} and \code{RawMetadata} sheets.
 }

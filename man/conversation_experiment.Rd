@@ -24,7 +24,8 @@ conversation_experiment(
   delay = 0,
   output_path = NULL,
   overwrite = TRUE,
-  return_raw = FALSE
+  return_raw = FALSE,
+  raw_output_path = NULL
 )
 }
 \arguments{
@@ -71,8 +72,13 @@ and we do **not** pass a role map to \code{llm_caller()} (no forcing).}
 \item{overwrite}{Logical(1). Overwrite existing outputs.}
 
 \item{return_raw}{Logical(1). Retain one redacted raw request/response per
-turn in an in-memory \code{raw} list-column. CSV excludes nested RAW;
-Excel adds a tabular \code{Raw} sheet.}
+turn in an in-memory \code{raw} list-column. Ordinary result files exclude
+the nested column.}
+
+\item{raw_output_path}{Character scalar ending in \code{.rds}, or
+\code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+complete redacted result as a lossless RDS archive. Excel output also adds
+compact \code{RawIndex} and \code{RawMetadata} sheets.}
 }
 \value{
 A data.frame/tibble with PsyLingLLM schema columns per turn:

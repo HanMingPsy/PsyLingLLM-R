@@ -54,6 +54,10 @@
 #' @param combined_output_path Optional character(1). If provided, write the
 #'   combined results CSV here. Parent directories are created; write failures
 #'   raise an error.
+#' @param raw_output_path Character scalar ending in \code{.rds}, or
+#'   \code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+#'   complete combined result as a redacted RDS archive. Combined Excel output
+#'   also receives compact \code{RawIndex} and \code{RawMetadata} sheets.
 #'
 #' @return A data.frame/tibble concatenating all per-model results. Each chunk
 #'   retains the standard PsyLingLLM schema columns and is annotated with
@@ -76,10 +80,16 @@ multi_model_experiment <- function(
     optionals = NULL,
     stream = NULL,
     output_dir = NULL,
-    combined_output_path = NULL
+    combined_output_path = NULL,
+    raw_output_path = NULL
 ) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
   nz_chr <- function(x) is.character(x) && length(x) == 1 && nzchar(x)
+  raw_output_path <- validate_raw_output_request(
+    raw_output_path,
+    return_raw = return_raw,
+    overwrite = overwrite
+  )
 
   # helpers ------------------------------------------------------------
   try_json <- function(x) {
@@ -221,6 +231,9 @@ multi_model_experiment <- function(
       ModelKey = character(),
       stringsAsFactors = FALSE
     )
+  if (isTRUE(return_raw) && !("raw" %in% names(combined))) {
+    combined$raw <- vector("list", nrow(combined))
+  }
 
   # optional combined CSV -----------------------------------------------------
   if (nz_chr(combined_output_path)) {
@@ -229,8 +242,11 @@ multi_model_experiment <- function(
       output_path = combined_output_path,
       model = "multi-model",
       overwrite = TRUE,
-      auto_naming = FALSE
+      auto_naming = FALSE,
+      raw_output_path = raw_output_path
     )
+  } else if (!is.null(raw_output_path)) {
+    save_raw_result_archive(combined, raw_output_path, overwrite = overwrite)
   }
 
   combined

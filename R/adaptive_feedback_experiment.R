@@ -51,8 +51,12 @@
 #' @param output_path Character or NULL. Where to save results/logs.
 #' @param overwrite Logical(1). Overwrite outputs.
 #' @param return_raw Logical(1). Retain one redacted raw request/response per
-#'   result row in an in-memory \code{raw} list-column. CSV excludes nested
-#'   RAW; Excel adds a tabular \code{Raw} sheet.
+#'   result row in an in-memory \code{raw} list-column. Ordinary result files
+#'   exclude the nested column.
+#' @param raw_output_path Character scalar ending in \code{.rds}, or
+#'   \code{NULL}. When supplied together with \code{return_raw = TRUE}, save the
+#'   complete redacted result as a lossless RDS archive. Excel output also adds
+#'   compact \code{RawIndex} and \code{RawMetadata} sheets.
 #' @importFrom stats setNames
 #'
 #' @return Invisibly, a tibble with the PsyLingLLM result schema for each
@@ -89,13 +93,19 @@ adaptive_feedback_experiment <- function(
     delay = 0,
     output_path = NULL,
     overwrite = TRUE,
-    return_raw = FALSE
+    return_raw = FALSE,
+    raw_output_path = NULL
 ) {
   if (missing(feedback_fn)) {
     stop("`feedback_fn` must be supplied.", call. = FALSE)
   }
   history_mode <- match.arg(history_mode)
   apply_mode <- match.arg(apply_mode)
+  raw_output_path <- validate_raw_output_request(
+    raw_output_path,
+    return_raw = return_raw,
+    overwrite = overwrite
+  )
 
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
   safe_chr <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_character_ else as.character(x)[1]
@@ -525,7 +535,8 @@ adaptive_feedback_experiment <- function(
     output_path = result_file,
     model = model_key,
     overwrite = overwrite,
-    auto_naming = FALSE
+    auto_naming = FALSE,
+    raw_output_path = raw_output_path
   )
 
   elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
