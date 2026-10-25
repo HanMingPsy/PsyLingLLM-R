@@ -20,7 +20,10 @@
 #' than timeouts.
 #'
 #' @param model_key Character(1).
-#' @param generation_interface Character(1). Default "chat".
+#' @param generation_interface Character(1) or \code{NULL}. When omitted or
+#'   \code{NULL}, use the Registry default interface. Explicit values continue
+#'   to force that interface. The displayed \code{"chat"} default is retained
+#'   for public signature compatibility.
 #' @param api_key Character(1). Provider API key.
 #' @param api_url Optional character(1). Overrides registry default URL; required for non-official providers.
 #' @param data data.frame/tibble with ConversationId, Turn, Material; optional TrialPrompt.
@@ -96,6 +99,11 @@ adaptive_feedback_experiment <- function(
     return_raw = FALSE,
     raw_output_path = NULL
 ) {
+  if (missing(generation_interface)) generation_interface <- NULL
+  generation_interface <- resolve_experiment_generation_interface(
+    model_key,
+    generation_interface
+  )
   if (missing(feedback_fn)) {
     stop("`feedback_fn` must be supplied.", call. = FALSE)
   }

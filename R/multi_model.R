@@ -10,7 +10,7 @@
 #' - `model_key` (character): registry key, e.g. "deepseek-chat" or "deepseek-chat@proxy".
 #'
 #' Optional columns (all per-model; if absent, corresponding top-level args are used):
-#' - `generation_interface` (character, default "chat")
+#' - `generation_interface` (character; missing selects the Registry default)
 #' - `api_key` (character)
 #' - `api_url` (character; required for non-official providers or to override official)
 #' - `stream` (logical or NA; `NA`/missing means follow registry default)
@@ -114,9 +114,12 @@ multi_model_experiment <- function(
     row <- models[i, , drop = FALSE]
     mk   <- as.character(row$model_key)
 
-    gi   <- if (has_col(row, "generation_interface") && nz_chr(row$generation_interface)) {
+    gi <- if (has_col(row, "generation_interface") && nz_chr(row$generation_interface)) {
       as.character(row$generation_interface)
-    } else "chat"
+    } else {
+      NULL
+    }
+    gi <- resolve_experiment_generation_interface(mk, gi)
 
     # per-model keys/URL/flags
     api_key_i <- if (has_col(row, "api_key") && nz_chr(row$api_key)) as.character(row$api_key) else NULL

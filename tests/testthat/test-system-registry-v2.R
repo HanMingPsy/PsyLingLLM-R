@@ -29,9 +29,10 @@ test_that("the bundled production registry is a valid v2 bundle", {
   expect_true(validate_registry_schema(registry))
   expect_true(all(c("deepseek-chat", "deepseek-reasoner", "gpt-4o") %in%
     names(registry$models)))
-  expect_error(
-    resolve_registry_entry("gpt-4o", registry = registry),
-    class = "registry_resolution_error"
+  gpt_4o <- resolve_registry_entry("gpt-4o", registry = registry)
+  expect_identical(
+    gpt_4o$interface$id,
+    "openai-chat-completions-v1"
   )
 })
 

@@ -86,7 +86,7 @@ Required column:
 - `model_key` (character): registry key, e.g. "deepseek-chat" or "deepseek-chat@proxy".
 
 Optional columns (all per-model; if absent, corresponding top-level args are used):
-- `generation_interface` (character, default "chat")
+- `generation_interface` (character; missing selects the Registry default)
 - `api_key` (character)
 - `api_url` (character; required for non-official providers or to override official)
 - `stream` (logical or NA; `NA`/missing means follow registry default)

@@ -27,7 +27,8 @@ validate_experiment_config(
 
 \item{registry}{Ignored (kept for backward compatibility).}
 
-\item{generation_interface}{Character(1). Interface to validate, default "chat".}
+\item{generation_interface}{Character(1) or \code{NULL}. Interface to
+validate. \code{NULL} selects the Registry default.}
 }
 \value{
 Invisibly returns a list with resolved fields:

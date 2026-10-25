@@ -27,7 +27,10 @@
 #'   compact \code{RawIndex} and \code{RawMetadata} sheets.
 #'
 #' @param model_key Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").
-#' @param generation_interface Character(1). Interface name; defaults to "chat".
+#' @param generation_interface Character(1) or \code{NULL}. When omitted or
+#'   \code{NULL}, use the Registry default interface. Explicit values continue
+#'   to force that interface. The displayed \code{"chat"} default is retained
+#'   for public signature compatibility.
 #' @param api_key Character(1). Provider API key.
 #' @param api_url Optional character(1). Overrides registry default URL; required for non-official providers.
 #' @param data data.frame/tibble with `Material`; may contain `TrialPrompt`.
@@ -81,6 +84,11 @@ trial_experiment <- function(
     return_raw = FALSE,
     raw_output_path = NULL
 ) {
+  if (missing(generation_interface)) generation_interface <- NULL
+  generation_interface <- resolve_experiment_generation_interface(
+    model_key,
+    generation_interface
+  )
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
   safe_chr <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_character_ else as.character(x)[1]
   safe_num <- function(x) if (is.null(x) || length(x) == 0 || all(is.na(x))) NA_real_ else as.numeric(x)[1]
@@ -103,7 +111,8 @@ trial_experiment <- function(
     model = model_key,
     data = data,
     required_cols = c("Material"),
-    registry = load_registry()
+    registry = load_registry(),
+    generation_interface = generation_interface
   )
 
   # ---- Output & log paths ---------------------------------------------------

@@ -924,6 +924,7 @@ models:
     interfaces:
       - openai-chat-completions-v1
       - openai-responses-legacy-v1
+    default_interface: openai-chat-completions-v1
     capabilities:
       reasoning: false
       streaming: true

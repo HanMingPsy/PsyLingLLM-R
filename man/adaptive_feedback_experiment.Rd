@@ -62,7 +62,10 @@ conversation_experiment_with_feedback(
 \arguments{
 \item{model_key}{Character(1).}
 
-\item{generation_interface}{Character(1). Default "chat".}
+\item{generation_interface}{Character(1) or \code{NULL}. When omitted or
+\code{NULL}, use the Registry default interface. Explicit values continue
+to force that interface. The displayed \code{"chat"} default is retained
+for public signature compatibility.}
 
 \item{api_key}{Character(1). Provider API key.}
 

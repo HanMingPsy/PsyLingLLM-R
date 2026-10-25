@@ -29,7 +29,10 @@ trial_experiment(
 \arguments{
 \item{model_key}{Character(1). Registry key (e.g., "deepseek-chat" or "deepseek-chat@proxy").}
 
-\item{generation_interface}{Character(1). Interface name; defaults to "chat".}
+\item{generation_interface}{Character(1) or \code{NULL}. When omitted or
+\code{NULL}, use the Registry default interface. Explicit values continue
+to force that interface. The displayed \code{"chat"} default is retained
+for public signature compatibility.}
 
 \item{api_key}{Character(1). Provider API key.}
 

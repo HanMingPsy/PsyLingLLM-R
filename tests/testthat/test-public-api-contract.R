@@ -101,4 +101,17 @@ test_that("critical public function signatures remain stable", {
     c("model_name", "registry")
   )
   expect_length(formals(load_registry), 0L)
+  expect_identical(formals(trial_experiment)$generation_interface, "chat")
+  expect_identical(
+    formals(factorial_trial_experiment)$generation_interface,
+    "chat"
+  )
+  expect_identical(
+    formals(conversation_experiment)$generation_interface,
+    "chat"
+  )
+  expect_identical(
+    formals(adaptive_feedback_experiment)$generation_interface,
+    "chat"
+  )
 })

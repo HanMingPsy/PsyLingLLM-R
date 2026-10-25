@@ -17,6 +17,42 @@ report_once <- function(key, msg) {
   }
 }
 
+# Resolve an omitted experiment interface through Registry v2 while retaining
+# the historical chat fallback for legacy multi-interface registries.
+resolve_experiment_generation_interface <- function(
+    model_key,
+    generation_interface) {
+  if (!is.null(generation_interface)) {
+    return(generation_interface)
+  }
+
+  tryCatch(
+    {
+      resolve_registry_entry(
+        model_key = model_key,
+        generation_interface = NULL
+      )
+      NULL
+    },
+    registry_resolution_error = function(error) {
+      if (identical(error$reason, "model_not_found")) {
+        return(NULL)
+      }
+      if (!identical(error$reason, "ambiguous_interface")) {
+        stop(error)
+      }
+
+      # Registry v1 experiment functions historically defaulted to chat.
+      # Verify that chat exists before retaining that compatibility behavior.
+      resolve_registry_entry(
+        model_key = model_key,
+        generation_interface = "chat"
+      )
+      "chat"
+    }
+  )
+}
+
 #' Validate experiment configuration and resolve API URL
 #'
 #' Applies PsyLingLLM's registry-first rules:
@@ -33,7 +69,8 @@ report_once <- function(key, msg) {
 #' @param data data.frame/tibble. Must contain columns in \code{required_cols}.
 #' @param required_cols Character vector. Columns that must be present in \code{data}.
 #' @param registry Ignored (kept for backward compatibility).
-#' @param generation_interface Character(1). Interface to validate, default "chat".
+#' @param generation_interface Character(1) or \code{NULL}. Interface to
+#'   validate. \code{NULL} selects the Registry default.
 #'
 #' @return Invisibly returns a list with resolved fields:
 #'   \code{list(api_key, api_url, model_key, provider, generation_interface)}.
