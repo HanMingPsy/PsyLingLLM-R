@@ -20,12 +20,14 @@ previous submission was not accepted. In this version I:
 The exact resubmission source tarball passes the complete local Windows R 4.5.1
 check with:
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
 
 This run used `R CMD check --as-cran` with CRAN incoming remote checks disabled.
 It included package installation, examples, the complete offline test suite,
 and PDF and HTML manual generation. Normal checks do not use provider
-credentials or make live model API requests.
+credentials or make live model API requests. The only note was "unable to
+verify current time", because the local runner could not complete the external
+clock comparison; it is unrelated to package contents.
 
 An additional `R CMD check --as-cran` run with CRAN incoming remote checks
 enabled completed with 0 errors, 0 warnings, and 2 notes:
