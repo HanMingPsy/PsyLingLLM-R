@@ -6,6 +6,10 @@
 \usage{
 normalize_registry_entry(entry, model_key, generation_interface)
 }
+\value{
+A normalized compatibility registry-entry list containing model,
+  interface, provider, input, output, streaming, and reasoning fields.
+}
 \description{
 Backward-compatible alias kept for older tests/fixtures that call this directly.
 Prefer the closure `normalize_registry_entry()` inside `get_registry_entry()`.

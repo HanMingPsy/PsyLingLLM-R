@@ -6,6 +6,10 @@
 \usage{
 unwrap_typed_defaults(lst)
 }
+\value{
+A named list of unwrapped R values. Empty or non-list input returns
+  an empty list.
+}
 \description{
 Unwrap typed optional_defaults (value/type) back to R types
 }

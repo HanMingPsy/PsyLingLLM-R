@@ -1,6 +1,8 @@
 #' Safe excerpt for logs
 #' @param x character
 #' @param n max chars
+#' @return A character scalar containing at most `n` characters, followed by
+#'   an ellipsis when truncated. Missing or empty input returns `""`.
 #' @keywords internal
 trim_excerpt <- function(x, n = 160) {
   if (is.null(x) || !length(x)) return("")
@@ -161,6 +163,8 @@ stream_reconstruct_text <- function(raw_json, path) {
 
 
 #' Escape replacement string for gsub(perl=TRUE) (escapes '\' and '$')
+#' @return A character scalar safe for use as a Perl-style replacement string,
+#'   or `""` when `x` is not a non-missing character scalar.
 #' @keywords internal
 escape_replacement <- function(x) {
   if (!is_scalar_chr(x)) return("")
@@ -172,6 +176,8 @@ escape_replacement <- function(x) {
 
 
 #' Return TRUE if x is a length-1, non-NA character
+#' @return A logical scalar indicating whether `x` is one non-missing
+#'   character value.
 #' @keywords internal
 is_scalar_chr <- function(x) {
   is.character(x) && length(x) == 1L && !is.na(x)
@@ -234,6 +240,8 @@ load_registry <- function() {
 
 
 #' Detect parameter type for registry storage
+#' @return A character scalar: `"logical"`, `"numeric"`, `"character"`,
+#'   `"list"`, or `"unknown"`.
 #' @keywords internal
 detect_param_type <- function(x) {
   if (is.logical(x)) return("logical")
@@ -244,6 +252,8 @@ detect_param_type <- function(x) {
 }
 
 #' Wrap parameters with type info for registry
+#' @return A named list whose elements contain `value` and `type` fields. Empty
+#'   input returns an empty list.
 #' @keywords internal
 wrap_typed_defaults <- function(lst) {
   if (is.null(lst) || !length(lst)) return(list())
@@ -256,6 +266,8 @@ wrap_typed_defaults <- function(lst) {
 }
 
 #' Unwrap typed optional_defaults (value/type) back to R types
+#' @return A named list of unwrapped R values. Empty or non-list input returns
+#'   an empty list.
 #' @keywords internal
 unwrap_typed_defaults <- function(lst) {
   if (!is.list(lst) || !length(lst)) return(list())

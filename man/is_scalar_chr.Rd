@@ -6,6 +6,10 @@
 \usage{
 is_scalar_chr(x)
 }
+\value{
+A logical scalar indicating whether `x` is one non-missing
+  character value.
+}
 \description{
 Return TRUE if x is a length-1, non-NA character
 }

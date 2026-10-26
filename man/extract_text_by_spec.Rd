@@ -6,6 +6,10 @@
 \usage{
 extract_text_by_spec(obj, path_spec)
 }
+\value{
+A character vector extracted from the first matching path, or `""`
+  when no path matches.
+}
 \description{
 Extract text by registry path spec (flat-key with optional ".." wildcard)
 }

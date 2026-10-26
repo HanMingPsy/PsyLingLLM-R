@@ -11,6 +11,10 @@ trim_excerpt(x, n = 160)
 
 \item{n}{max chars}
 }
+\value{
+A character scalar containing at most `n` characters, followed by
+  an ellipsis when truncated. Missing or empty input returns `""`.
+}
 \description{
 Safe excerpt for logs
 }

@@ -6,6 +6,10 @@
 \usage{
 do_stream_request(url, headers, json_payload, timeout = 120, debug = FALSE)
 }
+\value{
+A named transport-result list containing status, headers, collected
+  stream events and text, and any transport error.
+}
 \description{
 Minimal SSE streaming POST (registry-strict headers)
 }

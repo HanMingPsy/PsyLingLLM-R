@@ -6,6 +6,10 @@
 \usage{
 segment_hit_count(segs, vocab)
 }
+\value{
+A non-negative integer scalar containing the number of vocabulary
+  entries found in `segs`.
+}
 \description{
 Count keyword hits by exact segment match (no substrings)
 }

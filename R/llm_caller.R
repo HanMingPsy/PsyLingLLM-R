@@ -200,6 +200,9 @@ build_user_content <- function(trial_prompt, material) {
 }
 
 #' Resolve optionals tri-state at call site
+#' @return A list containing registry defaults when `optionals` was omitted,
+#'   the supplied list when provided, or an empty list for explicit `NULL` or
+#'   invalid input.
 #' @keywords internal
 resolve_optionals_tristate <- function(optionals_missing, optionals_value, defaults = list()) {
   if (isTRUE(optionals_missing)) {

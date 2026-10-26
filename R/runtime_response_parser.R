@@ -862,6 +862,8 @@ validate_llm_parsed_response <- function(response, parser_id = NULL) {
 }
 
 #' Extract text by registry path spec (flat-key with optional ".." wildcard)
+#' @return A character vector extracted from the first matching path, or `""`
+#'   when no path matches.
 #' @keywords internal
 extract_text_by_spec <- function(obj, path_spec) {
   nr <- normalize_path_key_with_regex(path_spec)

@@ -6,6 +6,9 @@
 \usage{
 extract_segments(path, key)
 }
+\value{
+A character vector of unique lowercase path and key segments.
+}
 \description{
 Extract lowercase dot-level segments from a path/key
 }

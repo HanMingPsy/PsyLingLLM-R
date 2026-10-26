@@ -6,6 +6,10 @@
 \usage{
 wrap_typed_defaults(lst)
 }
+\value{
+A named list whose elements contain `value` and `type` fields. Empty
+  input returns an empty list.
+}
 \description{
 Wrap parameters with type info for registry
 }

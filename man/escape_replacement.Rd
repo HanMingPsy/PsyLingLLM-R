@@ -6,6 +6,10 @@
 \usage{
 escape_replacement(x)
 }
+\value{
+A character scalar safe for use as a Perl-style replacement string,
+  or `""` when `x` is not a non-missing character scalar.
+}
 \description{
 Escape replacement string for gsub(perl=TRUE) (escapes '\' and '$')
 }

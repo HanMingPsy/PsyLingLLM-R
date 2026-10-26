@@ -6,6 +6,10 @@
 \usage{
 detect_param_type(x)
 }
+\value{
+A character scalar: `"logical"`, `"numeric"`, `"character"`,
+  `"list"`, or `"unknown"`.
+}
 \description{
 Detect parameter type for registry storage
 }

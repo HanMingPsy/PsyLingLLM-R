@@ -6,6 +6,10 @@
 \usage{
 has_reasoning_segment(segs)
 }
+\value{
+A logical scalar indicating whether `segs` contains a recognized
+  reasoning segment.
+}
 \description{
 Reasoning segment flag (any think-ish segment present)
 }

@@ -10,6 +10,11 @@ resolve_optionals_tristate(
   defaults = list()
 )
 }
+\value{
+A list containing registry defaults when `optionals` was omitted,
+  the supplied list when provided, or an empty list for explicit `NULL` or
+  invalid input.
+}
 \description{
 Resolve optionals tri-state at call site
 }

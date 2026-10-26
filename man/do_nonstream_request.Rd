@@ -6,6 +6,11 @@
 \usage{
 do_nonstream_request(url, headers, json_payload, timeout = 120, debug = FALSE)
 }
+\value{
+A named transport-result list containing status, headers, raw and
+  decoded response content, parsed JSON and parse diagnostics, and any
+  transport error.
+}
 \description{
 Minimal non-streaming POST (registry-strict headers)
 }

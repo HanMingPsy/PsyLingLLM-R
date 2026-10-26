@@ -467,6 +467,8 @@ score_candidates_st <- function(raw_df,
 
 
 #' Count keyword hits by exact segment match (no substrings)
+#' @return A non-negative integer scalar containing the number of vocabulary
+#'   entries found in `segs`.
 #' @keywords internal
 segment_hit_count <- function(segs, vocab) {
   if (!length(segs) || !length(vocab)) return(0L)
@@ -475,6 +477,7 @@ segment_hit_count <- function(segs, vocab) {
 
 
 #' Extract lowercase dot-level segments from a path/key
+#' @return A character vector of unique lowercase path and key segments.
 #' @keywords internal
 extract_segments <- function(path, key) {
   p <- tolower(as.character(path %||% ""))
@@ -486,6 +489,8 @@ extract_segments <- function(path, key) {
 
 
 #' Reasoning segment flag (any think-ish segment present)
+#' @return A logical scalar indicating whether `segs` contains a recognized
+#'   reasoning segment.
 #' @keywords internal
 has_reasoning_segment <- function(segs) {
   reason_segs <- c("reasoning", "reasoning_content", "thinking", "thought",

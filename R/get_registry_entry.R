@@ -111,6 +111,8 @@ registry_project_compatibility_entry <- function(bundle, resolved) {
 #'
 #' Backward-compatible alias kept for older tests/fixtures that call this directly.
 #' Prefer the closure `normalize_registry_entry()` inside `get_registry_entry()`.
+#' @return A normalized compatibility registry-entry list containing model,
+#'   interface, provider, input, output, streaming, and reasoning fields.
 #' @keywords internal
 normalize_registry_entry <- function(entry, model_key, generation_interface) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a

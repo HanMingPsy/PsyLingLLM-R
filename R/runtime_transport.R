@@ -469,6 +469,9 @@ escape_unescaped_json_control_bytes <- function(body) {
 # Compatibility executors retained for existing internal mocks.
 #
 #' Minimal non-streaming POST (registry-strict headers)
+#' @return A named transport-result list containing status, headers, raw and
+#'   decoded response content, parsed JSON and parse diagnostics, and any
+#'   transport error.
 #' @keywords internal
 do_nonstream_request <- function(url,
                                  headers,
@@ -526,6 +529,8 @@ do_nonstream_request <- function(url,
 }
 
 #' Minimal SSE streaming POST (registry-strict headers)
+#' @return A named transport-result list containing status, headers, collected
+#'   stream events and text, and any transport error.
 #' @keywords internal
 do_stream_request <- function(url,
                               headers,
