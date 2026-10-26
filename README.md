@@ -1013,6 +1013,7 @@ Core output fields include:
 | `FirstTokenLatency` | Time to first streamed token when available |
 | `PromptTokens`, `CompletionTokens` | Provider-reported usage when available |
 | `TrialStatus` | `SUCCESS`, `ERROR`, or `TIMEOUT` |
+| `ResponseStatus` | Normalized response outcome such as `OK`, `EMPTY_RESPONSE`, or `PARSE_ERROR` |
 | `Streaming` | Whether streaming transport was used |
 | `Timestamp`, `RequestID` | Completion time and provider request identifier |
 
@@ -1485,8 +1486,9 @@ Experiment functions convert these outcomes into `TrialStatus = "ERROR"` or
 Runtime diagnostics redact secret-like fields, but `return_raw = TRUE` may
 still contain submitted research material and provider-generated content.
 `trial_experiment()`, `factorial_trial_experiment()`,
-`conversation_experiment()`, and `adaptive_feedback_experiment()` retain these
-records in a `raw` list-column with one element per result row.
+`conversation_experiment()`, `adaptive_feedback_experiment()`, and
+`multi_model_experiment()` retain these records in a `raw` list-column with one
+element per result row.
 
 ```r
 result <- trial_experiment(
@@ -1526,6 +1528,77 @@ not create task-specific measures such as `LogProbY`, `LogProbN`, or
 `YNLogOdds`. Request provider-native fields explicitly through `optionals` or
 `...`, then derive task-specific contrasts from the preserved evidence using a
 documented analysis rule. Do not publish RAW output without review.
+
+#### Process metrics and token probabilities
+
+Process evidence is extracted from the row-aligned RAW records rather than
+added automatically to the ordinary result table. First request the fields
+supported by the selected provider and interface. For example, an
+OpenAI-compatible Chat interface may accept:
+
+```r
+result <- trial_experiment(
+  model_key = "deepseek-flash",
+  api_key = Sys.getenv("DEEPSEEK_API_KEY"),
+  data = data.frame(Material = "Reply with Y or N."),
+  return_raw = TRUE,
+  raw_output_path = "experiment-with-raw.rds",
+  optionals = list(
+    max_tokens = 512L,
+    logprobs = TRUE,
+    top_logprobs = 20L
+  )
+)
+```
+
+Provider-native parameters are forwarded without renaming. Their names,
+allowed values, and availability depend on the resolved interface; PsyLingLLM
+does not silently enable log probabilities or substitute one provider's
+parameter for another.
+
+Create one standardized summary row per result row with:
+
+```r
+process_metrics <- extract_process_metrics(result)
+
+process_metrics[c(
+  "ResultRow", "RequestID", "ReasoningTokens",
+  "ReasoningTokensAvailable", "AnswerToken", "AnswerLogProb",
+  "LogprobsAvailable", "ProcessMetricsStatus"
+)]
+```
+
+`ReasoningTokensAvailable` and `LogprobsAvailable` distinguish unavailable
+evidence from a measured zero. Unsupported, unrequested, missing, or malformed
+fields remain `NA` or unavailable; they are never fabricated.
+
+Convert supported token-level evidence to a provider-neutral long table with:
+
+```r
+token_probabilities <- extract_token_probabilities(result)
+
+token_probabilities[c(
+  "ResultRow", "RequestID", "Channel", "TokenPosition",
+  "CandidateRank", "Selected", "Token", "TokenBytes",
+  "LogProb", "Probability"
+)]
+```
+
+Each row represents a generated token or a returned alternative candidate.
+`Selected` identifies the generated token, `Channel` distinguishes answer and
+reasoning evidence when the provider exposes both, and `TokenBytes` preserves
+provider byte metadata as a portable text field. `Probability` is
+`exp(LogProb)` and is not renormalized over the returned top-k candidates. If
+log probabilities were not requested or are unavailable, the extractor returns
+an empty table rather than inventing candidate probabilities.
+
+These extractors are task-neutral. Contrasts such as Y versus N, A versus B,
+or multilingual response sets should be derived explicitly from the long table
+with documented matching and censoring rules. A candidate absent from the
+provider's returned top-k set is missing or censored evidence, not probability
+zero. Keep the RDS archive for later re-analysis; spreadsheets contain only
+ordinary results plus linkage metadata, not the full process tables or nested
+provider payload.
 
 #### Reproducibility record
 
