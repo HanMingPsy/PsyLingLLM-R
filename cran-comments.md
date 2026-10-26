@@ -43,17 +43,17 @@ checks passed in that run.
 ## Test environments
 
 - Local Windows 11, R 4.5.1, `R CMD check --as-cran` (current source tarball)
-- GitHub Actions macOS, R release (current source, commit `de07bfb`)
-- GitHub Actions Windows, R release (current source, commit `de07bfb`)
-- GitHub Actions Ubuntu, R-devel (current source, commit `de07bfb`)
-- GitHub Actions Ubuntu, R release (current source, commit `de07bfb`)
-- GitHub Actions Ubuntu, R oldrel-1 (current source, commit `de07bfb`)
+- GitHub Actions macOS, R release (current source, commit `619677a`)
+- GitHub Actions Windows, R release (current source, commit `619677a`)
+- GitHub Actions Ubuntu, R-devel (current source, commit `619677a`)
+- GitHub Actions Ubuntu, R release (current source, commit `619677a`)
+- GitHub Actions Ubuntu, R oldrel-1 (current source, commit `619677a`)
 - Win-builder Windows Server 2022, R-devel r90539 (earlier 0.4.0 release
   candidate)
 
 All five current-source GitHub Actions jobs passed, including package examples
 and tests. The run is available at:
-<https://github.com/HanMingPsy/PsyLingLLM-R/actions/runs/40290523985>.
+<https://github.com/HanMingPsy/PsyLingLLM-R/actions/runs/40299656747>.
 The earlier Win-builder candidate also passed its PDF and HTML manual checks.
 
 ## CRAN incoming notes
