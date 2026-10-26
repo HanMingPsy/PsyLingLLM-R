@@ -497,7 +497,7 @@ directory.
 | Argument | Purpose and behavior |
 |---|---|
 | `model_key` | Registry key for the model or deployment |
-| `generation_interface` | Friendly interface label or exact versioned interface ID; defaults to `"chat"` |
+| `generation_interface` | Friendly interface label or exact versioned interface ID. When omitted or `NULL`, use the model's Registry default; an explicit value forces that interface. The displayed `"chat"` function default is retained for signature compatibility |
 | `api_key` | Runtime credential; never store it in materials or Registry YAML |
 | `api_url` | Optional complete endpoint override for a proxy, workspace, deployment, or local server |
 | `data` | Data frame or tibble containing `Material`; use a list-generation helper to load CSV/XLSX first |
@@ -513,7 +513,16 @@ directory.
 | `delay` | Pause in seconds after each request |
 | `output_path` | Result filename or directory; `NULL` uses the timestamped user results directory |
 | `overwrite` | Whether an existing explicit result file may be replaced |
-| `return_raw` | Retains one redacted provider RAW object per result row. CSV remains flat; XLSX adds a path-based `Raw` sheet; use `saveRDS()` for lossless nested evidence |
+| `return_raw` | Retains one redacted provider RAW object per result row in the returned object's `raw` list-column. Ordinary CSV and Excel result tables remain flat |
+| `raw_output_path` | Optional `.rds` path used with `return_raw = TRUE` for automatic lossless archival. Excel output then adds compact `RawIndex` and `RawMetadata` sheets that link rows to the RDS archive |
+
+Omitting `generation_interface` lets each model use its declared Registry
+default. For example, the bundled Registry routes `gpt-5.6-luna` through
+OpenAI Responses, `gpt-4o` through OpenAI Chat Completions, and
+`deepseek-flash` through the DeepSeek Chat interface. Existing scripts that
+explicitly pass `"chat"`, `"responses"`, or a versioned interface ID continue
+to force that route. Legacy Registry v1 models with multiple interfaces retain
+the historical Chat fallback when no unambiguous default is available.
 
 `trial_experiment()` and `factorial_trial_experiment()` default `optionals` to
 `NULL`, so they do not inject Registry optional defaults. The conversation
@@ -1035,9 +1044,10 @@ save_experiment_results(
 ```
 
 CSV output uses an Excel-compatible UTF-8 encoding. XLS/XLSX output uses
-`writexl`. Columns containing only missing or empty values may be removed from
-the saved file; keep the in-memory object when the full schema is needed for
-programmatic checks.
+`writexl`. Package-defined result columns remain present even when every value
+is unavailable, so streaming and non-streaming files retain a stable schema.
+Other non-standard columns containing only missing or empty values may be
+removed; keep the in-memory object when every input column must be preserved.
 
 ### Function guide
 
@@ -1052,6 +1062,9 @@ The main user-facing workflow functions are:
 | `conversation_experiment_with_feedback()` | Backward-compatible alias for `adaptive_feedback_experiment()` |
 | `multi_model_experiment()` | Run one trial design across Registry model rows |
 | `llm_caller()` | Make one normalized request without an experiment table |
+| `get_trial_raw()` | Retrieve one row-aligned RAW record from an in-memory result or RDS archive |
+| `extract_process_metrics()` | Create one provider-neutral process-metric summary row per trial |
+| `extract_token_probabilities()` | Convert supported token-logprob evidence into a long analysis table |
 | `generate_llm_experiment_list()` | Inspect, repeat, randomize, and optionally save an ordinary trial list |
 | `generate_llm_factorial_experiment_list()` | Inspect and save a factorial expansion before API calls |
 | `save_experiment_results()` | Save a result data frame as CSV or Excel |
@@ -1481,18 +1494,32 @@ result <- trial_experiment(
   api_key = Sys.getenv("DEEPSEEK_API_KEY"),
   data = data.frame(Material = "Reply with Y or N."),
   output_path = "experiment.xlsx",
-  return_raw = TRUE
+  return_raw = TRUE,
+  raw_output_path = "experiment-with-raw.rds"
 )
 
 stopifnot(length(result$raw) == nrow(result))
-saveRDS(result, "experiment-with-raw.rds")
+
+archived_result <- readRDS("experiment-with-raw.rds")
+first_raw_record <- get_trial_raw(archived_result, trial = 1L)
+process_metrics <- extract_process_metrics(archived_result)
+token_probabilities <- extract_token_probabilities(archived_result)
 ```
 
-CSV output never serializes the nested `raw` column. XLSX output keeps the
-ordinary result in `Results` and writes a redacted field-path projection to
-`Raw` (continued as `Raw_2`, and so on, if necessary). The spreadsheet view is
-for inspection; the RDS object is the lossless archival form. Standard result
-columns such as `FirstTokenLatency` remain present with `NA` when unavailable.
+CSV output never serializes the nested `raw` column. XLSX output keeps ordinary
+trial data in `Results`. When `raw_output_path` is supplied, the workbook also
+contains `RawIndex`, which links result rows to RAW records, and `RawMetadata`,
+which identifies the associated RDS archive. Provider payloads are not copied
+into spreadsheet cells; the RDS object is the lossless archival form.
+
+Automatic RDS persistence is optional. Existing workflows may omit
+`raw_output_path` and continue to call
+`saveRDS(result, "experiment-with-raw.rds")` explicitly. `get_trial_raw()`
+retrieves one archived record, while `extract_process_metrics()` and
+`extract_token_probabilities()` create provider-neutral analysis tables from
+supported RAW fields. Missing or unrequested metrics remain unavailable rather
+than being inferred. Standard result columns such as `FirstTokenLatency`
+remain present with `NA` when unavailable.
 
 The package does not automatically request provider log probabilities and does
 not create task-specific measures such as `LogProbY`, `LogProbN`, or

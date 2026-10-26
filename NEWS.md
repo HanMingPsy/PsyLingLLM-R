@@ -31,8 +31,21 @@
   created explicitly, and failed writes no longer report false success.
 - Restored one-to-one RAW evidence retention across trial, factorial,
   conversation, adaptive-feedback, and multi-model experiment results. CSV
-  output remains flat, XLSX output can include a redacted path-based RAW view,
-  and complete nested results remain compatible with `saveRDS()`.
+  and ordinary Excel result tables remain flat. The optional
+  `raw_output_path` writes a lossless, redacted RDS archive; Excel output then
+  adds compact `RawIndex` and `RawMetadata` sheets without embedding provider
+  payloads in cells. Existing explicit `saveRDS()` workflows remain supported.
+- Added `get_trial_raw()`, `extract_process_metrics()`, and
+  `extract_token_probabilities()` for provider-neutral inspection and analysis
+  of supported reasoning-token, usage, and token-logprob evidence.
+- Changed omitted experiment-level `generation_interface` arguments to use the
+  model's Registry default interface. Explicit interface values remain strict,
+  public function signatures retain their historical displayed defaults, and
+  ambiguous Registry v1 models retain the historical Chat fallback.
+- Decode non-stream provider response bytes explicitly as UTF-8 before strict
+  JSON parsing. The existing control-byte recovery remains a secondary,
+  auditable fallback, and other malformed JSON remains a structured parser
+  error.
 - Added a narrow, auditable recovery path for otherwise valid provider JSON
   containing unescaped control bytes inside strings. Original response bytes
   remain available in RAW diagnostics; other malformed JSON remains a
